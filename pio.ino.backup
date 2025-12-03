@@ -1,0 +1,592 @@
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
+#include "Adafruit_VL53L0X.h"
+#include <WiFi.h>
+#include <WebServer.h>
+
+// WiFi credentials - CHANGE THESE
+const char* ssid = "Calculator";
+const char* password = "sage312@";
+
+// Access Point settings (used if WiFi connection fails)
+const char* ap_ssid = "RoboEyes";
+const char* ap_password = "roboeyes123";  // Min 8 characters, or "" for open
+
+WebServer server(80);
+
+#define i2c_Address 0x3c
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+
+Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_VL53L0X lox = Adafruit_VL53L0X();
+
+#include "RoboEyes/src/FluxGarage_RoboEyes.h"
+RoboEyes<Adafruit_SH1106G> roboEyes(display);
+
+String inputBuffer = "";
+bool tofAvailable = false;
+bool wasClose = false;
+unsigned long lastTofRead = 0;
+unsigned long happyStartTime = 0;
+bool isHappy = false;
+const unsigned long TOF_INTERVAL = 100;
+const unsigned long HAPPY_DURATION = 2000;
+const int HAPPY_DISTANCE_CM = 15;
+
+void resetEffects() {
+  roboEyes.setCuriosity(OFF);
+  roboEyes.setHFlicker(OFF);
+  roboEyes.setVFlicker(OFF);
+  roboEyes.setSweat(OFF);
+  roboEyes.setIdleMode(OFF);
+  roboEyes.setEyebrows(false);
+}
+
+void printHelp() {
+  Serial.println(F("\n=== RoboEyes Serial Commands ==="));
+  Serial.println(F("EXPRESSIONS:"));
+  Serial.println(F("  happy    - Happy expression with smile"));
+  Serial.println(F("  sad      - Tired/sad expression"));
+  Serial.println(F("  angry    - Angry expression"));
+  Serial.println(F("  surprised- Surprised wide eyes"));
+  Serial.println(F("  confused - Confused shaking"));
+  Serial.println(F("  sleepy   - Sleepy/drowsy look"));
+  Serial.println(F("  curious  - Curious scanning"));
+  Serial.println(F("  nervous  - Nervous with sweat"));
+  Serial.println(F("  love     - Heart eyes with blush"));
+  Serial.println(F("  raised   - Raised eyebrows"));
+  Serial.println(F("  neutral  - Default neutral"));
+  Serial.println(F("  idle     - Relaxed idle mode"));
+  Serial.println(F("\nMOUTH:"));
+  Serial.println(F("  smile    - Smiling mouth"));
+  Serial.println(F("  frown    - Sad/frown mouth"));
+  Serial.println(F("  open     - Open mouth (surprised)"));
+  Serial.println(F("  ooo      - Small 'ooo' mouth"));
+  Serial.println(F("  flat     - Neutral flat mouth"));
+  Serial.println(F("  talk     - Talking animation"));
+  Serial.println(F("  chew     - Chewing animation"));
+  Serial.println(F("  wobble   - Wobble mouth animation"));
+  Serial.println(F("\nACTIONS:"));
+  Serial.println(F("  blink    - Blink once"));
+  Serial.println(F("  wink     - Wink left eye (squint right)"));
+  Serial.println(F("  winkr    - Wink right eye (squint left)"));
+  Serial.println(F("  laugh    - Laugh animation"));
+  Serial.println(F("  cry      - Crying with tears"));
+  Serial.println(F("  knocked  - Dizzy spiral eyes"));
+  Serial.println(F("\nPOSITIONS:"));
+  Serial.println(F("  center, n, ne, e, se, s, sw, w, nw"));
+  Serial.println(F("\nTOGGLES:"));
+  Serial.println(F("  sweat    - Toggle sweat drops"));
+  Serial.println(F("  cyclops  - Toggle cyclops mode"));
+  Serial.println(F("================================\n"));
+}
+
+void handleCommand(String cmd) {
+  cmd.trim();
+  cmd.toLowerCase();
+  
+  if (cmd.length() == 0) return;
+  
+  Serial.print(F("> "));
+  Serial.println(cmd);
+
+  // === EXPRESSIONS ===
+  if (cmd == "happy") {
+    resetEffects();
+    roboEyes.setMood(HAPPY);
+    roboEyes.setPosition(DEFAULT);
+    roboEyes.anim_laugh();
+    roboEyes.setMouthType(1);  // Smile
+    Serial.println(F("Expression: Happy"));
+  }
+  else if (cmd == "sad") {
+    resetEffects();
+    roboEyes.setMood(TIRED);
+    roboEyes.setPosition(DEFAULT);
+    roboEyes.setMouthType(2);  // Frown
+    Serial.println(F("Expression: Sad"));
+  }
+  else if (cmd == "angry") {
+    resetEffects();
+    roboEyes.setMood(ANGRY);
+    roboEyes.setPosition(DEFAULT);
+    roboEyes.setMouthType(5);  // Flat line
+    Serial.println(F("Expression: Angry"));
+  }
+  else if (cmd == "love") {
+    resetEffects();
+    roboEyes.anim_love();  // Timed animation like laugh/confused
+    roboEyes.setMood(HAPPY);
+    roboEyes.setPosition(DEFAULT);
+    roboEyes.setMouthType(3);  // Open happy mouth
+    Serial.println(F("Expression: Love"));
+  }
+  else if (cmd == "surprised") {
+    resetEffects();
+    roboEyes.setMood(DEFAULT);
+    roboEyes.setCuriosity(ON);
+    roboEyes.setPosition(N);
+    roboEyes.blink();
+    roboEyes.setMouthType(3);  // Open
+    Serial.println(F("Expression: Surprised"));
+  }
+  else if (cmd == "confused") {
+    resetEffects();
+    roboEyes.setMood(DEFAULT);
+    roboEyes.anim_confused();
+    roboEyes.setMouthType(4);  // Small ooo
+    Serial.println(F("Expression: Confused"));
+  }
+  else if (cmd == "sleepy") {
+    resetEffects();
+    roboEyes.setMood(TIRED);
+    roboEyes.setPosition(SW);
+    roboEyes.setMouthType(5);  // Flat
+    Serial.println(F("Expression: Sleepy"));
+  }
+  else if (cmd == "curious") {
+    resetEffects();
+    roboEyes.setMood(DEFAULT);
+    roboEyes.setCuriosity(ON);
+    roboEyes.setPosition(E);
+    roboEyes.setMouthType(4);  // Small
+    Serial.println(F("Expression: Curious"));
+  }
+  else if (cmd == "nervous") {
+    resetEffects();
+    roboEyes.setMood(DEFAULT);
+    roboEyes.setSweat(ON);
+    roboEyes.setCuriosity(ON);
+    roboEyes.setPosition(NW);
+    roboEyes.setMouthType(2);  // Worried frown
+    Serial.println(F("Expression: Nervous"));
+  }
+  else if (cmd == "neutral" || cmd == "normal" || cmd == "reset") {
+    resetEffects();
+    roboEyes.setMood(DEFAULT);
+    roboEyes.setPosition(DEFAULT);
+    roboEyes.setMouthType(1);  // Smile
+    Serial.println(F("Expression: Neutral"));
+  }
+  else if (cmd == "idle") {
+    resetEffects();
+    roboEyes.setMood(DEFAULT);
+    roboEyes.setIdleMode(ON, 1, 2);
+    roboEyes.setPosition(DEFAULT);
+    roboEyes.setMouthType(1);  // Smile
+    Serial.println(F("Mode: Idle (random looking)"));
+  }
+  else if (cmd == "raised") {
+    resetEffects();
+    roboEyes.setEyebrows(true);
+    roboEyes.setMood(DEFAULT);
+    roboEyes.setPosition(DEFAULT);
+    roboEyes.setMouthType(4);  // Small ooo
+    Serial.println(F("Expression: Raised eyebrows"));
+  }
+
+  // === MOUTH ===
+  else if (cmd == "smile") {
+    roboEyes.setMouthType(1);
+    Serial.println(F("Mouth: Smile"));
+  }
+  else if (cmd == "frown") {
+    roboEyes.setMouthType(2);
+    Serial.println(F("Mouth: Frown"));
+  }
+  else if (cmd == "open") {
+    roboEyes.setMouthType(3);
+    Serial.println(F("Mouth: Open"));
+  }
+  else if (cmd == "ooo") {
+    roboEyes.setMouthType(4);
+    Serial.println(F("Mouth: Ooo"));
+  }
+  else if (cmd == "flat") {
+    roboEyes.setMouthType(5);
+    Serial.println(F("Mouth: Flat"));
+  }
+  else if (cmd == "talk") {
+    roboEyes.startMouthAnim(1, 3000);  // Talk for 3 seconds
+    Serial.println(F("Mouth: Talking"));
+  }
+  else if (cmd == "chew") {
+    roboEyes.startMouthAnim(2, 2000);  // Chew for 2 seconds
+    Serial.println(F("Mouth: Chewing"));
+  }
+  else if (cmd == "wobble") {
+    roboEyes.startMouthAnim(3, 2000);  // Wobble for 2 seconds
+    Serial.println(F("Mouth: Wobbling"));
+  }
+
+  // === ACTIONS ===
+  else if (cmd == "blink") {
+    roboEyes.blink();
+    Serial.println(F("Action: Blink"));
+  }
+  else if (cmd == "wink") {
+    roboEyes.wink(true);  // Wink left eye
+    roboEyes.setMouthType(1);  // Cheeky smile
+    Serial.println(F("Action: Wink"));
+  }
+  else if (cmd == "winkr") {
+    roboEyes.wink(false);  // Wink right eye
+    roboEyes.setMouthType(1);  // Cheeky smile
+    Serial.println(F("Action: Wink Right"));
+  }
+  else if (cmd == "laugh") {
+    roboEyes.anim_laugh();
+    Serial.println(F("Action: Laugh"));
+  }
+  else if (cmd == "cry") {
+    roboEyes.anim_cry();  // Tears falling animation
+    Serial.println(F("Action: Cry"));
+  }
+  else if (cmd == "knocked") {
+    roboEyes.anim_knocked();  // Spiral dizzy eyes
+    roboEyes.setMouthType(4);  // Small ooo
+    Serial.println(F("Action: Knocked"));
+  }
+
+  // === POSITIONS ===
+  else if (cmd == "center") {
+    roboEyes.setPosition(DEFAULT);
+    Serial.println(F("Position: Center"));
+  }
+  else if (cmd == "n" || cmd == "up") {
+    roboEyes.setPosition(N);
+    Serial.println(F("Position: North"));
+  }
+  else if (cmd == "ne") {
+    roboEyes.setPosition(NE);
+    Serial.println(F("Position: North-East"));
+  }
+  else if (cmd == "e" || cmd == "right") {
+    roboEyes.setPosition(E);
+    Serial.println(F("Position: East"));
+  }
+  else if (cmd == "se") {
+    roboEyes.setPosition(SE);
+    Serial.println(F("Position: South-East"));
+  }
+  else if (cmd == "s" || cmd == "down") {
+    roboEyes.setPosition(S);
+    Serial.println(F("Position: South"));
+  }
+  else if (cmd == "sw") {
+    roboEyes.setPosition(SW);
+    Serial.println(F("Position: South-West"));
+  }
+  else if (cmd == "w" || cmd == "left") {
+    roboEyes.setPosition(W);
+    Serial.println(F("Position: West"));
+  }
+  else if (cmd == "nw") {
+    roboEyes.setPosition(NW);
+    Serial.println(F("Position: North-West"));
+  }
+
+  // === TOGGLES ===
+  else if (cmd == "sweat") {
+    static bool sweatOn = false;
+    sweatOn = !sweatOn;
+    roboEyes.setSweat(sweatOn);
+    Serial.print(F("Sweat: "));
+    Serial.println(sweatOn ? F("ON") : F("OFF"));
+  }
+  else if (cmd == "cyclops") {
+    static bool cyclopsOn = false;
+    cyclopsOn = !cyclopsOn;
+    roboEyes.setCyclops(cyclopsOn);
+    Serial.print(F("Cyclops: "));
+    Serial.println(cyclopsOn ? F("ON") : F("OFF"));
+  }
+
+  // === HELP ===
+  else if (cmd == "help" || cmd == "?") {
+    printHelp();
+  }
+  else {
+    Serial.print(F("Unknown command: "));
+    Serial.println(cmd);
+    Serial.println(F("Type 'help' for commands"));
+  }
+}
+
+// Web page HTML
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RoboEyes Control</title>
+  <style>
+    body { font-family: Arial; background: #1a1a2e; color: #fff; margin: 0; padding: 20px; }
+    h1 { text-align: center; color: #00ff88; }
+    .section { background: #16213e; border-radius: 10px; padding: 15px; margin: 10px 0; }
+    .section h2 { margin-top: 0; color: #00d4ff; font-size: 16px; border-bottom: 1px solid #00d4ff; padding-bottom: 5px; }
+    .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .btn { background: #0f3460; border: none; color: #fff; padding: 12px 8px; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+    .btn:hover { background: #00ff88; color: #000; transform: scale(1.05); }
+    .btn:active { transform: scale(0.95); }
+    .btn.expression { background: #e94560; }
+    .btn.mouth { background: #533483; }
+    .btn.action { background: #f39c12; color: #000; }
+    .btn.position { background: #16a085; }
+    .pos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; max-width: 200px; margin: 0 auto; }
+    .status { text-align: center; color: #888; font-size: 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>🤖 RoboEyes</h1>
+  
+  <div class="section">
+    <h2>😊 Expressions</h2>
+    <div class="btn-grid">
+      <button class="btn expression" onclick="send('happy')">Happy</button>
+      <button class="btn expression" onclick="send('sad')">Sad</button>
+      <button class="btn expression" onclick="send('angry')">Angry</button>
+      <button class="btn expression" onclick="send('love')">Love</button>
+      <button class="btn expression" onclick="send('surprised')">Surprised</button>
+      <button class="btn expression" onclick="send('confused')">Confused</button>
+      <button class="btn expression" onclick="send('sleepy')">Sleepy</button>
+      <button class="btn expression" onclick="send('curious')">Curious</button>
+      <button class="btn expression" onclick="send('nervous')">Nervous</button>
+      <button class="btn expression" onclick="send('neutral')">Neutral</button>
+      <button class="btn expression" onclick="send('idle')">Idle</button>
+      <button class="btn expression" onclick="send('raised')">Raised</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>👄 Mouth</h2>
+    <div class="btn-grid">
+      <button class="btn mouth" onclick="send('smile')">Smile</button>
+      <button class="btn mouth" onclick="send('frown')">Frown</button>
+      <button class="btn mouth" onclick="send('open')">Open</button>
+      <button class="btn mouth" onclick="send('ooo')">Ooo</button>
+      <button class="btn mouth" onclick="send('flat')">Flat</button>
+      <button class="btn mouth" onclick="send('talk')">Talk</button>
+      <button class="btn mouth" onclick="send('chew')">Chew</button>
+      <button class="btn mouth" onclick="send('wobble')">Wobble</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>⚡ Actions</h2>
+    <div class="btn-grid">
+      <button class="btn action" onclick="send('blink')">Blink</button>
+      <button class="btn action" onclick="send('wink')">Wink L</button>
+      <button class="btn action" onclick="send('winkr')">Wink R</button>
+      <button class="btn action" onclick="send('laugh')">Laugh</button>
+      <button class="btn action" onclick="send('cry')">Cry</button>
+      <button class="btn action" onclick="send('knocked')">Knocked</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>👁️ Look Direction</h2>
+    <div class="pos-grid">
+      <button class="btn position" onclick="send('nw')">↖</button>
+      <button class="btn position" onclick="send('n')">↑</button>
+      <button class="btn position" onclick="send('ne')">↗</button>
+      <button class="btn position" onclick="send('w')">←</button>
+      <button class="btn position" onclick="send('center')">●</button>
+      <button class="btn position" onclick="send('e')">→</button>
+      <button class="btn position" onclick="send('sw')">↙</button>
+      <button class="btn position" onclick="send('s')">↓</button>
+      <button class="btn position" onclick="send('se')">↘</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🔧 Toggles</h2>
+    <div class="btn-grid">
+      <button class="btn" onclick="send('sweat')">Sweat</button>
+      <button class="btn" onclick="send('cyclops')">Cyclops</button>
+    </div>
+  </div>
+
+  <div class="status" id="status">Ready</div>
+
+  <script>
+    function send(cmd) {
+      document.getElementById('status').innerText = 'Sending: ' + cmd;
+      fetch('/cmd?c=' + cmd)
+        .then(r => r.text())
+        .then(t => { document.getElementById('status').innerText = t; })
+        .catch(e => { document.getElementById('status').innerText = 'Error: ' + e; });
+    }
+  </script>
+</body>
+</html>
+)rawliteral";
+
+// Web server handlers are set up in setup()
+
+void setup() {
+  Serial.begin(115200);
+  delay(250);
+  
+  // Initialize display first so we can show WiFi status
+  display.begin(i2c_Address, true);
+  roboEyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, 100);
+  roboEyes.setAutoblinker(ON, 3, 3);
+  
+  // Connect to WiFi
+  Serial.println(F("\nConnecting to WiFi..."));
+  WiFi.begin(ssid, password);
+  // ESP32-C3 Super Mini has antenna flaw - reduce TX power to fix WiFi
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
+  
+  int wifiAttempts = 0;
+  while (WiFi.status() != WL_CONNECTED && wifiAttempts < 30) {
+    delay(500);
+    Serial.print(".");
+    wifiAttempts++;
+    // Show connecting animation
+    roboEyes.setPosition(wifiAttempts % 2 == 0 ? E : W);
+    roboEyes.update();
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println(F("\nWiFi connected!"));
+    Serial.print(F("IP Address: "));
+    Serial.println(WiFi.localIP());
+    
+    // Happy face for connected
+    roboEyes.setMood(HAPPY);
+    roboEyes.setPosition(DEFAULT);
+  } else {
+    Serial.println(F("\nWiFi connection failed! Starting Access Point..."));
+    
+    // Disconnect from any previous WiFi and start Access Point
+    WiFi.disconnect(true);
+    delay(100);
+    WiFi.mode(WIFI_AP);
+    delay(100);
+    // Reduce TX power for AP mode too (ESP32-C3 Super Mini antenna fix)
+    WiFi.setTxPower(WIFI_POWER_8_5dBm);
+    
+    // Start Access Point (use empty string "" for open network if password issues)
+    bool apStarted = WiFi.softAP(ap_ssid, ap_password);
+    
+    if (apStarted) {
+      delay(500);  // Give AP time to start
+      Serial.println(F("✓ Access Point Started!"));
+      Serial.print(F("  SSID: "));
+      Serial.println(ap_ssid);
+      Serial.print(F("  Password: "));
+      Serial.println(ap_password);
+      Serial.print(F("  IP Address: "));
+      Serial.println(WiFi.softAPIP());
+    } else {
+      Serial.println(F("✗ Failed to start Access Point!"));
+    }
+    
+    // Curious face for AP mode
+    roboEyes.setCuriosity(ON);
+    roboEyes.setPosition(DEFAULT);
+  }
+  
+  // Setup web server routes (works for both STA and AP mode)
+  server.on("/", HTTP_GET, [](){
+    server.send_P(200, "text/html", index_html);
+  });
+  
+  server.on("/cmd", HTTP_GET, [](){
+    if (server.hasArg("c")) {
+      String cmd = server.arg("c");
+      handleCommand(cmd);
+      server.send(200, "text/plain", "OK: " + cmd);
+    } else {
+      server.send(400, "text/plain", "Missing command");
+    }
+  });
+  
+  server.onNotFound([](){
+    server.send(404, "text/plain", "Not found");
+  });
+  
+  server.begin();
+  Serial.println(F("Web server started!"));
+  
+  // Initialize TOF sensor
+  if (lox.begin()) {
+    tofAvailable = true;
+    Serial.println(F("VL53L0X TOF sensor ready!"));
+  } else {
+    Serial.println(F("VL53L0X not found, continuing without distance sensing"));
+  }
+  
+  roboEyes.setMood(DEFAULT);
+  roboEyes.setPosition(DEFAULT);
+  
+  Serial.println(F("\n*** RoboEyes Ready ***"));
+  Serial.println(F("Type 'help' for commands\n"));
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print(F("Web control: http://"));
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.print(F("Connect to WiFi '"));
+    Serial.print(ap_ssid);
+    Serial.print(F("' then go to: http://"));
+    Serial.println(WiFi.softAPIP());
+  }
+}
+
+void loop() {
+  // Handle web server requests
+  server.handleClient();
+  
+  roboEyes.update();
+  
+  // Reset expression after 2 seconds
+  if (isHappy && (millis() - happyStartTime >= HAPPY_DURATION)) {
+    isHappy = false;
+    wasClose = false;
+    resetEffects();
+    roboEyes.setMood(DEFAULT);
+    roboEyes.setPosition(DEFAULT);
+    Serial.println(F("Timeout -> Neutral"));
+  }
+  
+  // Read TOF sensor
+  if (tofAvailable && !isHappy && (millis() - lastTofRead >= TOF_INTERVAL)) {
+    lastTofRead = millis();
+    
+    VL53L0X_RangingMeasurementData_t measure;
+    lox.rangingTest(&measure, false);
+    
+    if (measure.RangeStatus != 4) {
+      int distanceCm = measure.RangeMilliMeter / 10;
+      
+      if (distanceCm <= HAPPY_DISTANCE_CM && distanceCm > 0) {
+        isHappy = true;
+        happyStartTime = millis();
+        roboEyes.setPosition(N);
+        roboEyes.setCuriosity(ON);
+        Serial.print(F("Someone close! ("));
+        Serial.print(distanceCm);
+        Serial.println(F(" cm) -> Looking up!"));
+      }
+    }
+  }
+  
+  // Read serial commands
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      if (inputBuffer.length() > 0) {
+        handleCommand(inputBuffer);
+        inputBuffer = "";
+      }
+    } else {
+      inputBuffer += c;
+    }
+  }
+}
