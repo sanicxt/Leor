@@ -54,6 +54,19 @@ unsigned long lastTofRead = 0;
 unsigned long reactionStartTime = 0;
 bool isReacting = false;
 
+// Random expression shuffle
+bool shuffleEnabled = false;
+uint32_t shuffleIntervalMs = 10000;  // default 10s
+int lastShuffleIndex = -1;
+bool shuffleNeedsInit = false;
+
+enum ShufflePhase {
+  SHUFFLE_NEUTRAL,
+  SHUFFLE_EXPRESSION
+};
+ShufflePhase shufflePhase = SHUFFLE_NEUTRAL;
+unsigned long shuffleNextChangeMs = 0;
+
 // Gesture matching state
 int matchSamples[SAMPLE_COUNT];
 int matchSampleIndex = 0;
@@ -81,6 +94,8 @@ bool gestVerbose = false;
 void setup() {
   Serial.begin(115200);
   delay(250);
+
+  randomSeed((uint32_t)micros());
   
   Serial.println(F("\n============================="));
   Serial.println(F("      Leora Starting..."));
@@ -136,9 +151,57 @@ void loop() {
   
   // Handle TOF sensor reactions
   handleTofSensor();
+
+  // Randomly shuffle expressions
+  maybeShuffleExpression();
   
   // Handle serial commands
   handleSerialInput();
+}
+
+// Pick a random expression and apply it via existing command handler
+void maybeShuffleExpression() {
+  if (!shuffleEnabled) return;
+  if (isReacting) return;
+  if (isTraining()) return;
+
+  unsigned long now = millis();
+
+  // When shuffle gets enabled, force neutral first for 2 seconds
+  if (shuffleNeedsInit) {
+    shuffleNeedsInit = false;
+    shufflePhase = SHUFFLE_NEUTRAL;
+    handleCommand(String("neutral"));
+    shuffleNextChangeMs = now + 2000;
+    return;
+  }
+
+  if (shuffleNextChangeMs != 0 && now < shuffleNextChangeMs) return;
+
+  if (shufflePhase == SHUFFLE_EXPRESSION) {
+    // After showing an expression, go neutral for 2–5 seconds
+    handleCommand(String("neutral"));
+    shufflePhase = SHUFFLE_NEUTRAL;
+    shuffleNextChangeMs = now + (unsigned long)random(2000, 5001);
+    return;
+  }
+
+  static const char* kExpressions[] = {
+    "happy", "sad", "angry", "love", "surprised", "confused",
+    "sleepy", "curious", "nervous", "knocked", "neutral", "idle"
+  };
+  const int count = (int)(sizeof(kExpressions) / sizeof(kExpressions[0]));
+  int idx = random(count);
+  if (count > 1 && idx == lastShuffleIndex) {
+    idx = (idx + 1 + random(count - 1)) % count;
+  }
+  lastShuffleIndex = idx;
+
+  handleCommand(String(kExpressions[idx]));
+
+  // After picking an expression, hold it for the configured shuffle interval
+  shufflePhase = SHUFFLE_EXPRESSION;
+  shuffleNextChangeMs = now + shuffleIntervalMs;
 }
 
 // ==================== Helper Functions ====================
@@ -146,6 +209,14 @@ void loop() {
 // Connect to WiFi with eye animation
 WifiStatus connectWiFiWithAnimation() {
   Serial.println(F("Connecting to WiFi..."));
+  WiFi.disconnect(true);
+  delay(100);
+  WiFi.mode(WIFI_STA);
+  delay(100);
+
+#ifdef HOSTNAME
+  WiFi.setHostname(HOSTNAME);
+#endif
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
   

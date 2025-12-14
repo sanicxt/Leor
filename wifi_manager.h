@@ -101,6 +101,15 @@ WifiStatus connectWiFi(const char* ssid, const char* password,
   Serial.println(F("\nConnecting to WiFi..."));
   Serial.print(F("SSID: "));
   Serial.println(storedSsid);
+
+  WiFi.disconnect(true);
+  delay(100);
+  WiFi.mode(WIFI_STA);
+  delay(100);
+
+#ifdef HOSTNAME
+  WiFi.setHostname(HOSTNAME);
+#endif
   
   WiFi.begin(storedSsid.c_str(), storedPass.c_str());
   // ESP32-C3 Super Mini has antenna flaw - reduce TX power

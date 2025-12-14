@@ -14,6 +14,9 @@ const char* WIFI_PASSWORD = "sage312@";
 const char* AP_SSID = "Leora";
 const char* AP_PASSWORD = "leora123";  // Min 8 characters, or "" for open
 
+// Hostname for WiFi (STA) + mDNS (if enabled elsewhere)
+#define HOSTNAME "leora-bot"
+
 // ==================== Display Settings ====================
 #define I2C_ADDRESS 0x3c
 #define SCREEN_WIDTH 128

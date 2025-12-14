@@ -192,6 +192,22 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   </div>
 
   <div class="section">
+    <h2>🎲 Shuffle Expressions</h2>
+    <div class="btn-grid">
+      <button class="btn" id="shuffleBtn" onclick="toggleShuffle()">Off</button>
+      <select id="shuffleTime" onchange="updateShuffleTime()" style="background:#0f3460;color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;">
+        <option value="2">2 sec</option>
+        <option value="5">5 sec</option>
+        <option value="10" selected>10 sec</option>
+        <option value="15">15 sec</option>
+        <option value="30">30 sec</option>
+        <option value="60">60 sec</option>
+      </select>
+      <button class="btn" onclick="send('shuffle:')">Status</button>
+    </div>
+  </div>
+
+  <div class="section">
     <h2>📶 WiFi <button class="collapse-btn" onclick="toggleWifi()">▼</button></h2>
     <div id="wifiPanel" class="collapsed">
       <div id="wifiDefaults" style="font-size:11px;color:#888;margin-bottom:10px;padding:8px;background:#0f3460;border-radius:4px;">
@@ -282,6 +298,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   <script>
     let autoResetEnabled = false;
     let resetTimer = null;
+    let shuffleEnabled = false;
     
     function toggleSettings() {
       let panel = document.getElementById('settingsPanel');
@@ -327,6 +344,27 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       document.getElementById('resetBtn').innerText = autoResetEnabled ? 'On ✓' : 'Off';
       document.getElementById('resetBtn').style.background = autoResetEnabled ? '#00ff88' : '#0f3460';
       document.getElementById('resetBtn').style.color = autoResetEnabled ? '#000' : '#fff';
+    }
+
+    function setShuffleButton() {
+      document.getElementById('shuffleBtn').innerText = shuffleEnabled ? 'On ✓' : 'Off';
+      document.getElementById('shuffleBtn').style.background = shuffleEnabled ? '#00ff88' : '#0f3460';
+      document.getElementById('shuffleBtn').style.color = shuffleEnabled ? '#000' : '#fff';
+    }
+
+    function toggleShuffle() {
+      shuffleEnabled = !shuffleEnabled;
+      setShuffleButton();
+      let seconds = parseInt(document.getElementById('shuffleTime').value);
+      send('shuffle:' + (shuffleEnabled ? 'on' : 'off') + ',time=' + seconds);
+    }
+
+    function updateShuffleTime() {
+      let seconds = parseInt(document.getElementById('shuffleTime').value);
+      // If shuffle is enabled, apply the new timing immediately
+      if (shuffleEnabled) {
+        send('shuffle:time=' + seconds);
+      }
     }
     
     function send(cmd) {

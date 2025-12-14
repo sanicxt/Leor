@@ -18,6 +18,11 @@ extern RoboEyes<Adafruit_SH1106G>* pRoboEyes;
 extern bool tofVerbose;
 extern bool gestVerbose;
 
+// Random expression shuffle state set in main sketch
+extern bool shuffleEnabled;
+extern uint32_t shuffleIntervalMs;
+extern bool shuffleNeedsInit;
+
 // Preferences for WiFi storage
 Preferences wifiPrefs;
 
@@ -483,6 +488,62 @@ String handleCommand(String cmd) {
       return String("Matching: ") + (enable ? "ON" : "OFF");
     }
     return "Unknown gesture command";
+  }
+
+  // ==================== EXPRESSION SHUFFLE ====================
+  else if (cmd.startsWith("shuffle:")) {
+    String params = cmd.substring(8);
+    params.trim();
+
+    if (params.length() == 0) {
+      return String("Shuffle: ") + (shuffleEnabled ? "ON" : "OFF") +
+             ", expression=" + String(shuffleIntervalMs / 1000UL) +
+             "s, neutral=2-5s (start neutral=2s)";
+    }
+
+    bool turnedOn = false;
+
+    int idx = 0;
+    while (idx < params.length()) {
+      int commaPos = params.indexOf(',', idx);
+      if (commaPos == -1) commaPos = params.length();
+      String token = params.substring(idx, commaPos);
+      token.trim();
+
+      if (token == "on" || token == "1") {
+        shuffleEnabled = true;
+        turnedOn = true;
+      } else if (token == "off" || token == "0") {
+        shuffleEnabled = false;
+      } else if (token.startsWith("time=") || token.startsWith("t=") || token.startsWith("interval=")) {
+        int eqPos = token.indexOf('=');
+        long seconds = token.substring(eqPos + 1).toInt();
+        if (seconds < 1) seconds = 1;
+        shuffleIntervalMs = (uint32_t)seconds * 1000UL;
+      } else {
+        // If token is just a number, treat it as seconds
+        bool numeric = token.length() > 0;
+        for (int i = 0; i < token.length(); i++) {
+          if (!isDigit(token[i])) { numeric = false; break; }
+        }
+        if (numeric) {
+          long seconds = token.toInt();
+          if (seconds < 1) seconds = 1;
+          shuffleIntervalMs = (uint32_t)seconds * 1000UL;
+        }
+      }
+
+      idx = commaPos + 1;
+    }
+
+    // Kick the state machine so it starts with neutral
+    if (turnedOn) {
+      shuffleNeedsInit = true;
+    }
+
+    return String("Shuffle: ") + (shuffleEnabled ? "ON" : "OFF") +
+           ", expression=" + String(shuffleIntervalMs / 1000UL) +
+           "s, neutral=2-5s";
   }
 
   // ==================== HELP ====================
