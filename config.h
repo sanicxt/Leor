@@ -1,21 +1,22 @@
 /*
- * config.h - Configuration settings for Leora
+ * config.h - Configuration settings for leor
  */
 
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// ==================== WiFi Settings ====================
-// WiFi credentials - CHANGE THESE to your network
-const char* WIFI_SSID = "Charmander";
-const char* WIFI_PASSWORD = "sage312@";
+// ==================== BLE Settings ====================
+// BLE Device Name (shown when scanning for Bluetooth devices)
+const char* BLE_DEVICE_NAME = "Leor";
 
-// Access Point settings (used if WiFi connection fails)
-const char* AP_SSID = "Leora";
-const char* AP_PASSWORD = "leora123";  // Min 8 characters, or "" for open
+// BLE Robustness Settings
+#define BLE_NOTIFY_MIN_INTERVAL_MS 20   // Minimum ms between notifications (prevent flooding)
+#define BLE_CONNECTION_TIMEOUT_MS 30000 // Detect stale connections (30 seconds no activity)
+#define BLE_MTU_REQUEST 185             // Request larger MTU (ESP32 max is typically 517, but 185 is safer)
+#define BLE_ADV_WATCHDOG_MS 60000       // Restart advertising if no connection after 60s
 
-// Hostname for WiFi (STA) + mDNS (if enabled elsewhere)
-#define HOSTNAME "leora-bot"
+// Note: BLE uses significantly less power than WiFi
+// Control via Bluetooth using a mobile app or web Bluetooth API
 
 // ==================== Display Settings ====================
 #define I2C_ADDRESS 0x3c
@@ -24,19 +25,11 @@ const char* AP_PASSWORD = "leora123";  // Min 8 characters, or "" for open
 #define OLED_RESET -1
 #define FRAME_RATE 100  // FPS
 
-// ==================== TOF Sensor Settings ====================
-#define TOF_INTERVAL 80           // Read interval in ms (balance speed vs performance)
-#define GESTURE_DISTANCE_CM 15    // Max distance to detect gestures (cm)
-#define GESTURE_MIN_CM 3          // Minimum valid distance (cm)
-
-// Gesture detection
-#define PAT_THRESHOLD 30          // Distance change (mm) to count as movement (filter noise)
-#define PAT_COUNT_THRESHOLD 4     // Number of direction changes for pat (more reliable)
-#define PAT_WINDOW_MS 1500        // Pat movements must happen within this time
-#define RUB_TIME_MS 1200          // Time hand must stay steady for rub (longer = more intentional)
-#define RUB_TOLERANCE 15          // Max movement (mm) still considered "steady"
-#define GESTURE_TIMEOUT_MS 800    // Reset gesture if no hand detected
-#define GESTURE_REACTION_MS 1500  // How long to show reaction (reduced for responsiveness)
+// ==================== MPU6050 Sensor Settings ====================
+#define MPU_SAMPLE_RATE_MS 20     // Read interval in ms
+#define GESTURE_MAG_MIN 2.0f      // Min magnitude (rad/s) to start gesture sampling
+#define GESTURE_COOLDOWN_MS 1500  // Cooldown after gesture match before next detection
+#define GESTURE_REACTION_MS 1500  // How long to show reaction expression
 
 // ==================== Autoblinker Settings ====================
 #define BLINK_INTERVAL 3          // Base interval in seconds

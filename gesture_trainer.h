@@ -1,6 +1,12 @@
 /*
- * gesture_trainer.h - Gesture training and recognition for Leora
- * Records TOF sensor patterns and matches them to named gestures
+ * gesture_trainer.h - Gesture recognition with browser-based ML training
+ * 
+ * Flow:
+ * 1. Browser sends "gs" to start streaming gyro data
+ * 2. ESP32 streams "gd:x,y,z" samples via BLE
+ * 3. Browser trains TensorFlow.js model
+ * 4. Browser sends "gw=base64weights" to upload model
+ * 5. ESP32 runs inference locally
  */
 
 #ifndef GESTURE_TRAINER_H
@@ -10,404 +16,390 @@
 #include <Preferences.h>
 
 // ==================== Configuration ====================
-#define MAX_GESTURES 8           // Max number of custom gestures
-#define SAMPLE_COUNT 12          // Number of distance samples per gesture
-#define SAMPLE_INTERVAL_MS 80    // Time between samples during recording
-#define MATCH_THRESHOLD 0.65     // Minimum similarity score (0-1) to match
-#define GESTURE_NAME_LEN 16      // Max chars for gesture name
-#define MATCH_COOLDOWN_MS 1500   // Cooldown after a gesture match before next detection
+#define SAMPLE_COUNT 25          // Samples per gesture (~2 sec at 80ms)
+#define SAMPLE_INTERVAL_MS 40    // Time between samples (40ms * 25 = 1s)
+#define INPUT_SIZE 75            // 25 samples * 3 axes
+#define HIDDEN_SIZE 24           // Hidden layer neurons
+#define OUTPUT_SIZE 5            // Max gesture classes (5)
+#define MATCH_THRESHOLD 0.7f     // Confidence threshold
 
-// ==================== Data Structures ====================
-struct GesturePattern {
-  char name[GESTURE_NAME_LEN];     // Gesture name
-  char action[32];                  // Command to execute when matched
-  int samples[SAMPLE_COUNT];        // Distance samples (mm)
-  int minDist;                      // Min distance in pattern
-  int maxDist;                      // Max distance in pattern
-  bool valid;                       // Is this gesture slot used?
+// ==================== Neural Network Weights ====================
+// Model: 75 inputs -> 24 hidden (ReLU) -> 5 outputs (Softmax)
+// Weights: (75*24) + 24 + (24*5) + 5 = 1800 + 24 + 120 + 5 = 1949 floats
+#define TOTAL_WEIGHTS 1949
+
+float nn_weights[TOTAL_WEIGHTS];  // Stored weights from browser
+bool weights_loaded = false;
+
+// Weight layout indices
+#define W1_START 0              // 75*24 = 1800 weights
+#define B1_START 1800           // 24 biases
+#define W2_START 1824           // 24*5 = 120 weights  
+#define B2_START 1944           // 5 biases
+
+// ==================== Gesture Labels ====================
+char gesture_labels[OUTPUT_SIZE][16] = {
+  "gesture0", "gesture1", "gesture2", "gesture3", "gesture4"
 };
-
-// ==================== Training Mode State ====================
-enum TrainState {
-  TRAIN_IDLE,           // Not training
-  TRAIN_WAITING,        // Waiting for hand to enter range
-  TRAIN_COUNTDOWN,      // Countdown before recording
-  TRAIN_RECORDING,      // Recording samples
-  TRAIN_DONE,           // Recording complete
-  TRAIN_MATCHING        // Actively matching against gestures
+char gesture_actions[OUTPUT_SIZE][32] = {
+  "", "", "", "", ""
 };
+int num_gestures = 0;
 
-// Training mode variables
-TrainState trainState = TRAIN_IDLE;
-GesturePattern gestures[MAX_GESTURES];
-GesturePattern recordingGesture;
-int sampleIndex = 0;
-unsigned long trainStartTime = 0;
-unsigned long lastSampleTime = 0;
-int countdownNum = 3;
-String pendingGestureName = "";
-String pendingGestureAction = "";
-int gestureCount = 0;
-bool matchingEnabled = false;
-String lastMatchedGesture = "";
-unsigned long lastMatchTime = 0;  // For cooldown after match
+// ==================== Streaming State ====================
+bool is_streaming = false;
+unsigned long last_stream_time = 0;
+
+// ==================== Chunked Weight Transfer ====================
+// Weights arrive as multiple base64 chunks via BLE
+String weight_buffer = "";  // Accumulates base64 chunks
+bool weight_transfer_active = false;
+
+// ==================== Inference State ====================
+bool matching_enabled = false;
+float sample_buffer_x[SAMPLE_COUNT];
+float sample_buffer_y[SAMPLE_COUNT];
+float sample_buffer_z[SAMPLE_COUNT];
+int sample_index = 0;
+bool buffer_ready = false;
+unsigned long last_sample_time = 0;
+unsigned long last_match_time = 0;
+#define MATCH_COOLDOWN_MS 500
 
 // ==================== Preferences Storage ====================
 Preferences gesturePrefs;
 
-// ==================== OLED Overlay Drawing ====================
-// Forward declare - will be provided by main sketch
-extern void drawTrainingOverlay(const char* status, int progress);
+// ==================== Forward Declarations ====================
+extern void sendBLEStatus(const String& status);
 
-// ==================== Gesture Functions ====================
+// ==================== Neural Network Inference ====================
 
-// Initialize gesture system
-void initGestureTrainer() {
-  // Load saved gestures from flash
-  gesturePrefs.begin("gestures", true);  // Read-only
-  gestureCount = gesturePrefs.getInt("count", 0);
+// ReLU activation
+float relu(float x) {
+  return x > 0 ? x : 0;
+}
+
+// Run inference on input buffer
+// Returns class index or -1 if below threshold
+int runInference(float* input) {
+  if (!weights_loaded) return -1;
   
-  for (int i = 0; i < MAX_GESTURES; i++) {
-    gestures[i].valid = false;
+  // Layer 1: Input (75) -> Hidden (24) with ReLU
+  float hidden[HIDDEN_SIZE];
+  for (int j = 0; j < HIDDEN_SIZE; j++) {
+    float sum = nn_weights[B1_START + j];  // Bias
+    for (int i = 0; i < INPUT_SIZE; i++) {
+      sum += input[i] * nn_weights[W1_START + i * HIDDEN_SIZE + j];
+    }
+    hidden[j] = relu(sum);
   }
   
-  for (int i = 0; i < gestureCount && i < MAX_GESTURES; i++) {
-    String key = "g" + String(i);
-    if (gesturePrefs.isKey(key.c_str())) {
-      size_t len = gesturePrefs.getBytesLength(key.c_str());
-      if (len == sizeof(GesturePattern)) {
-        gesturePrefs.getBytes(key.c_str(), &gestures[i], sizeof(GesturePattern));
+  // Layer 2: Hidden (24) -> Output (8) with Softmax
+  float output[OUTPUT_SIZE];
+  float max_val = -1e9;
+  for (int j = 0; j < OUTPUT_SIZE; j++) {
+    float sum = nn_weights[B2_START + j];  // Bias
+    for (int i = 0; i < HIDDEN_SIZE; i++) {
+      sum += hidden[i] * nn_weights[W2_START + i * OUTPUT_SIZE + j];
+    }
+    output[j] = sum;
+    if (sum > max_val) max_val = sum;
+  }
+  
+  // Softmax normalization
+  float exp_sum = 0;
+  for (int j = 0; j < OUTPUT_SIZE; j++) {
+    output[j] = exp(output[j] - max_val);  // Subtract max for numerical stability
+    exp_sum += output[j];
+  }
+  for (int j = 0; j < OUTPUT_SIZE; j++) {
+    output[j] /= exp_sum;
+  }
+  
+  // Find best class
+  int best_class = -1;
+  float best_prob = 0;
+  for (int j = 0; j < num_gestures && j < OUTPUT_SIZE; j++) {
+    if (output[j] > best_prob) {
+      best_prob = output[j];
+      best_class = j;
+    }
+  }
+  
+  // Debug
+  Serial.print(F("Inference: "));
+  for (int j = 0; j < num_gestures; j++) {
+    Serial.print(output[j]); Serial.print(F(" "));
+  }
+  Serial.println();
+  
+  if (best_prob >= MATCH_THRESHOLD) {
+    return best_class;
+  }
+  return -1;
+}
+
+// ==================== Streaming Functions ====================
+
+void startStreaming() {
+  is_streaming = true;
+  last_stream_time = millis();
+  Serial.println(F("Gyro streaming started"));
+}
+
+void stopStreaming() {
+  is_streaming = false;
+  Serial.println(F("Gyro streaming stopped"));
+}
+
+bool isStreaming() {
+  return is_streaming;
+}
+
+// Called from main loop with gyro data
+void processGyroForStreaming(float gx, float gy, float gz) {
+  if (!is_streaming) return;
+  
+  unsigned long now = millis();
+  if (now - last_stream_time >= SAMPLE_INTERVAL_MS) {
+    // Send sample via BLE: gd:x,y,z
+    String msg = "gd:" + String(gx, 3) + "," + String(gy, 3) + "," + String(gz, 3);
+    sendBLEStatus(msg);
+    last_stream_time = now;
+  }
+}
+
+// ==================== Inference Collection ====================
+
+void processGyroForInference(float gx, float gy, float gz) {
+  if (!matching_enabled || !weights_loaded || num_gestures == 0) return;
+  if (millis() - last_match_time < MATCH_COOLDOWN_MS) return;
+  
+  unsigned long now = millis();
+  if (now - last_sample_time >= SAMPLE_INTERVAL_MS) {
+    sample_buffer_x[sample_index] = gx;
+    sample_buffer_y[sample_index] = gy;
+    sample_buffer_z[sample_index] = gz;
+    sample_index++;
+    last_sample_time = now;
+    
+    if (sample_index >= SAMPLE_COUNT) {
+      // Buffer full - run inference
+      float input[INPUT_SIZE];
+      int idx = 0;
+      for (int i = 0; i < SAMPLE_COUNT; i++) input[idx++] = sample_buffer_x[i];
+      for (int i = 0; i < SAMPLE_COUNT; i++) input[idx++] = sample_buffer_y[i];
+      for (int i = 0; i < SAMPLE_COUNT; i++) input[idx++] = sample_buffer_z[i];
+      
+// Forward declaration
+extern String handleCommand(String cmd);
+
+// ...
+
+      int result = runInference(input);
+      if (result >= 0) {
+        Serial.print(F("✓ Matched: ")); Serial.println(gesture_labels[result]);
+        last_match_time = millis();
+        
+        // Execute action if defined
+        if (strlen(gesture_actions[result]) > 0) {
+          String action = gesture_actions[result];
+          sendBLEStatus("gm:" + String(gesture_labels[result]));
+          
+          // Actually execute the action!
+          handleCommand(action); 
+        }
       }
+      
+      sample_index = 0;  // Reset buffer
     }
   }
-  gesturePrefs.end();
-  
-  Serial.print(F("Gesture trainer: "));
-  Serial.print(gestureCount);
-  Serial.println(F(" gestures loaded"));
 }
 
-// Save all gestures to flash
-void saveGestures() {
-  gesturePrefs.begin("gestures", false);  // Read-write
-  gesturePrefs.putInt("count", gestureCount);
-  
-  for (int i = 0; i < MAX_GESTURES; i++) {
-    String key = "g" + String(i);
-    if (gestures[i].valid) {
-      gesturePrefs.putBytes(key.c_str(), &gestures[i], sizeof(GesturePattern));
-    } else {
-      gesturePrefs.remove(key.c_str());
-    }
-  }
-  gesturePrefs.end();
-  Serial.println(F("Gestures saved to flash"));
-}
+// ==================== Weight Loading ====================
 
-// Start recording a new gesture
-bool startGestureRecording(const String& name, const String& action) {
-  if (trainState != TRAIN_IDLE) {
-    return false;  // Already training
-  }
+// Decode base64 weights from browser
+bool loadWeightsFromBase64(const String& base64data) {
+  // Simple base64 decode
+  static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   
-  // Find empty slot
-  int slot = -1;
-  for (int i = 0; i < MAX_GESTURES; i++) {
-    if (!gestures[i].valid) {
-      slot = i;
-      break;
-    }
-    // Or overwrite existing with same name
-    if (strcmp(gestures[i].name, name.c_str()) == 0) {
-      slot = i;
-      break;
-    }
-  }
-  
-  if (slot == -1) {
-    Serial.println(F("No gesture slots available"));
+  int len = base64data.length();
+  if (len < 100) {
+    Serial.println(F("Weight data too short"));
     return false;
   }
   
-  // Initialize recording
-  pendingGestureName = name;
-  pendingGestureAction = action;
-  memset(&recordingGesture, 0, sizeof(GesturePattern));
-  strncpy(recordingGesture.name, name.c_str(), GESTURE_NAME_LEN - 1);
-  strncpy(recordingGesture.action, action.c_str(), 31);
-  recordingGesture.minDist = 9999;
-  recordingGesture.maxDist = 0;
+  // Decode to bytes first
+  memset(nn_weights, 0, sizeof(nn_weights)); // Clear buffer first
   
-  sampleIndex = 0;
-  trainState = TRAIN_WAITING;
-  trainStartTime = millis();
+  int byte_count = 0;
+  uint8_t* bytes = (uint8_t*)nn_weights;  // Reuse buffer temporarily
+  int max_bytes = TOTAL_WEIGHTS * 4;
   
-  Serial.print(F("Training gesture: "));
-  Serial.println(name);
-  Serial.println(F("Place hand in range to start..."));
+  for (int i = 0; i < len && byte_count < max_bytes; i += 4) {
+    uint32_t n = 0;
+    for (int j = 0; j < 4 && i + j < len; j++) {
+      char c = base64data[i + j];
+      if (c == '=') break;
+      const char* p = strchr(b64, c);
+      if (p) n = (n << 6) | (p - b64);
+    }
+    
+    if (i + 3 < len && base64data[i+3] != '=') {
+      bytes[byte_count++] = (n >> 16) & 0xFF;
+      bytes[byte_count++] = (n >> 8) & 0xFF;
+      bytes[byte_count++] = n & 0xFF;
+    } else if (base64data[i+3] == '=') {
+      bytes[byte_count++] = (n >> 16) & 0xFF;
+      if (base64data[i+2] != '=') bytes[byte_count++] = (n >> 8) & 0xFF;
+    }
+  }
+  
+
+  
+  // Now bytes contain the float data (little-endian)
+  // The data is already in nn_weights buffer since we decoded in-place
+  
+  int expected = TOTAL_WEIGHTS * 4;
+  if (byte_count < expected) {
+    Serial.print(F("Got ")); Serial.print(byte_count);
+    Serial.print(F(" bytes, expected ")); Serial.println(expected);
+    // Still try to use what we got
+  }
+  
+  weights_loaded = true;
+  Serial.println(F("Weights loaded successfully"));
+  
+
+  
+  // Save to flash
+  gesturePrefs.begin("gestures", false);
+  gesturePrefs.putBytes("weights", nn_weights, sizeof(nn_weights));
+  gesturePrefs.putInt("num_gestures", num_gestures);
+  // Persist labels and actions
+  gesturePrefs.putBytes("labels", gesture_labels, sizeof(gesture_labels));
+  gesturePrefs.putBytes("actions", gesture_actions, sizeof(gesture_actions));
+  gesturePrefs.end();
   
   return true;
 }
 
-// Cancel current recording
-void cancelGestureRecording() {
-  trainState = TRAIN_IDLE;
-  sampleIndex = 0;
-  Serial.println(F("Training cancelled"));
+// Set gesture label and action
+void setGestureLabel(int index, const char* label, const char* action) {
+  if (index < 0 || index >= OUTPUT_SIZE) return;
+  strncpy(gesture_labels[index], label, 15);
+  strncpy(gesture_actions[index], action, 31);
+  if (index >= num_gestures) num_gestures = index + 1;
+  
+  // Save metadata update immediately (optional, or rely on deploy)
+  gesturePrefs.begin("gestures", false);
+  gesturePrefs.putBytes("labels", gesture_labels, sizeof(gesture_labels));
+  gesturePrefs.putBytes("actions", gesture_actions, sizeof(gesture_actions));
+  gesturePrefs.putInt("num_gestures", num_gestures);
+  gesturePrefs.end();
 }
 
-// Process a distance sample during training
-void processTrainingSample(int distanceMm, int distanceCm) {
-  unsigned long now = millis();
-  
-  switch (trainState) {
-    case TRAIN_WAITING:
-      // Wait for hand to enter range
-      if (distanceCm <= 15 && distanceCm >= 3) {
-        trainState = TRAIN_COUNTDOWN;
-        countdownNum = 3;
-        trainStartTime = now;
-        Serial.println(F("Hand detected! Starting countdown..."));
-      } else if (now - trainStartTime > 30000) {
-        // Timeout after 30 seconds
-        cancelGestureRecording();
-        Serial.println(F("Training timeout"));
-      }
-      break;
-      
-    case TRAIN_COUNTDOWN:
-      // 3-2-1 countdown
-      {
-        int elapsed = (now - trainStartTime) / 1000;
-        countdownNum = 3 - elapsed;
-        if (countdownNum <= 0) {
-          trainState = TRAIN_RECORDING;
-          sampleIndex = 0;
-          lastSampleTime = now;
-          Serial.println(F("Recording..."));
-        }
-      }
-      break;
-      
-    case TRAIN_RECORDING:
-      // Record samples at fixed intervals
-      if (now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
-        if (distanceCm <= 20 && distanceCm >= 2) {
-          recordingGesture.samples[sampleIndex] = distanceMm;
-          if (distanceMm < recordingGesture.minDist) recordingGesture.minDist = distanceMm;
-          if (distanceMm > recordingGesture.maxDist) recordingGesture.maxDist = distanceMm;
-          sampleIndex++;
-          lastSampleTime = now;
-          
-          if (sampleIndex >= SAMPLE_COUNT) {
-            // Recording complete
-            trainState = TRAIN_DONE;
-            recordingGesture.valid = true;
-            
-            // Save to slot
-            for (int i = 0; i < MAX_GESTURES; i++) {
-              if (!gestures[i].valid || strcmp(gestures[i].name, recordingGesture.name) == 0) {
-                memcpy(&gestures[i], &recordingGesture, sizeof(GesturePattern));
-                if (!gestures[i].valid || i >= gestureCount) {
-                  gestureCount = i + 1;
-                }
-                gestures[i].valid = true;
-                break;
-              }
-            }
-            
-            saveGestures();
-            Serial.print(F("✓ Gesture '"));
-            Serial.print(recordingGesture.name);
-            Serial.println(F("' saved!"));
-            
-            // Return to idle after short delay
-            trainStartTime = now;
-          }
-        } else {
-          // Hand left range during recording
-          Serial.println(F("Hand lost! Restarting..."));
-          trainState = TRAIN_WAITING;
-          trainStartTime = now;
-          sampleIndex = 0;
-        }
-      }
-      break;
-      
-    case TRAIN_DONE:
-      // Show completion for a moment then return to idle
-      if (now - trainStartTime > 2000) {
-        trainState = TRAIN_IDLE;
-      }
-      break;
-      
-    default:
-      break;
+// ==================== Chunked Weight Transfer ====================
+
+// Start a new weight transfer (clears buffer)
+void startWeightTransfer() {
+  weights_loaded = false; // Disable inference explicitly
+  weight_buffer = "";
+  weight_buffer.reserve(11000); // Pre-allocate to prevent fragmentation
+  weight_transfer_active = true;
+  Serial.println(F("Weight transfer started"));
+}
+
+// Append a chunk of base64 weight data
+void appendWeightChunk(const String& chunk) {
+  if (!weight_transfer_active) {
+    startWeightTransfer();
+  }
+  weight_buffer += chunk;
+  // Reduce verbose logging
+  if (weight_buffer.length() % 1000 < 50) {
+     Serial.print(F("."));
   }
 }
 
-// Calculate similarity between two gesture patterns (0-1)
-float calculateSimilarity(const GesturePattern& pattern, const int* currentSamples) {
-  if (!pattern.valid) return 0;
-  
-  // Normalize both patterns to 0-100 range for comparison
-  int patternRange = pattern.maxDist - pattern.minDist;
-  if (patternRange < 20) patternRange = 20;  // Minimum range
-  
-  int currentMin = 9999, currentMax = 0;
-  for (int i = 0; i < SAMPLE_COUNT; i++) {
-    if (currentSamples[i] < currentMin) currentMin = currentSamples[i];
-    if (currentSamples[i] > currentMax) currentMax = currentSamples[i];
-  }
-  int currentRange = currentMax - currentMin;
-  if (currentRange < 20) currentRange = 20;
-  
-  // Compare normalized patterns
-  float totalDiff = 0;
-  for (int i = 0; i < SAMPLE_COUNT; i++) {
-    float patternNorm = (float)(pattern.samples[i] - pattern.minDist) / patternRange;
-    float currentNorm = (float)(currentSamples[i] - currentMin) / currentRange;
-    totalDiff += abs(patternNorm - currentNorm);
+// Finalize weight transfer - decode and load
+bool finalizeWeights() {
+  if (weight_buffer.length() < 100) {
+    Serial.println(F("Weight buffer too small"));
+    weight_transfer_active = false;
+    return false;
   }
   
-  float avgDiff = totalDiff / SAMPLE_COUNT;
-  float similarity = 1.0 - avgDiff;
-  return similarity > 0 ? similarity : 0;
+  Serial.print(F("Finalizing ")); Serial.print(weight_buffer.length()); Serial.println(F(" chars..."));
+  
+  bool result = loadWeightsFromBase64(weight_buffer);
+  weight_buffer = "";  // Free memory
+  weight_transfer_active = false;
+  
+  return result;
 }
 
-// Match current samples against saved gestures
-// Returns the gesture name if matched, empty string otherwise
-String matchGesture(const int* samples) {
-  float bestScore = 0;
-  int bestIndex = -1;
-  
-  for (int i = 0; i < MAX_GESTURES; i++) {
-    if (gestures[i].valid) {
-      float score = calculateSimilarity(gestures[i], samples);
-      if (score > bestScore) {
-        bestScore = score;
-        bestIndex = i;
-      }
+// ==================== Initialization ====================
+
+void initGestureTrainer() {
+  // Load weights from flash
+  gesturePrefs.begin("gestures", true);
+  size_t len = gesturePrefs.getBytesLength("weights");
+  if (len == sizeof(nn_weights)) {
+    gesturePrefs.getBytes("weights", nn_weights, sizeof(nn_weights));
+    weights_loaded = true;
+    num_gestures = gesturePrefs.getInt("num_gestures", 0);
+    // Load labels and actions
+    if (gesturePrefs.getBytesLength("labels") == sizeof(gesture_labels)) {
+       gesturePrefs.getBytes("labels", gesture_labels, sizeof(gesture_labels));
+       gesturePrefs.getBytes("actions", gesture_actions, sizeof(gesture_actions));
     }
+    Serial.print(F("Loaded NN weights for "));
+    Serial.print(num_gestures);
+    Serial.println(F(" gestures"));
+  } else {
+    Serial.println(F("No saved weights found"));
   }
-  
-  if (bestScore >= MATCH_THRESHOLD && bestIndex >= 0) {
-    Serial.print(F("Matched gesture: "));
-    Serial.print(gestures[bestIndex].name);
-    Serial.print(F(" (score: "));
-    Serial.print(bestScore);
-    Serial.println(F(")"));
-    lastMatchedGesture = gestures[bestIndex].name;
-    lastMatchTime = millis();  // Start cooldown
-    return String(gestures[bestIndex].action);
-  }
-  
-  return "";
+  gesturePrefs.end();
 }
 
-// Delete a gesture by name
-bool deleteGesture(const String& name) {
-  for (int i = 0; i < MAX_GESTURES; i++) {
-    if (gestures[i].valid && strcmp(gestures[i].name, name.c_str()) == 0) {
-      gestures[i].valid = false;
-      memset(&gestures[i], 0, sizeof(GesturePattern));
-      saveGestures();
-      
-      // Recount valid gestures
-      gestureCount = 0;
-      for (int j = 0; j < MAX_GESTURES; j++) {
-        if (gestures[j].valid) gestureCount++;
-      }
-      
-      Serial.print(F("Deleted gesture: "));
-      Serial.println(name);
-      return true;
-    }
-  }
-  return false;
+// ==================== Control Functions ====================
+
+void setMatchingEnabled(bool enabled) {
+  matching_enabled = enabled;
+  sample_index = 0;
+  Serial.print(F("Matching: ")); Serial.println(enabled ? F("ON") : F("OFF"));
 }
 
-// Clear all gestures
-void clearAllGestures() {
-  for (int i = 0; i < MAX_GESTURES; i++) {
-    gestures[i].valid = false;
-    memset(&gestures[i], 0, sizeof(GesturePattern));
-  }
-  gestureCount = 0;
-  saveGestures();
-  Serial.println(F("All gestures cleared"));
+bool isMatchingEnabled() {
+  return matching_enabled && weights_loaded;
 }
 
-// List all gestures (returns JSON string) - includes default gestures
-String listGestures(bool includeDefaults = true) {
+bool isTraining() {
+  return is_streaming;
+}
+
+// ==================== Utility Functions ====================
+
+String listGestures() {
   String json = "[";
-  bool first = true;
-  
-  // Add built-in default gestures first
-  if (includeDefaults) {
-    json += "{\"name\":\"pat\",\"action\":\"happy\",\"default\":true}";
-    json += ",{\"name\":\"rub\",\"action\":\"love\",\"default\":true}";
-    first = false;
-  }
-  
-  // Add custom trained gestures
-  for (int i = 0; i < MAX_GESTURES; i++) {
-    if (gestures[i].valid) {
-      if (!first) json += ",";
-      json += "{\"name\":\"" + String(gestures[i].name) + "\",";
-      json += "\"action\":\"" + String(gestures[i].action) + "\",";
-      json += "\"default\":false}";
-      first = false;
-    }
+  for (int i = 0; i < num_gestures; i++) {
+    if (i > 0) json += ",";
+    json += "{\"n\":\"" + String(gesture_labels[i]) + "\",";
+    json += "\"a\":\"" + String(gesture_actions[i]) + "\"}";
   }
   json += "]";
   return json;
 }
 
-// Get training status string for OLED
-String getTrainingStatus() {
-  switch (trainState) {
-    case TRAIN_WAITING:
-      return "WAITING...";
-    case TRAIN_COUNTDOWN:
-      return String(countdownNum);
-    case TRAIN_RECORDING:
-      return "REC " + String(sampleIndex) + "/" + String(SAMPLE_COUNT);
-    case TRAIN_DONE:
-      return "SAVED!";
-    default:
-      return "";
-  }
-}
-
-// Get recording progress (0-100)
-int getTrainingProgress() {
-  if (trainState == TRAIN_RECORDING) {
-    return (sampleIndex * 100) / SAMPLE_COUNT;
-  } else if (trainState == TRAIN_COUNTDOWN) {
-    return 0;
-  } else if (trainState == TRAIN_DONE) {
-    return 100;
-  }
-  return -1;  // Not recording
-}
-
-// Check if currently training
-bool isTraining() {
-  return trainState != TRAIN_IDLE;
-}
-
-// Enable/disable gesture matching
-void setMatchingEnabled(bool enabled) {
-  matchingEnabled = enabled;
-  Serial.print(F("Gesture matching: "));
-  Serial.println(enabled ? F("ON") : F("OFF"));
-}
-
-bool isMatchingEnabled() {
-  // Include cooldown check
-  if (millis() - lastMatchTime < MATCH_COOLDOWN_MS) return false;
-  return matchingEnabled && gestureCount > 0;
+void clearAllGestures() {
+  weights_loaded = false;
+  num_gestures = 0;
+  memset(nn_weights, 0, sizeof(nn_weights));
+  gesturePrefs.begin("gestures", false);
+  gesturePrefs.clear();
+  gesturePrefs.end();
+  Serial.println(F("All gestures cleared"));
 }
 
 #endif // GESTURE_TRAINER_H

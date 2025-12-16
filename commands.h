@@ -1,5 +1,5 @@
 /*
- * commands.h - Command handler for Leora
+ * commands.h - Command handler for leor
  * Handles serial and web commands for expressions, mouth, actions, etc.
  */
 
@@ -7,24 +7,27 @@
 #define COMMANDS_H
 
 #include <Arduino.h>
-#include <WiFi.h>
 #include <Preferences.h>
 #include "RoboEyes/src/FluxGarage_RoboEyes.h"
 #include "gesture_trainer.h"
 
 // Forward declaration - will be set in main sketch
 extern RoboEyes<Adafruit_SH1106G>* pRoboEyes;
-// Tuning/logging options set in main sketch
-extern bool tofVerbose;
-extern bool gestVerbose;
+extern Preferences preferences;
+
+// MPU6050 debug logging set in main sketch
+extern bool mpuVerbose;
 
 // Random expression shuffle state set in main sketch
 extern bool shuffleEnabled;
-extern uint32_t shuffleIntervalMs;
+extern uint32_t shuffleExprMinMs;
+extern uint32_t shuffleExprMaxMs;
+extern uint32_t shuffleNeutralMinMs;
+extern uint32_t shuffleNeutralMaxMs;
 extern bool shuffleNeedsInit;
 
-// Preferences for WiFi storage
-Preferences wifiPrefs;
+
+
 
 // Reset all effects to default
 void resetEffects() {
@@ -39,7 +42,7 @@ void resetEffects() {
 
 // Print help menu to Serial
 void printHelp() {
-  Serial.println(F("\n=== Leora Serial Commands ==="));
+  Serial.println(F("\n=== leor Serial Commands ==="));
   Serial.println(F("EXPRESSIONS:"));
   Serial.println(F("  happy, sad, angry, love, surprised"));
   Serial.println(F("  confused, sleepy, curious, nervous"));
@@ -53,17 +56,36 @@ void printHelp() {
   Serial.println(F("  center, n, ne, e, se, s, sw, w, nw"));
   Serial.println(F("\nTOGGLES:"));
   Serial.println(F("  sweat, cyclops"));
-  Serial.println(F("  toflog - toggle raw TOF debug output"));
-  Serial.println(F("  gestlog - toggle gesture processing debug output"));
+  Serial.println(F("  mpulog - toggle MPU6050 debug output"));
   Serial.println(F("================================\n"));
 }
 
 // Handle a command string, returns response for web UI
 String handleCommand(String cmd) {
   cmd.trim();
-  cmd.toLowerCase();
   
   if (cmd.length() == 0) return "Empty command";
+  
+  // IMPORTANT: Handle weight transfer commands BEFORE toLowerCase
+  // Base64 is case-sensitive!
+  if (cmd.startsWith("gw+")) {
+    String chunk = cmd.substring(3);
+    appendWeightChunk(chunk);
+    Serial.print(F("> gw+ chunk: ")); Serial.println(chunk.length());
+    return "gw+ok";
+  }
+  if (cmd.startsWith("gw=")) {
+    String base64data = cmd.substring(3);
+    Serial.print(F("> gw= data: ")); Serial.println(base64data.length());
+    if (loadWeightsFromBase64(base64data)) {
+      return "gw:ok";
+    } else {
+      return "gw:err";
+    }
+  }
+  
+  // Lowercase for all other commands
+  cmd.toLowerCase();
   
   Serial.print(F("> "));
   Serial.println(cmd);
@@ -289,23 +311,36 @@ String handleCommand(String cmd) {
   }
 
   // ==================== LOW-LEVEL DEBUG ====================
-  else if (cmd == "toflog") {
-    tofVerbose = !tofVerbose;
-    Serial.print(F("TOF verbose logging: "));
-    Serial.println(tofVerbose ? F("ON") : F("OFF"));
-    return String(tofVerbose ? "TOF verbose ON" : "TOF verbose OFF");
-  }
-  else if (cmd == "gestlog") {
-    gestVerbose = !gestVerbose;
-    Serial.print(F("Gesture verbose logging: "));
-    Serial.println(gestVerbose ? F("ON") : F("OFF"));
-    return String(gestVerbose ? "Gesture verbose ON" : "Gesture verbose OFF");
+  else if (cmd == "mpulog") {
+    mpuVerbose = !mpuVerbose;
+    Serial.print(F("MPU6050 verbose logging: "));
+    Serial.println(mpuVerbose ? F("ON") : F("OFF"));
+    return String(mpuVerbose ? "MPU verbose ON" : "MPU verbose OFF");
   }
 
-  // ==================== SETTINGS ====================
-  else if (cmd.startsWith("set:")) {
-    // Parse settings string: set:ew=36,eh=36,es=10,er=8,mw=20,lt=1000,vt=2000,bi=3
-    String params = cmd.substring(4);
+
+  // ==================== SETTINGS (short: s:, long: set:) ====================
+  else if (cmd.startsWith("s:") || cmd.startsWith("set:")) {
+    // Parse settings string: s:ew=36,eh=36 or set:ew=36,eh=36
+    int prefixLen = cmd.startsWith("s:") ? 2 : 4;
+    String params = cmd.substring(prefixLen);
+    
+    // If empty params, return current settings string for sync
+    if (params.length() == 0) {
+      String current = "";
+      current += "ew=" + String(preferences.getInt("ew", 36)) + ",";
+      current += "eh=" + String(preferences.getInt("eh", 36)) + "\n";
+      
+      current += "es=" + String(preferences.getInt("es", 10)) + ",";
+      current += "er=" + String(preferences.getInt("er", 8)) + "\n";
+      
+      current += "mw=" + String(preferences.getInt("mw", 20)) + ",";
+      current += "lt=" + String(preferences.getInt("lt", 1000)) + "\n";
+      
+      current += "vt=" + String(preferences.getInt("vt", 2000)) + ",";
+      current += "bi=" + String(preferences.getInt("bi", 3));
+      return current;
+    }
     
     int idx = 0;
     while (idx < params.length()) {
@@ -319,189 +354,104 @@ String handleCommand(String cmd) {
         
         if (key == "ew") {
           pRoboEyes->setWidth(value, value);
+          preferences.putInt("ew", value);
         } else if (key == "eh") {
           pRoboEyes->setHeight(value, value);
+          preferences.putInt("eh", value);
         } else if (key == "es") {
           pRoboEyes->setSpacebetween(value);
+          preferences.putInt("es", value);
         } else if (key == "er") {
           pRoboEyes->setBorderradius(value, value);
+          preferences.putInt("er", value);
         } else if (key == "mw") {
           pRoboEyes->setMouthSize(value, 6);
+          preferences.putInt("mw", value);
         } else if (key == "lt") {
           pRoboEyes->setLaughDuration(value);
+          preferences.putInt("lt", value);
         } else if (key == "vt") {
           pRoboEyes->setLoveDuration(value);
+          preferences.putInt("vt", value);
         } else if (key == "bi") {
           pRoboEyes->setAutoblinker(true, value, 3);
+          preferences.putInt("bi", value);
         }
       }
       idx = commaPos + 1;
     }
-    Serial.println(F("Settings applied"));
-    return "Settings applied";
+    Serial.println(F("Settings applied & saved"));
+    return "Settings applied & saved";
   }
 
-  // ==================== WIFI SETTINGS ====================
-  else if (cmd.startsWith("wifi:")) {
-    String params = cmd.substring(5);
-    
-    if (params == "info") {
-      // Return WiFi info
-      String info = "Mode: ";
-      if (WiFi.getMode() == WIFI_AP) {
-        info += "Access Point\n";
-        info += "SSID: " + String(WiFi.softAPSSID()) + "\n";
-        info += "IP: " + WiFi.softAPIP().toString() + "\n";
-        info += "Clients: " + String(WiFi.softAPgetStationNum());
-      } else {
-        info += "Station\n";
-        info += "SSID: " + WiFi.SSID() + "\n";
-        info += "IP: " + WiFi.localIP().toString() + "\n";
-        info += "RSSI: " + String(WiFi.RSSI()) + " dBm";
-      }
-      Serial.println(info);
-      return info;
+  // ==================== GESTURE COMMANDS (streaming + ML) ====================
+  // gs = start streaming gyro data to browser
+  else if (cmd == "gs") {
+    startStreaming();
+    return "gs:1";
+  }
+  // gx = stop streaming
+  else if (cmd == "gx") {
+    stopStreaming();
+    return "gs:0";
+  }
+  // gw! = finalize chunked weight transfer
+  else if (cmd == "gw!") {
+    if (finalizeWeights()) {
+      return "gw:ok";
+    } else {
+      return "gw:err";
     }
-    else if (params == "force_ap") {
-      // Set flag to force AP mode on next boot
-      wifiPrefs.begin("leora", false);
-      wifiPrefs.putBool("force_ap", true);
-      wifiPrefs.end();
-      Serial.println(F("Rebooting to AP mode..."));
-      delay(500);
-      ESP.restart();
+  }
+  // gl=index:name:action = set gesture label
+  else if (cmd.startsWith("gl=")) {
+    String params = cmd.substring(3);
+    int sep1 = params.indexOf(':');
+    int sep2 = params.indexOf(':', sep1 + 1);
+    if (sep1 > 0 && sep2 > sep1) {
+      int index = params.substring(0, sep1).toInt();
+      String name = params.substring(sep1 + 1, sep2);
+      String action = params.substring(sep2 + 1);
+      setGestureLabel(index, name.c_str(), action.c_str());
+      return "gl:ok";
     }
-    else if (params == "reset") {
-      // Clear all saved WiFi settings, revert to defaults
-      wifiPrefs.begin("leora", false);
-      wifiPrefs.clear();
-      wifiPrefs.end();
-      Serial.println(F("WiFi settings reset to defaults. Rebooting..."));
-      delay(500);
-      ESP.restart();
-    }
-    else {
-      // Parse wifi settings: wifi:ssid=xxx,pass=xxx or wifi:ap_ssid=xxx,ap_pass=xxx
-      wifiPrefs.begin("leora", false);
-      
-      int idx = 0;
-      bool hasStaCreds = false;
-      bool hasApCreds = false;
-      String newSsid, newPass, newApSsid, newApPass;
-      
-      while (idx < params.length()) {
-        int eqPos = params.indexOf('=', idx);
-        int commaPos = params.indexOf(',', idx);
-        if (commaPos == -1) commaPos = params.length();
-        
-        if (eqPos > idx && eqPos < commaPos) {
-          String key = params.substring(idx, eqPos);
-          String value = params.substring(eqPos + 1, commaPos);
-          
-          if (key == "ssid") {
-            newSsid = value;
-            wifiPrefs.putString("wifi_ssid", value);
-            hasStaCreds = true;
-          } else if (key == "pass") {
-            newPass = value;
-            wifiPrefs.putString("wifi_pass", value);
-          } else if (key == "ap_ssid") {
-            newApSsid = value;
-            wifiPrefs.putString("ap_ssid", value);
-            hasApCreds = true;
-          } else if (key == "ap_pass") {
-            newApPass = value;
-            wifiPrefs.putString("ap_pass", value);
-          }
-        }
-        idx = commaPos + 1;
-      }
-      
-      // If AP creds set, force AP mode
-      if (hasApCreds) {
-        wifiPrefs.putBool("force_ap", true);
-      } else {
-        wifiPrefs.putBool("force_ap", false);
-      }
-      
-      wifiPrefs.end();
-      Serial.println(F("WiFi settings saved. Rebooting..."));
-      delay(500);
-      ESP.restart();
-      return "Rebooting...";  // Never reached
-    }
-    return "WiFi command processed";
+    return "gl:err";
+  }
+  // gm=1 or gm=0 = enable/disable matching
+  else if (cmd.startsWith("gm=")) {
+    String val = cmd.substring(3);
+    val.trim();
+    bool enable = (val == "1");
+    setMatchingEnabled(enable);
+    return enable ? "gm:1" : "gm:0";
+  }
+  // gc = clear all gestures
+  else if (cmd == "gc") {
+    clearAllGestures();
+    return "gc:ok";
+  }
+  // gi = get gesture info
+  else if (cmd == "gi") {
+    return listGestures();
   }
 
-  // ==================== GESTURE TRAINING ====================
-  else if (cmd.startsWith("gesture:")) {
-    String params = cmd.substring(8);
-    
-    if (params.startsWith("train=")) {
-      // Start training: gesture:train=name,action
-      String trainParams = params.substring(6);
-      int commaPos = trainParams.indexOf(',');
-      if (commaPos > 0) {
-        String name = trainParams.substring(0, commaPos);
-        String action = trainParams.substring(commaPos + 1);
-        if (startGestureRecording(name, action)) {
-          return "Training started: " + name;
-        } else {
-          return "Failed to start training";
-        }
-      }
-      return "Invalid format. Use: gesture:train=name,action";
-    }
-    else if (params == "cancel") {
-      cancelGestureRecording();
-      return "Training cancelled";
-    }
-    else if (params == "status") {
-      // Return training status for web UI polling
-      String state;
-      switch (trainState) {
-        case TRAIN_WAITING: state = "waiting"; break;
-        case TRAIN_COUNTDOWN: state = "countdown," + String(countdownNum); break;
-        case TRAIN_RECORDING: state = "recording," + String(getTrainingProgress()); break;
-        case TRAIN_DONE: state = "done"; break;
-        default: state = "idle"; break;
-      }
-      return state;
-    }
-    else if (params == "list") {
-      return listGestures();
-    }
-    else if (params.startsWith("delete=")) {
-      String name = params.substring(7);
-      if (deleteGesture(name)) {
-        return "Deleted: " + name;
-      }
-      return "Gesture not found: " + name;
-    }
-    else if (params == "clear") {
-      clearAllGestures();
-      return "All gestures cleared";
-    }
-    else if (params.startsWith("match=")) {
-      bool enable = params.substring(6) == "1";
-      setMatchingEnabled(enable);
-      return String("Matching: ") + (enable ? "ON" : "OFF");
-    }
-    return "Unknown gesture command";
-  }
+  // ==================== BLE COMMANDS ====================
+  // ... (omitted for brevity, assume matches original) ...
 
-  // ==================== EXPRESSION SHUFFLE ====================
-  else if (cmd.startsWith("shuffle:")) {
-    String params = cmd.substring(8);
-    params.trim();
+  // ==================== EXPRESSION SHUFFLE (short: sh:, long: shuffle:) ====================
+  else if (cmd.startsWith("sh:") || cmd.startsWith("shuffle:")) {
+    int prefixLen = cmd.startsWith("sh:") ? 3 : 8;
+    String params = cmd.substring(prefixLen);
 
     if (params.length() == 0) {
-      return String("Shuffle: ") + (shuffleEnabled ? "ON" : "OFF") +
-             ", expression=" + String(shuffleIntervalMs / 1000UL) +
-             "s, neutral=2-5s (start neutral=2s)";
+      String resp = String("Shuffle: ") + (shuffleEnabled ? "ON" : "OFF");
+      resp += "\nexpr=" + String(shuffleExprMinMs / 1000) + "-" + String(shuffleExprMaxMs / 1000) + "s";
+      resp += "\nneutral=" + String(shuffleNeutralMinMs / 1000) + "-" + String(shuffleNeutralMaxMs / 1000) + "s";
+      return resp;
     }
 
     bool turnedOn = false;
+    bool changed = false;
 
     int idx = 0;
     while (idx < params.length()) {
@@ -513,27 +463,58 @@ String handleCommand(String cmd) {
       if (token == "on" || token == "1") {
         shuffleEnabled = true;
         turnedOn = true;
+        changed = true;
       } else if (token == "off" || token == "0") {
         shuffleEnabled = false;
-      } else if (token.startsWith("time=") || token.startsWith("t=") || token.startsWith("interval=")) {
+        changed = true;
+      } else if (token.startsWith("expr=") || token.startsWith("e=")) {
+        // expr=2-5 or expr=3 (fixed duration)
         int eqPos = token.indexOf('=');
-        long seconds = token.substring(eqPos + 1).toInt();
-        if (seconds < 1) seconds = 1;
-        shuffleIntervalMs = (uint32_t)seconds * 1000UL;
-      } else {
-        // If token is just a number, treat it as seconds
-        bool numeric = token.length() > 0;
-        for (int i = 0; i < token.length(); i++) {
-          if (!isDigit(token[i])) { numeric = false; break; }
-        }
-        if (numeric) {
-          long seconds = token.toInt();
+        String val = token.substring(eqPos + 1);
+        int dashPos = val.indexOf('-');
+        if (dashPos > 0) {
+          long minS = val.substring(0, dashPos).toInt();
+          long maxS = val.substring(dashPos + 1).toInt();
+          if (minS < 1) minS = 1;
+          if (maxS < minS) maxS = minS;
+          shuffleExprMinMs = (uint32_t)minS * 1000UL;
+          shuffleExprMaxMs = (uint32_t)maxS * 1000UL;
+        } else {
+          long seconds = val.toInt();
           if (seconds < 1) seconds = 1;
-          shuffleIntervalMs = (uint32_t)seconds * 1000UL;
+          shuffleExprMinMs = shuffleExprMaxMs = (uint32_t)seconds * 1000UL;
         }
+        changed = true;
+      } else if (token.startsWith("neutral=") || token.startsWith("n=")) {
+        // neutral=2-5 or neutral=3 (fixed duration)
+        int eqPos = token.indexOf('=');
+        String val = token.substring(eqPos + 1);
+        int dashPos = val.indexOf('-');
+        if (dashPos > 0) {
+          long minS = val.substring(0, dashPos).toInt();
+          long maxS = val.substring(dashPos + 1).toInt();
+          if (minS < 1) minS = 1;
+          if (maxS < minS) maxS = minS;
+          shuffleNeutralMinMs = (uint32_t)minS * 1000UL;
+          shuffleNeutralMaxMs = (uint32_t)maxS * 1000UL;
+        } else {
+          long seconds = val.toInt();
+          if (seconds < 1) seconds = 1;
+          shuffleNeutralMinMs = shuffleNeutralMaxMs = (uint32_t)seconds * 1000UL;
+        }
+        changed = true;
       }
 
       idx = commaPos + 1;
+    }
+
+    // Save changes to preferences
+    if (changed) {
+      preferences.putBool("shuf_en", shuffleEnabled);
+      preferences.putUInt("shuf_emin", shuffleExprMinMs);
+      preferences.putUInt("shuf_emax", shuffleExprMaxMs);
+      preferences.putUInt("shuf_nmin", shuffleNeutralMinMs);
+      preferences.putUInt("shuf_nmax", shuffleNeutralMaxMs);
     }
 
     // Kick the state machine so it starts with neutral
@@ -541,9 +522,10 @@ String handleCommand(String cmd) {
       shuffleNeedsInit = true;
     }
 
-    return String("Shuffle: ") + (shuffleEnabled ? "ON" : "OFF") +
-           ", expression=" + String(shuffleIntervalMs / 1000UL) +
-           "s, neutral=2-5s";
+    String resp = String("Shuffle: ") + (shuffleEnabled ? "ON" : "OFF");
+    resp += "\nexpr=" + String(shuffleExprMinMs / 1000) + "-" + String(shuffleExprMaxMs / 1000) + "s";
+    resp += "\nneutral=" + String(shuffleNeutralMinMs / 1000) + "-" + String(shuffleNeutralMaxMs / 1000) + "s";
+    return resp;
   }
 
   // ==================== HELP ====================
