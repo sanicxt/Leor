@@ -18,10 +18,11 @@ npx sv create my-app
 
 ## Developing
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Once you've created a project and installed dependencies with Bun, start a development server:
 
 ```sh
-npm run dev
+bun install
+bun run dev
 
 # or start the server and open the app in a new browser tab
 npm run dev -- --open
@@ -41,6 +42,37 @@ To create a production version of your showcase app:
 
 ```sh
 npm run build
+```
+
+## GitHub Pages
+
+If you publish this app to GitHub Pages from a repository that is **not** named `your-username.github.io`, the site is served from a subpath:
+
+`https://your-username.github.io/your-repo-name/`
+
+This project is configured to:
+
+- Automatically set `config.kit.paths.base` to `/${repo}` when `GITHUB_REPOSITORY=owner/repo` is present.
+- Generate a fallback `404.html` (via `adapter-static`) so client-side routing works on refresh.
+
+Build for Pages from the `leora/` folder:
+
+```sh
+bun install
+bun run build:pages
+```
+
+### GitHub Actions deploy
+
+This repo includes a workflow that builds and deploys to GitHub Pages on pushes to `main`:
+
+- Workflow: `.github/workflows/deploy.yml`
+- Output folder: `leora/build/`
+
+Optional override (if you want to force a specific base path):
+
+```sh
+BASE_PATH=/your-repo-name bun run build:pages
 ```
 
 You can preview the production build with `npm run preview`.

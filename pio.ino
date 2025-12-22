@@ -20,7 +20,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
-#include <MPU6050.h>  // i2cdevlib MPU6050
+#include <mpu6050.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
@@ -32,8 +32,20 @@
 
 // ==================== Hardware Objects ====================
 Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-MPU6050 mpu;  // i2cdevlib MPU6050
 Preferences preferences;
+
+// ==================== New MPU6050 Library ====================
+#define MPU_ADDRESS 0x68 // mpu6050 address is 0x69 if AD0 pin is powered - otherwise it's 0x68
+
+float rawGX, rawGY, rawGZ; // initialise raw gyroscope variables
+float rawAX, rawAY, rawAZ; // initialise raw accelerometer variables
+float dpsGX, dpsGY, dpsGZ; // initialise dps gyroscope variables
+float gForceAX, gForceAY, gForceAZ; // initialise g force accelerometer variables
+
+#define FREQUENCY_HZ 50 // sampling frequency in Hz (adjust as needed)
+#define INTERVAL_MS (1000 / (FREQUENCY_HZ))
+
+static unsigned long last_interval_ms = 0;
 
 // ==================== RoboEyes ====================
 #include "RoboEyes/src/FluxGarage_RoboEyes.h"
@@ -130,50 +142,13 @@ void setup() {
   // Initialize BLE (low power alternative to WiFi)
   initBLE(BLE_DEVICE_NAME);
   
-  // Initialize MPU6050 sensor (i2cdevlib)
-  // Wire already initialized above
+  // Initialize MPU6050 sensor (new library)
+  wakeSensor(MPU_ADDRESS); // wakes sensor from sleep mode
+  mpuAvailable = true; // assume available for now
+  Serial.println(F("✓ MPU6050 ready"));
   
-  // DEBUG: Manually check WHO_AM_I
-  Wire.beginTransmission(0x68);
-  Wire.write(0x75); // WHO_AM_I register
-  Wire.endTransmission();
-  Wire.requestFrom(0x68, 1);
-  if (Wire.available()) {
-    byte who = Wire.read();
-    Serial.print(F("MPU6050 WHO_AM_I: 0x"));
-    Serial.println(who, HEX);
-  } else {
-    Serial.println(F("MPU6050 WHO_AM_I read failed"));
-  }
-
-  mpu.initialize();
-  
-  // Strict check failed (0x72 != 0x68), but we might have a clone
-  if (mpu.testConnection()) {
-    mpuAvailable = true;
-    Serial.println(F("✓ MPU6050 ready"));
-  } else {
-    // Retry: if we saw ANY valid WHO_AM_I, force enable
-    Wire.beginTransmission(0x68);
-    Wire.write(0x75);
-    Wire.endTransmission();
-    Wire.requestFrom(0x68, 1);
-    if (Wire.available()) {
-      byte who = Wire.read();
-      if (who != 0x00 && who != 0xFF) {
-        mpuAvailable = true;
-        Serial.print(F("! MPU6050 ID mismatch (0x"));
-        Serial.print(who, HEX);
-        Serial.println(F(") but device responsive. Forcing ON."));
-      } else {
-        mpuAvailable = false;
-        Serial.println(F("✗ MPU6050 not found"));
-      }
-    } else {
-      mpuAvailable = false;
-      Serial.println(F("✗ MPU6050 not found"));
-    }
-  }
+  // Calibrate gyro
+  calibrateGyro();
   
   // Initialize gesture trainer
   initGestureTrainer();
@@ -336,16 +311,16 @@ void handleMPU6050() {
     if (now - lastMpuRead >= MPU_SAMPLE_RATE_MS) {
       lastMpuRead = now;
       
-      // Read gyro data using i2cdevlib
-      int16_t ax, ay, az, gx, gy, gz;
-      mpu.getAcceleration(&ax, &ay, &az);
-      mpu.getRotation(&gx, &gy, &gz);
+      // Read gyro and accel data using new library
+      readGyroData(MPU_ADDRESS, rawGX, rawGY, rawGZ); // pass MPU6050 address and gyroscope values are written to 3 provided variables
+      rawGyroToDPS(rawGX, rawGY, rawGZ, dpsGX, dpsGY, dpsGZ); // provide the 3 raw gyroscope values and returns them in their dps (degrees per second) values
+      readAccelData(MPU_ADDRESS, rawAX, rawAY, rawAZ); // pass MPU6050 address and accelerometer values are written to 3 provided variables
+      rawAccelToGForce(rawAX, rawAY, rawAZ, gForceAX, gForceAY, gForceAZ); // provide the 3 raw accelerometer values and returns them in their g force values
       
-      // Convert raw gyro values to rad/s (sensitivity: 131 LSB/(deg/s) at ±250°/s range)
-      float gyroScale = (1.0f / 131.0f) * (3.14159265f / 180.0f);
-      gxf = gx * gyroScale;
-      gyf = gy * gyroScale;
-      gzf = gz * gyroScale;
+      // Convert dps to rad/s
+      gxf = dpsGX * (PI / 180.0f);
+      gyf = dpsGY * (PI / 180.0f);
+      gzf = dpsGZ * (PI / 180.0f);
       
       // Calculate magnitude of angular velocity (gyroscope)
       magnitude = sqrt(gxf * gxf + gyf * gyf + gzf * gzf);

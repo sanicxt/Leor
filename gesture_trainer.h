@@ -72,6 +72,28 @@ Preferences gesturePrefs;
 // ==================== Forward Declarations ====================
 extern void sendBLEStatus(const String& status);
 
+// ==================== Calibration ====================
+float gyroXoffset = 0, gyroYoffset = 0, gyroZoffset = 0;
+
+void calibrateGyro() {
+  Serial.println(F("Calibrating Gyro..."));
+  float gx_sum = 0, gy_sum = 0, gz_sum = 0;
+  const int samples = 100;
+  
+  for (int i = 0; i < samples; i++) {
+    readGyroData(MPU_ADDRESS, rawGX, rawGY, rawGZ);
+    rawGyroToDPS(rawGX, rawGY, rawGZ, dpsGX, dpsGY, dpsGZ);
+    gx_sum += dpsGX; gy_sum += dpsGY; gz_sum += dpsGZ;
+    delay(10);
+  }
+  
+  gyroXoffset = (gx_sum / (float)samples) * (PI / 180.0f);
+  gyroYoffset = (gy_sum / (float)samples) * (PI / 180.0f);
+  gyroZoffset = (gz_sum / (float)samples) * (PI / 180.0f);
+  
+  Serial.println(F("Gyro calibration done."));
+}
+
 // ==================== Neural Network Inference ====================
 
 // ReLU activation
@@ -163,7 +185,7 @@ void processGyroForStreaming(float gx, float gy, float gz) {
   unsigned long now = millis();
   if (now - last_stream_time >= SAMPLE_INTERVAL_MS) {
     // Send sample via BLE: gd:x,y,z
-    String msg = "gd:" + String(gx, 3) + "," + String(gy, 3) + "," + String(gz, 3);
+    String msg = "gd:" + String(gx - gyroXoffset, 3) + "," + String(gy - gyroYoffset, 3) + "," + String(gz - gyroZoffset, 3);
     sendBLEStatus(msg);
     last_stream_time = now;
   }
@@ -177,9 +199,9 @@ void processGyroForInference(float gx, float gy, float gz) {
   
   unsigned long now = millis();
   if (now - last_sample_time >= SAMPLE_INTERVAL_MS) {
-    sample_buffer_x[sample_index] = gx;
-    sample_buffer_y[sample_index] = gy;
-    sample_buffer_z[sample_index] = gz;
+    sample_buffer_x[sample_index] = gx - gyroXoffset;
+    sample_buffer_y[sample_index] = gy - gyroYoffset;
+    sample_buffer_z[sample_index] = gz - gyroZoffset;
     sample_index++;
     last_sample_time = now;
     
