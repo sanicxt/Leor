@@ -9,16 +9,16 @@
     let isDeploying = $state(false);
     let deployProgress = $state(0);
     let currentGesture = $state("");
-    let sampleCount = $state(0); // Just show count, not full array
+    let sampleCount = $state(0);
     let trainingProgress = $state({ epoch: 0, loss: 0, accuracy: 0 });
     let stats = $state(ml.getStats());
 
-    // New gesture input
-    let newGestureName = $state("");
-    let newGestureAction = $state("happy");
+    // New gesture input - default to neutral if missing samples
+    let newGestureName = $state("neutral");
+    let newGestureAction = $state("neutral");
     let liveGyro = $state({ x: 0, y: 0, z: 0 });
 
-    // Non-reactive buffer for sample collection (avoids UI freeze)
+    // Non-reactive buffer for sample collection
     let sampleBuffer: number[] = [];
 
     // Parse incoming gyro data from ESP32
@@ -26,7 +26,6 @@
         const status = getLastStatus();
         if (!status) return;
 
-        // Parse gyro data: gd:x,y,z
         if (status.startsWith("gd:") && isRecording) {
             const parts = status.substring(3).split(",");
             if (parts.length === 3) {
@@ -34,18 +33,15 @@
                 const y = parseFloat(parts[1]);
                 const z = parseFloat(parts[2]);
                 liveGyro = { x, y, z };
-                sampleBuffer.push(x, y, z); // Push to non-reactive buffer
-                sampleCount = Math.floor(sampleBuffer.length / 3); // Update count only
+                sampleBuffer.push(x, y, z);
+                sampleCount = Math.floor(sampleBuffer.length / 3);
             }
         }
-
-        // Handle streaming responses
-        if (status === "gs:1") {
-            console.log("[Gesture] Streaming started");
-        } else if (status === "gs:0") {
-            console.log("[Gesture] Streaming stopped");
-        }
     });
+
+    // Helper to check if neutral is ready
+    const neutralCount = $derived(stats.samplesPerGesture["neutral"] || 0);
+    const isNeutralReady = $derived(neutralCount >= 5);
 
     async function startRecording() {
         if (!currentGesture) {
@@ -60,27 +56,21 @@
         sampleCount = 0;
         liveGyro = { x: 0, y: 0, z: 0 };
         isRecording = true;
-        await sendCommand("gs"); // Start streaming
-
-        // Auto-stop after 1 second
+        await sendCommand("gs");
 
         setTimeout(() => {
             if (isRecording) {
                 finishRecording();
             }
-        }, 1000);
+        }, 2500); // 2.5 sec to capture 50+ samples (BLE latency buffer)
     }
 
     async function finishRecording() {
         isRecording = false;
-        await sendCommand("gx"); // Stop streaming
+        await sendCommand("gx");
 
         const numSamples = Math.floor(sampleBuffer.length / 3);
-        console.log(`[Gesture] Recorded ${numSamples} samples in 1 second`);
-
         if (numSamples >= 3) {
-            // Need at least a few samples
-            // Separate into X, Y, Z arrays
             const xs: number[] = [],
                 ys: number[] = [],
                 zs: number[] = [];
@@ -90,9 +80,7 @@
                 zs.push(sampleBuffer[i + 2]);
             }
 
-            // Resample to exactly 25 points using linear interpolation
             function resample(arr: number[], targetLen: number): number[] {
-                if (arr.length === targetLen) return arr;
                 const result: number[] = [];
                 for (let i = 0; i < targetLen; i++) {
                     const pos = (i / (targetLen - 1)) * (arr.length - 1);
@@ -104,20 +92,22 @@
                 return result;
             }
 
-            const rsX = resample(xs, 25);
-            const rsY = resample(ys, 25);
-            const rsZ = resample(zs, 25);
-
-            // Flatten: [x0..x24, y0..y24, z0..z24]
-            const flat = [...rsX, ...rsY, ...rsZ];
-
+            const flat = [
+                ...resample(xs, 50),
+                ...resample(ys, 50),
+                ...resample(zs, 50),
+            ];
             ml.addSample(flat, currentGesture);
             stats = ml.getStats();
-            console.log(
-                `[Gesture] Added resampled sample for "${currentGesture}"`,
-            );
-        } else {
-            console.warn("[Gesture] Not enough samples collected");
+
+            // If just finished neutral and it's enough, clear name for next one
+            if (
+                currentGesture === "neutral" &&
+                ml.getStats().samplesPerGesture["neutral"] >= 5
+            ) {
+                newGestureName = "";
+                newGestureAction = "happy";
+            }
         }
     }
 
@@ -129,71 +119,53 @@
     }
 
     async function trainModel() {
+        if (!isNeutralReady) {
+            alert(
+                "Please record at least 5 samples of 'neutral' first. This is mandatory for baseline matching.",
+            );
+            return;
+        }
         if (stats.totalSamples < 2) {
-            alert("Need at least 2 samples to train");
+            alert("Need at least 2 gestures to train");
             return;
         }
 
         isTraining = true;
-        trainingProgress = { epoch: 0, loss: 0, accuracy: 0 };
-
-        try {
-            await ml.trainModel((epoch: number, loss: number, acc: number) => {
-                trainingProgress = { epoch, loss, accuracy: acc };
-            });
-        } catch (e) {
-            console.error("[Gesture] Training failed:", e);
-        }
-
+        await ml.trainModel((epoch: number, loss: number, acc: number) => {
+            trainingProgress = { epoch, loss, accuracy: acc };
+        });
         isTraining = false;
     }
 
     async function deployModel() {
+        if (!isNeutralReady) {
+            alert("Neutral baseline missing. Record 5+ 'neutral' samples.");
+            return;
+        }
         try {
-            // Export weights
             const base64Weights = await ml.exportWeights();
-            console.log(`[Gesture] Weights: ${base64Weights.length} chars`);
-
-            // Verify weights weren't NaN/Inf (simple check by decoding a few or trusting process)
-            // But better to let user know if training exploded
-            if (base64Weights.length < 100) {
-                throw new Error("Generated weights are empty/invalid");
-            }
-
-            // Validate weights locally
-            // We can't easily decode base64 back to float here efficiently without code duplication
-            // but we can rely on ESP32 validation or assume if training accuracy was OK, weights are OK.
-            // However, let's trust the ESP32 debug for now.
-
             isDeploying = true;
-            deployProgress = 0;
-
-            // Send weights in chunks via BLE
-            // MTU is often 20 bytes. gw+ (3) + 17 chars = 20 bytes.
             const chunkSize = 17;
-            const totalChunks = Math.ceil(base64Weights.length / chunkSize);
             for (let i = 0; i < base64Weights.length; i += chunkSize) {
-                const chunk = base64Weights.substring(i, i + chunkSize);
-                await sendCommand(`gw+${chunk}`);
-                // Small delay to prevent congestion
+                await sendCommand(
+                    `gw+${base64Weights.substring(i, i + chunkSize)}`,
+                );
                 await new Promise((r) => setTimeout(r, 25));
-
                 deployProgress = Math.round(
                     ((i + chunkSize) / base64Weights.length) * 100,
                 );
             }
-
-            // Finalize transfer
             await sendCommand("gw!");
 
-            // Send gesture labels
             const labels = ml.getGestureLabels();
             for (let i = 0; i < labels.length; i++) {
-                const action = newGestureAction || "happy";
+                // Neutral action is always 'neutral' or nothing
+                const action =
+                    labels[i] === "neutral"
+                        ? "neutral"
+                        : newGestureAction || "happy";
                 await sendCommand(`gl=${i}:${labels[i]}:${action}`);
             }
-
-            console.log("[Gesture] Model deployed to ESP32");
         } catch (e) {
             console.error("[Gesture] Deploy failed:", e);
         } finally {
@@ -207,8 +179,16 @@
     }
 
     function clearData() {
-        ml.clearData();
-        stats = ml.getStats();
+        if (
+            confirm(
+                "Clear all training data? You will need to re-train the mandatory neutral gesture.",
+            )
+        ) {
+            ml.clearData();
+            stats = ml.getStats();
+            newGestureName = "neutral";
+            newGestureAction = "neutral";
+        }
     }
 
     const actions = [
@@ -235,54 +215,75 @@
 >
     <div class="flex items-center justify-between flex-wrap gap-3">
         <h3 class="text-zinc-400 text-xs font-bold tracking-widest uppercase">
-            Gesture Training (Browser ML)
+            Gesture Training
             {#if isRecording}
                 <span
                     class="ml-2 px-2 py-0.5 bg-rose-500/20 text-rose-400 rounded-full text-xs animate-pulse"
                 >
-                    Recording... {sampleCount}/25
-                </span>
-            {/if}
-            {#if isTraining}
-                <span
-                    class="ml-2 px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-xs animate-pulse"
-                >
-                    Training... Epoch {trainingProgress.epoch}
+                    Recording... {sampleCount}/50
                 </span>
             {/if}
         </h3>
 
-        <!-- Matching Toggle -->
         <div class="flex items-center gap-2">
             <span class="text-xs text-zinc-400">Matching</span>
             <button
-                class="w-12 h-6 rounded-full transition-all duration-300 relative focus:outline-none focus:ring-2 focus:ring-indigo-500/50
-                {matchEnabled
+                class="w-12 h-6 rounded-full transition-all duration-300 relative {matchEnabled
                     ? 'bg-indigo-500 shadow-lg shadow-indigo-500/20'
                     : 'bg-zinc-700'}"
                 onclick={toggleMatch}
             >
                 <span
-                    class="absolute left-0 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-sm
-                    {matchEnabled ? 'translate-x-7' : 'translate-x-1'}"
+                    class="absolute left-0 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 {matchEnabled
+                        ? 'translate-x-7'
+                        : 'translate-x-1'}"
                 ></span>
             </button>
         </div>
     </div>
 
-    <!-- Record Section -->
     <div class="space-y-4">
+        {#if !isNeutralReady}
+            <div
+                class="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4"
+            >
+                <div
+                    class="text-indigo-300 text-sm font-medium mb-1 flex items-center gap-2"
+                >
+                    <span
+                        class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"
+                    ></span>
+                    Mandatory: Neutral Training
+                </div>
+                <p class="text-zinc-400 text-xs leading-relaxed">
+                    Record at least 5 samples of you <b
+                        >holding the device still</b
+                    >. This baseline is required for accurate gesture detection.
+                </p>
+                <div
+                    class="mt-3 h-1.5 bg-zinc-800 rounded-full overflow-hidden"
+                >
+                    <div
+                        class="h-full bg-indigo-500 transition-all duration-500"
+                        style="width: {(neutralCount / 5) * 100}%"
+                    ></div>
+                </div>
+            </div>
+        {/if}
+
         <div class="flex flex-col sm:flex-row gap-2">
             <input
                 type="text"
                 bind:value={newGestureName}
-                placeholder="Gesture name (e.g. 'shake')"
-                class="flex-1 bg-zinc-800/50 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50"
+                placeholder="Gesture name"
+                class="flex-1 bg-zinc-800/50 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50"
                 onchange={() => (currentGesture = newGestureName.trim())}
+                disabled={!isNeutralReady && newGestureName === "neutral"}
             />
             <select
                 bind:value={newGestureAction}
                 class="bg-zinc-800/50 border border-white/10 rounded-xl px-4 py-2 text-sm text-white"
+                disabled={!isNeutralReady && newGestureName === "neutral"}
             >
                 {#each actions as action}
                     <option value={action}>{action}</option>
@@ -290,139 +291,142 @@
             </select>
         </div>
 
-        <!-- Record Button -->
-        <div class="flex gap-2">
-            {#if isRecording}
-                <button
-                    class="flex-1 px-4 py-3 bg-rose-500/20 text-rose-300 rounded-xl border border-rose-500/30 transition-all"
-                    onclick={cancelRecording}
-                >
-                    ⏹ Cancel Recording
-                </button>
-            {:else}
-                <button
-                    class="flex-1 px-4 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 rounded-xl border border-rose-500/20 hover:border-rose-500/40 transition-all font-medium"
-                    onclick={startRecording}
-                >
-                    ⏺ Record Sample
-                </button>
-            {/if}
-        </div>
+        <button
+            class="w-full px-4 py-3 {isRecording
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 border-rose-500/20'} rounded-xl border transition-all font-medium"
+            onclick={isRecording ? cancelRecording : startRecording}
+        >
+            {isRecording ? "⏹ Cancel Recording" : "⏺ Record Sample"}
+        </button>
 
-        <!-- Live Gyro Display (during recording) -->
         {#if isRecording}
             <div
-                class="bg-zinc-800/50 rounded-xl p-4 border border-rose-500/30 animate-pulse"
+                class="bg-zinc-800/50 rounded-xl p-4 border border-rose-500/30 text-center"
             >
-                <div class="text-xs text-rose-400 mb-2">📡 Live Gyro Data</div>
-                <div class="grid grid-cols-3 gap-2 text-center">
+                <div
+                    class="text-[10px] text-rose-400 uppercase tracking-widest mb-2 font-bold"
+                >
+                    📡 Sampling...
+                </div>
+                <div class="flex justify-center gap-8">
                     <div>
-                        <div class="text-xs text-zinc-500">X</div>
-                        <div class="text-lg font-mono text-white">
+                        <div class="text-[10px] text-zinc-500">X</div>
+                        <div class="text-sm font-mono">
                             {liveGyro.x.toFixed(2)}
                         </div>
                     </div>
                     <div>
-                        <div class="text-xs text-zinc-500">Y</div>
-                        <div class="text-lg font-mono text-white">
+                        <div class="text-[10px] text-zinc-500">Y</div>
+                        <div class="text-sm font-mono">
                             {liveGyro.y.toFixed(2)}
                         </div>
                     </div>
                     <div>
-                        <div class="text-xs text-zinc-500">Z</div>
-                        <div class="text-lg font-mono text-white">
+                        <div class="text-[10px] text-zinc-500">Z</div>
+                        <div class="text-sm font-mono">
                             {liveGyro.z.toFixed(2)}
                         </div>
                     </div>
                 </div>
-                <div class="mt-2 text-xs text-center text-zinc-400">
-                    {sampleCount}/25 samples
-                </div>
             </div>
         {/if}
 
-        <!-- Stats & Gesture List -->
         <div class="bg-zinc-800/30 rounded-xl p-4 border border-white/5">
-            <div class="text-xs text-zinc-500 mb-2">
-                Training Data (max 5 gestures)
+            <div
+                class="text-[10px] text-zinc-500 uppercase tracking-widest mb-3 font-bold"
+            >
+                Active Gestures
             </div>
-            <div class="text-sm text-white">
-                {stats.totalSamples} samples across {stats.gestures.length}/5
-                gestures
-            </div>
-            {#if stats.gestures.length > 0}
-                <div class="mt-3 space-y-2">
-                    {#each stats.gestures as gesture}
-                        <div
-                            class="flex items-center justify-between bg-zinc-700/30 rounded-lg px-3 py-2"
-                        >
-                            <div>
-                                <span class="text-sm text-white">{gesture}</span
+            <div class="space-y-2">
+                <!-- Always show neutral if not enough samples -->
+                {#if !stats.gestures.includes("neutral")}
+                    <div
+                        class="flex items-center justify-between bg-zinc-700/20 rounded-lg px-3 py-2 border border-dashed border-zinc-600"
+                    >
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-zinc-400">neutral</span>
+                            <span
+                                class="px-1.5 py-0.5 rounded-md bg-zinc-800 text-zinc-500 text-[9px] font-bold"
+                                >REQUIRED</span
+                            >
+                        </div>
+                        <span class="text-[10px] text-zinc-600">0 samples</span>
+                    </div>
+                {/if}
+
+                {#each stats.gestures as gesture}
+                    <div
+                        class="flex items-center justify-between bg-zinc-700/30 rounded-lg px-3 py-2 border border-white/5"
+                    >
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-white">{gesture}</span>
+                            {#if gesture === "neutral"}
+                                <span
+                                    class="px-1.5 py-0.5 rounded-md {isNeutralReady
+                                        ? 'bg-indigo-500/20 text-indigo-400'
+                                        : 'bg-rose-500/20 text-rose-400'} text-[9px] font-bold"
                                 >
-                                <span class="text-xs text-zinc-500 ml-2">
-                                    {stats.samplesPerGesture[gesture] || 0} samples
+                                    {isNeutralReady ? "OK" : "REQUIRED"}
                                 </span>
-                            </div>
+                            {/if}
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-[10px] text-zinc-500"
+                                >{stats.samplesPerGesture[gesture] || 0} samples</span
+                            >
                             <button
-                                class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1 rounded hover:bg-rose-500/10"
+                                class="text-rose-400/50 hover:text-rose-400 px-1"
                                 onclick={() => {
                                     ml.deleteGesture(gesture);
                                     stats = ml.getStats();
                                 }}
                             >
-                                Delete
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    ><path d="M3 6h18" /><path
+                                        d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"
+                                    /><path
+                                        d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"
+                                    /></svg
+                                >
                             </button>
                         </div>
-                    {/each}
-                </div>
-            {/if}
+                    </div>
+                {/each}
+            </div>
         </div>
 
-        <!-- Train & Deploy -->
         <div class="flex gap-2">
             <button
-                class="flex-1 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 rounded-xl border border-amber-500/20 transition-all disabled:opacity-50"
+                class="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl border border-white/5 transition-all text-xs font-medium disabled:opacity-30"
                 onclick={trainModel}
-                disabled={isTraining || stats.totalSamples < 2}
+                disabled={!isNeutralReady || isTraining}
             >
-                🧠 Train Model
+                {isTraining ? "Training..." : "🧠 Train"}
             </button>
             <button
-                class="flex-1 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-200 rounded-xl border border-emerald-500/20 transition-all"
+                class="flex-1 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 rounded-xl border border-indigo-500/20 transition-all text-xs font-medium disabled:opacity-30"
                 onclick={deployModel}
+                disabled={!isNeutralReady || isDeploying}
             >
-                {#if isDeploying}
-                    Deploying... {deployProgress}%
-                {:else}
-                    📤 Deploy to ESP32
-                {/if}
+                {isDeploying ? `Deploying ${deployProgress}%` : "📤 Deploy"}
             </button>
         </div>
 
-        <!-- Training Progress -->
-        {#if isTraining}
-            <div
-                class="bg-zinc-800/30 rounded-xl p-4 border border-amber-500/20"
-            >
-                <div class="flex justify-between text-xs text-zinc-400 mb-1">
-                    <span>Epoch {trainingProgress.epoch}/100</span>
-                    <span>Loss: {trainingProgress.loss.toFixed(4)}</span>
-                </div>
-                <div class="h-2 bg-zinc-700 rounded-full overflow-hidden">
-                    <div
-                        class="h-full bg-amber-500 transition-all"
-                        style="width: {trainingProgress.epoch}%"
-                    ></div>
-                </div>
-            </div>
-        {/if}
-
-        <!-- Clear Button -->
         <button
-            class="w-full px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-xl border border-white/5 transition-all text-sm"
+            class="w-full py-2 hover:text-rose-400 text-zinc-600 transition-all text-[10px] uppercase font-bold tracking-widest"
             onclick={clearData}
         >
-            Clear Training Data
+            Reset All Training Data
         </button>
     </div>
 </div>

@@ -8,11 +8,11 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
-#include "RoboEyes/src/FluxGarage_RoboEyes.h"
+#include "MochiEyes.h"
 #include "gesture_trainer.h"
 
 // Forward declaration - will be set in main sketch
-extern RoboEyes<Adafruit_SH1106G>* pRoboEyes;
+extern MochiEyes<Adafruit_SH1106G>* pMochiEyes;
 extern Preferences preferences;
 
 // MPU6050 debug logging set in main sketch
@@ -31,13 +31,13 @@ extern bool shuffleNeedsInit;
 
 // Reset all effects to default
 void resetEffects() {
-  pRoboEyes->setCuriosity(OFF);
-  pRoboEyes->setHFlicker(OFF);
-  pRoboEyes->setVFlicker(OFF);
-  pRoboEyes->setSweat(OFF);
-  pRoboEyes->setIdleMode(OFF);
-  pRoboEyes->setEyebrows(false);
-  pRoboEyes->setKnocked(OFF);
+  pMochiEyes->setCuriosity(OFF);
+  pMochiEyes->setHFlicker(OFF);
+  pMochiEyes->setVFlicker(OFF);
+  pMochiEyes->setSweat(OFF);
+  pMochiEyes->setIdleMode(OFF);
+  pMochiEyes->setEyebrows(false);
+  pMochiEyes->setKnocked(OFF);
 }
 
 // Print help menu to Serial
@@ -66,17 +66,22 @@ String handleCommand(String cmd) {
   
   if (cmd.length() == 0) return "Empty command";
   
-  // IMPORTANT: Handle weight transfer commands BEFORE toLowerCase
-  // Base64 is case-sensitive!
+  // Handle weight transfer BEFORE toLowerCase (base64 is case-sensitive!)
   if (cmd.startsWith("gw+")) {
     String chunk = cmd.substring(3);
     appendWeightChunk(chunk);
-    Serial.print(F("> gw+ chunk: ")); Serial.println(chunk.length());
     return "gw+ok";
   }
+  if (cmd == "gw!") {
+    if (finalizeWeights()) {
+      return "gw:ok";
+    } else {
+      return "gw:err";
+    }
+  }
   if (cmd.startsWith("gw=")) {
+    // Direct single-chunk weight load (for small models)
     String base64data = cmd.substring(3);
-    Serial.print(F("> gw= data: ")); Serial.println(base64data.length());
     if (loadWeightsFromBase64(base64data)) {
       return "gw:ok";
     } else {
@@ -93,197 +98,197 @@ String handleCommand(String cmd) {
   // ==================== EXPRESSIONS ====================
   if (cmd == "happy") {
     resetEffects();
-    pRoboEyes->setMood(HAPPY);
-    pRoboEyes->setPosition(DEFAULT);
-    pRoboEyes->anim_laugh();
-    pRoboEyes->setMouthType(1);
+    pMochiEyes->setMood(HAPPY);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->anim_laugh();
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Expression: Happy"));
   }
   else if (cmd == "sad") {
     resetEffects();
-    pRoboEyes->setMood(TIRED);
-    pRoboEyes->setPosition(DEFAULT);
-    pRoboEyes->setMouthType(2);
+    pMochiEyes->setMood(TIRED);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(2);
     Serial.println(F("Expression: Sad"));
   }
   else if (cmd == "angry") {
     resetEffects();
-    pRoboEyes->setMood(ANGRY);
-    pRoboEyes->setPosition(DEFAULT);
-    pRoboEyes->setMouthType(5);
+    pMochiEyes->setMood(ANGRY);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(5);
     Serial.println(F("Expression: Angry"));
   }
   else if (cmd == "love") {
     resetEffects();
-    pRoboEyes->anim_love();
-    pRoboEyes->setMood(HAPPY);
-    pRoboEyes->setPosition(DEFAULT);
-    pRoboEyes->setMouthType(3);
+    pMochiEyes->anim_love();
+    pMochiEyes->setMood(HAPPY);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(3);
     Serial.println(F("Expression: Love"));
   }
   else if (cmd == "surprised") {
     resetEffects();
-    pRoboEyes->setMood(DEFAULT);
-    pRoboEyes->setCuriosity(ON);
-    pRoboEyes->setPosition(N);
-    pRoboEyes->blink();
-    pRoboEyes->setMouthType(3);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setCuriosity(ON);
+    pMochiEyes->setPosition(N);
+    pMochiEyes->blink();
+    pMochiEyes->setMouthType(3);
     Serial.println(F("Expression: Surprised"));
   }
   else if (cmd == "confused") {
     resetEffects();
-    pRoboEyes->setMood(DEFAULT);
-    pRoboEyes->anim_confused();
-    pRoboEyes->setMouthType(4);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->anim_confused();
+    pMochiEyes->setMouthType(4);
     Serial.println(F("Expression: Confused"));
   }
   else if (cmd == "sleepy") {
     resetEffects();
-    pRoboEyes->setMood(TIRED);
-    pRoboEyes->setPosition(SW);
-    pRoboEyes->setMouthType(5);
+    pMochiEyes->setMood(TIRED);
+    pMochiEyes->setPosition(SW);
+    pMochiEyes->setMouthType(5);
     Serial.println(F("Expression: Sleepy"));
   }
   else if (cmd == "curious") {
     resetEffects();
-    pRoboEyes->setMood(DEFAULT);
-    pRoboEyes->setCuriosity(ON);
-    pRoboEyes->setPosition(E);
-    pRoboEyes->setMouthType(4);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setCuriosity(ON);
+    pMochiEyes->setPosition(E);
+    pMochiEyes->setMouthType(4);
     Serial.println(F("Expression: Curious"));
   }
   else if (cmd == "nervous") {
     resetEffects();
-    pRoboEyes->setMood(DEFAULT);
-    pRoboEyes->setSweat(ON);
-    pRoboEyes->setCuriosity(ON);
-    pRoboEyes->setPosition(N);  // Use N instead of NW - left eye gets bigger with curious mode
-    pRoboEyes->setMouthType(2);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setSweat(ON);
+    pMochiEyes->setCuriosity(ON);
+    pMochiEyes->setPosition(N);  // Use N instead of NW - left eye gets bigger with curious mode
+    pMochiEyes->setMouthType(2);
     Serial.println(F("Expression: Nervous"));
   }
   else if (cmd == "knocked" || cmd == "dizzy") {
     resetEffects();
-    pRoboEyes->setKnocked(ON);
+    pMochiEyes->setKnocked(ON);
     Serial.println(F("Expression: Knocked"));
   }
   else if (cmd == "neutral" || cmd == "normal" || cmd == "reset") {
     resetEffects();
-    pRoboEyes->setMood(DEFAULT);
-    pRoboEyes->setPosition(DEFAULT);
-    pRoboEyes->setMouthType(1);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Expression: Neutral"));
   }
   else if (cmd == "idle") {
     resetEffects();
-    pRoboEyes->setMood(DEFAULT);
-    pRoboEyes->setIdleMode(ON, 1, 2);
-    pRoboEyes->setPosition(DEFAULT);
-    pRoboEyes->setMouthType(1);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setIdleMode(ON, 1, 2);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Mode: Idle"));
   }
   else if (cmd == "raised") {
     resetEffects();
-    pRoboEyes->setEyebrows(true);
-    pRoboEyes->setMood(DEFAULT);
-    pRoboEyes->setPosition(DEFAULT);
-    pRoboEyes->setMouthType(4);
+    pMochiEyes->setEyebrows(true);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(4);
     Serial.println(F("Expression: Raised eyebrows"));
   }
 
   // ==================== MOUTH ====================
   else if (cmd == "smile") {
-    pRoboEyes->setMouthType(1);
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Mouth: Smile"));
   }
   else if (cmd == "frown") {
-    pRoboEyes->setMouthType(2);
+    pMochiEyes->setMouthType(2);
     Serial.println(F("Mouth: Frown"));
   }
   else if (cmd == "open") {
-    pRoboEyes->setMouthType(3);
+    pMochiEyes->setMouthType(3);
     Serial.println(F("Mouth: Open"));
   }
   else if (cmd == "ooo") {
-    pRoboEyes->setMouthType(4);
+    pMochiEyes->setMouthType(4);
     Serial.println(F("Mouth: Ooo"));
   }
   else if (cmd == "flat") {
-    pRoboEyes->setMouthType(5);
+    pMochiEyes->setMouthType(5);
     Serial.println(F("Mouth: Flat"));
   }
   else if (cmd == "talk") {
-    pRoboEyes->startMouthAnim(1, 3000);
+    pMochiEyes->startMouthAnim(1, 3000);
     Serial.println(F("Mouth: Talking"));
   }
   else if (cmd == "chew") {
-    pRoboEyes->startMouthAnim(2, 2000);
+    pMochiEyes->startMouthAnim(2, 2000);
     Serial.println(F("Mouth: Chewing"));
   }
   else if (cmd == "wobble") {
-    pRoboEyes->startMouthAnim(3, 2000);
+    pMochiEyes->startMouthAnim(3, 2000);
     Serial.println(F("Mouth: Wobbling"));
   }
 
   // ==================== ACTIONS ====================
   else if (cmd == "blink") {
-    pRoboEyes->blink();
+    pMochiEyes->blink();
     Serial.println(F("Action: Blink"));
   }
   else if (cmd == "wink") {
-    pRoboEyes->wink(true);
-    pRoboEyes->setMouthType(1);
+    pMochiEyes->wink(true);
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Action: Wink"));
   }
   else if (cmd == "winkr") {
-    pRoboEyes->wink(false);
-    pRoboEyes->setMouthType(1);
+    pMochiEyes->wink(false);
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Action: Wink Right"));
   }
   else if (cmd == "laugh") {
-    pRoboEyes->anim_laugh();
+    pMochiEyes->anim_laugh();
     Serial.println(F("Action: Laugh"));
   }
   else if (cmd == "cry") {
-    pRoboEyes->anim_cry();
+    pMochiEyes->anim_cry();
     Serial.println(F("Action: Cry"));
   }
   // knocked moved to expressions
 
   // ==================== POSITIONS ====================
   else if (cmd == "center") {
-    pRoboEyes->setPosition(DEFAULT);
+    pMochiEyes->setPosition(DEFAULT);
     Serial.println(F("Position: Center"));
   }
   else if (cmd == "n" || cmd == "up") {
-    pRoboEyes->setPosition(N);
+    pMochiEyes->setPosition(N);
     Serial.println(F("Position: North"));
   }
   else if (cmd == "ne") {
-    pRoboEyes->setPosition(NE);
+    pMochiEyes->setPosition(NE);
     Serial.println(F("Position: North-East"));
   }
   else if (cmd == "e" || cmd == "right") {
-    pRoboEyes->setPosition(E);
+    pMochiEyes->setPosition(E);
     Serial.println(F("Position: East"));
   }
   else if (cmd == "se") {
-    pRoboEyes->setPosition(SE);
+    pMochiEyes->setPosition(SE);
     Serial.println(F("Position: South-East"));
   }
   else if (cmd == "s" || cmd == "down") {
-    pRoboEyes->setPosition(S);
+    pMochiEyes->setPosition(S);
     Serial.println(F("Position: South"));
   }
   else if (cmd == "sw") {
-    pRoboEyes->setPosition(SW);
+    pMochiEyes->setPosition(SW);
     Serial.println(F("Position: South-West"));
   }
   else if (cmd == "w" || cmd == "left") {
-    pRoboEyes->setPosition(W);
+    pMochiEyes->setPosition(W);
     Serial.println(F("Position: West"));
   }
   else if (cmd == "nw") {
-    pRoboEyes->setPosition(NW);
+    pMochiEyes->setPosition(NW);
     Serial.println(F("Position: North-West"));
   }
 
@@ -291,21 +296,21 @@ String handleCommand(String cmd) {
   else if (cmd == "sweat") {
     static bool sweatOn = false;
     sweatOn = !sweatOn;
-    pRoboEyes->setSweat(sweatOn);
+    pMochiEyes->setSweat(sweatOn);
     Serial.print(F("Sweat: "));
     Serial.println(sweatOn ? F("ON") : F("OFF"));
   }
   else if (cmd == "cyclops") {
     static bool cyclopsOn = false;
     cyclopsOn = !cyclopsOn;
-    pRoboEyes->setCyclops(cyclopsOn);
+    pMochiEyes->setCyclops(cyclopsOn);
     Serial.print(F("Cyclops: "));
     Serial.println(cyclopsOn ? F("ON") : F("OFF"));
   }
   else if (cmd == "mouth") {
     static bool mouthOn = true;
     mouthOn = !mouthOn;
-    pRoboEyes->setMouthEnabled(mouthOn);
+    pMochiEyes->setMouthEnabled(mouthOn);
     Serial.print(F("Mouth: "));
     Serial.println(mouthOn ? F("ON") : F("OFF"));
   }
@@ -338,7 +343,11 @@ String handleCommand(String cmd) {
       current += "lt=" + String(preferences.getInt("lt", 1000)) + "\n";
       
       current += "vt=" + String(preferences.getInt("vt", 2000)) + ",";
-      current += "bi=" + String(preferences.getInt("bi", 3));
+      current += "bi=" + String(preferences.getInt("bi", 3)) + "\n";
+      
+      current += "gs=" + String(preferences.getInt("gs", 6)) + ",";
+      current += "os=" + String(preferences.getInt("os", 12)) + ",";
+      current += "ss=" + String(preferences.getInt("ss", 10));
       return current;
     }
     
@@ -353,29 +362,38 @@ String handleCommand(String cmd) {
         int value = params.substring(eqPos + 1, commaPos).toInt();
         
         if (key == "ew") {
-          pRoboEyes->setWidth(value, value);
+          pMochiEyes->setWidth(value, value);
           preferences.putInt("ew", value);
         } else if (key == "eh") {
-          pRoboEyes->setHeight(value, value);
+          pMochiEyes->setHeight(value, value);
           preferences.putInt("eh", value);
         } else if (key == "es") {
-          pRoboEyes->setSpacebetween(value);
+          pMochiEyes->setSpacebetween(value);
           preferences.putInt("es", value);
         } else if (key == "er") {
-          pRoboEyes->setBorderradius(value, value);
+          pMochiEyes->setBorderradius(value, value);
           preferences.putInt("er", value);
         } else if (key == "mw") {
-          pRoboEyes->setMouthSize(value, 6);
+          pMochiEyes->setMouthSize(value, 6);
           preferences.putInt("mw", value);
         } else if (key == "lt") {
-          pRoboEyes->setLaughDuration(value);
+          pMochiEyes->setLaughDuration(value);
           preferences.putInt("lt", value);
         } else if (key == "vt") {
-          pRoboEyes->setLoveDuration(value);
+          pMochiEyes->setLoveDuration(value);
           preferences.putInt("vt", value);
         } else if (key == "bi") {
-          pRoboEyes->setAutoblinker(true, value, 3);
+          pMochiEyes->setAutoblinker(true, value, 3);
           preferences.putInt("bi", value);
+        } else if (key == "gs") {
+          pMochiEyes->setGazeSpeed((float)value);
+          preferences.putInt("gs", value);
+        } else if (key == "os") {
+          pMochiEyes->setOpennessSpeed((float)value);
+          preferences.putInt("os", value);
+        } else if (key == "ss") {
+          pMochiEyes->setSquishSpeed((float)value);
+          preferences.putInt("ss", value);
         }
       }
       idx = commaPos + 1;
@@ -394,14 +412,6 @@ String handleCommand(String cmd) {
   else if (cmd == "gx") {
     stopStreaming();
     return "gs:0";
-  }
-  // gw! = finalize chunked weight transfer
-  else if (cmd == "gw!") {
-    if (finalizeWeights()) {
-      return "gw:ok";
-    } else {
-      return "gw:err";
-    }
   }
   // gl=index:name:action = set gesture label
   else if (cmd.startsWith("gl=")) {

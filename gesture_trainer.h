@@ -1,12 +1,14 @@
 /*
- * gesture_trainer.h - Gesture recognition with browser-based ML training
+ * gesture_trainer.h - Gesture Recognition with Neural Network
+ * 
+ * Architecture: Input(150) -> Dense(16) -> ReLU -> Dense(N) -> Softmax
  * 
  * Flow:
  * 1. Browser sends "gs" to start streaming gyro data
- * 2. ESP32 streams "gd:x,y,z" samples via BLE
+ * 2. ESP32 streams "gd:x,y,z" samples via BLE (50 samples @ 40ms = 2 sec window)
  * 3. Browser trains TensorFlow.js model
- * 4. Browser sends "gw=base64weights" to upload model
- * 5. ESP32 runs inference locally
+ * 4. Browser sends weights via "gw+" chunks + "gw!" to finalize
+ * 5. ESP32 runs inference using simple matrix multiply
  */
 
 #ifndef GESTURE_TRAINER_H
@@ -16,26 +18,26 @@
 #include <Preferences.h>
 
 // ==================== Configuration ====================
-#define SAMPLE_COUNT 25          // Samples per gesture (~2 sec at 80ms)
-#define SAMPLE_INTERVAL_MS 40    // Time between samples (40ms * 25 = 1s)
-#define INPUT_SIZE 75            // 25 samples * 3 axes
-#define HIDDEN_SIZE 24           // Hidden layer neurons
-#define OUTPUT_SIZE 5            // Max gesture classes (5)
-#define MATCH_THRESHOLD 0.7f     // Confidence threshold
+#define SAMPLE_COUNT 50          // Samples per gesture (2 sec window)
+#define SAMPLE_INTERVAL_MS 40    // Time between samples (25 Hz)
+#define INPUT_SIZE 150           // 50 samples * 3 axes
+#define HIDDEN_SIZE 16           // Hidden layer neurons
+#define OUTPUT_SIZE 5            // Max gesture classes
+#define MATCH_COOLDOWN_MS 1000   // Cooldown between detections
+
+// Weight sizes
+// W1: INPUT_SIZE * HIDDEN_SIZE = 150 * 16 = 2400
+// B1: HIDDEN_SIZE = 16
+// W2: HIDDEN_SIZE * OUTPUT_SIZE = 16 * 5 = 80 (max)
+// B2: OUTPUT_SIZE = 5 (max)
+// Total max: 2400 + 16 + 80 + 5 = 2501 floats
+
+#define MAX_WEIGHTS (INPUT_SIZE * HIDDEN_SIZE + HIDDEN_SIZE + HIDDEN_SIZE * OUTPUT_SIZE + OUTPUT_SIZE)
 
 // ==================== Neural Network Weights ====================
-// Model: 75 inputs -> 24 hidden (ReLU) -> 5 outputs (Softmax)
-// Weights: (75*24) + 24 + (24*5) + 5 = 1800 + 24 + 120 + 5 = 1949 floats
-#define TOTAL_WEIGHTS 1949
-
-float nn_weights[TOTAL_WEIGHTS];  // Stored weights from browser
+float nn_weights[MAX_WEIGHTS];
 bool weights_loaded = false;
-
-// Weight layout indices
-#define W1_START 0              // 75*24 = 1800 weights
-#define B1_START 1800           // 24 biases
-#define W2_START 1824           // 24*5 = 120 weights  
-#define B2_START 1944           // 5 biases
+int num_gestures = 0;
 
 // ==================== Gesture Labels ====================
 char gesture_labels[OUTPUT_SIZE][16] = {
@@ -44,33 +46,34 @@ char gesture_labels[OUTPUT_SIZE][16] = {
 char gesture_actions[OUTPUT_SIZE][32] = {
   "", "", "", "", ""
 };
-int num_gestures = 0;
 
 // ==================== Streaming State ====================
 bool is_streaming = false;
 unsigned long last_stream_time = 0;
-
-// ==================== Chunked Weight Transfer ====================
-// Weights arrive as multiple base64 chunks via BLE
-String weight_buffer = "";  // Accumulates base64 chunks
-bool weight_transfer_active = false;
+int stream_sample_count = 0;
 
 // ==================== Inference State ====================
 bool matching_enabled = false;
-float sample_buffer_x[SAMPLE_COUNT];
-float sample_buffer_y[SAMPLE_COUNT];
-float sample_buffer_z[SAMPLE_COUNT];
+float sample_buffer[INPUT_SIZE];  // Rolling buffer for inference
 int sample_index = 0;
-bool buffer_ready = false;
 unsigned long last_sample_time = 0;
 unsigned long last_match_time = 0;
-#define MATCH_COOLDOWN_MS 500
+
+// ==================== Weight Transfer ====================
+String weight_buffer = "";
+bool weight_transfer_active = false;
 
 // ==================== Preferences Storage ====================
 Preferences gesturePrefs;
 
 // ==================== Forward Declarations ====================
 extern void sendBLEStatus(const String& status);
+extern int readGyroData(uint8_t addr, float &gx, float &gy, float &gz);
+extern int rawGyroToDPS(float gx, float gy, float gz, float &dpsX, float &dpsY, float &dpsZ);
+extern float rawGX, rawGY, rawGZ;
+extern float dpsGX, dpsGY, dpsGZ;
+extern String handleCommand(String cmd);
+#define MPU_ADDRESS 0x68
 
 // ==================== Calibration ====================
 float gyroXoffset = 0, gyroYoffset = 0, gyroZoffset = 0;
@@ -97,97 +100,120 @@ void calibrateGyro() {
 // ==================== Neural Network Inference ====================
 
 // ReLU activation
-float relu(float x) {
+inline float relu(float x) {
   return x > 0 ? x : 0;
 }
 
-// Run inference on input buffer
-// Returns class index or -1 if below threshold
+// Softmax activation (in-place)
+void softmax(float* output, int size) {
+  float maxVal = output[0];
+  for (int i = 1; i < size; i++) {
+    if (output[i] > maxVal) maxVal = output[i];
+  }
+  
+  float sum = 0;
+  for (int i = 0; i < size; i++) {
+    output[i] = exp(output[i] - maxVal);
+    sum += output[i];
+  }
+  
+  for (int i = 0; i < size; i++) {
+    output[i] /= sum;
+  }
+}
+
+// Run neural network inference
+// Returns class index with highest probability, or -1 if no match
 int runInference(float* input) {
-  if (!weights_loaded) return -1;
+  if (!weights_loaded || num_gestures == 0) return -1;
   
-  // Layer 1: Input (75) -> Hidden (24) with ReLU
+  // Weight layout in nn_weights:
+  // W1: [0 .. INPUT_SIZE*HIDDEN_SIZE-1]
+  // B1: [INPUT_SIZE*HIDDEN_SIZE .. INPUT_SIZE*HIDDEN_SIZE+HIDDEN_SIZE-1]
+  // W2: [INPUT_SIZE*HIDDEN_SIZE+HIDDEN_SIZE .. ...]
+  // B2: [... to end]
+  
+  const int W1_offset = 0;
+  const int B1_offset = INPUT_SIZE * HIDDEN_SIZE;
+  const int W2_offset = B1_offset + HIDDEN_SIZE;
+  const int B2_offset = W2_offset + HIDDEN_SIZE * num_gestures;
+  
+  // Layer 1: hidden = ReLU(input @ W1 + B1)
   float hidden[HIDDEN_SIZE];
-  for (int j = 0; j < HIDDEN_SIZE; j++) {
-    float sum = nn_weights[B1_START + j];  // Bias
+  for (int h = 0; h < HIDDEN_SIZE; h++) {
+    float sum = nn_weights[B1_offset + h];  // bias
     for (int i = 0; i < INPUT_SIZE; i++) {
-      sum += input[i] * nn_weights[W1_START + i * HIDDEN_SIZE + j];
+      // W1 is stored as [INPUT_SIZE, HIDDEN_SIZE] row-major
+      sum += input[i] * nn_weights[W1_offset + i * HIDDEN_SIZE + h];
     }
-    hidden[j] = relu(sum);
+    hidden[h] = relu(sum);
   }
   
-  // Layer 2: Hidden (24) -> Output (8) with Softmax
+  // Layer 2: output = Softmax(hidden @ W2 + B2)
   float output[OUTPUT_SIZE];
-  float max_val = -1e9;
-  for (int j = 0; j < OUTPUT_SIZE; j++) {
-    float sum = nn_weights[B2_START + j];  // Bias
-    for (int i = 0; i < HIDDEN_SIZE; i++) {
-      sum += hidden[i] * nn_weights[W2_START + i * OUTPUT_SIZE + j];
+  for (int o = 0; o < num_gestures; o++) {
+    float sum = nn_weights[B2_offset + o];  // bias
+    for (int h = 0; h < HIDDEN_SIZE; h++) {
+      sum += hidden[h] * nn_weights[W2_offset + h * num_gestures + o];
     }
-    output[j] = sum;
-    if (sum > max_val) max_val = sum;
+    output[o] = sum;
   }
   
-  // Softmax normalization
-  float exp_sum = 0;
-  for (int j = 0; j < OUTPUT_SIZE; j++) {
-    output[j] = exp(output[j] - max_val);  // Subtract max for numerical stability
-    exp_sum += output[j];
-  }
-  for (int j = 0; j < OUTPUT_SIZE; j++) {
-    output[j] /= exp_sum;
-  }
+  // Apply softmax
+  softmax(output, num_gestures);
   
   // Find best class
-  int best_class = -1;
-  float best_prob = 0;
-  for (int j = 0; j < num_gestures && j < OUTPUT_SIZE; j++) {
-    if (output[j] > best_prob) {
-      best_prob = output[j];
-      best_class = j;
+  int best_class = 0;
+  float best_prob = output[0];
+  for (int i = 1; i < num_gestures; i++) {
+    if (output[i] > best_prob) {
+      best_prob = output[i];
+      best_class = i;
     }
   }
   
-  // Debug
-  Serial.print(F("Inference: "));
-  for (int j = 0; j < num_gestures; j++) {
-    Serial.print(output[j]); Serial.print(F(" "));
-  }
-  Serial.println();
-  
-  if (best_prob >= MATCH_THRESHOLD) {
+  // Only return if confidence > 50%
+  if (best_prob > 0.5f) {
+    Serial.print(F("✓ Match: ")); Serial.print(gesture_labels[best_class]);
+    Serial.print(F(" (conf: ")); Serial.print(best_prob * 100.0f, 1);
+    Serial.println(F("%)"));
     return best_class;
   }
-  return -1;
+  
+  return -1;  // No confident match
 }
 
 // ==================== Streaming Functions ====================
 
 void startStreaming() {
   is_streaming = true;
+  stream_sample_count = 0;
   last_stream_time = millis();
-  Serial.println(F("Gyro streaming started"));
+  Serial.println(F("Gyro streaming started (2s window, 50 samples)"));
 }
 
 void stopStreaming() {
   is_streaming = false;
-  Serial.println(F("Gyro streaming stopped"));
+  Serial.print(F("Gyro streaming stopped. Samples sent: "));
+  Serial.println(stream_sample_count);
 }
 
 bool isStreaming() {
   return is_streaming;
 }
 
-// Called from main loop with gyro data
+// Stream gyro data to browser for training
 void processGyroForStreaming(float gx, float gy, float gz) {
   if (!is_streaming) return;
   
   unsigned long now = millis();
   if (now - last_stream_time >= SAMPLE_INTERVAL_MS) {
-    // Send sample via BLE: gd:x,y,z
-    String msg = "gd:" + String(gx - gyroXoffset, 3) + "," + String(gy - gyroYoffset, 3) + "," + String(gz - gyroZoffset, 3);
+    String msg = "gd:" + String(gx - gyroXoffset, 3) + "," + 
+                        String(gy - gyroYoffset, 3) + "," + 
+                        String(gz - gyroZoffset, 3);
     sendBLEStatus(msg);
     last_stream_time = now;
+    stream_sample_count++;
   }
 }
 
@@ -199,37 +225,29 @@ void processGyroForInference(float gx, float gy, float gz) {
   
   unsigned long now = millis();
   if (now - last_sample_time >= SAMPLE_INTERVAL_MS) {
-    sample_buffer_x[sample_index] = gx - gyroXoffset;
-    sample_buffer_y[sample_index] = gy - gyroYoffset;
-    sample_buffer_z[sample_index] = gz - gyroZoffset;
+    // Add calibrated sample to buffer
+    // Buffer format: [x0..x49, y0..y49, z0..z49]
+    int xi = sample_index;
+    int yi = SAMPLE_COUNT + sample_index;
+    int zi = 2 * SAMPLE_COUNT + sample_index;
+    
+    sample_buffer[xi] = gx - gyroXoffset;
+    sample_buffer[yi] = gy - gyroYoffset;
+    sample_buffer[zi] = gz - gyroZoffset;
+    
     sample_index++;
     last_sample_time = now;
     
     if (sample_index >= SAMPLE_COUNT) {
       // Buffer full - run inference
-      float input[INPUT_SIZE];
-      int idx = 0;
-      for (int i = 0; i < SAMPLE_COUNT; i++) input[idx++] = sample_buffer_x[i];
-      for (int i = 0; i < SAMPLE_COUNT; i++) input[idx++] = sample_buffer_y[i];
-      for (int i = 0; i < SAMPLE_COUNT; i++) input[idx++] = sample_buffer_z[i];
-      
-// Forward declaration
-extern String handleCommand(String cmd);
-
-// ...
-
-      int result = runInference(input);
+      int result = runInference(sample_buffer);
       if (result >= 0) {
-        Serial.print(F("✓ Matched: ")); Serial.println(gesture_labels[result]);
         last_match_time = millis();
         
         // Execute action if defined
         if (strlen(gesture_actions[result]) > 0) {
-          String action = gesture_actions[result];
           sendBLEStatus("gm:" + String(gesture_labels[result]));
-          
-          // Actually execute the action!
-          handleCommand(action); 
+          handleCommand(gesture_actions[result]);
         }
       }
       
@@ -242,7 +260,6 @@ extern String handleCommand(String cmd);
 
 // Decode base64 weights from browser
 bool loadWeightsFromBase64(const String& base64data) {
-  // Simple base64 decode
   static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   
   int len = base64data.length();
@@ -251,12 +268,12 @@ bool loadWeightsFromBase64(const String& base64data) {
     return false;
   }
   
-  // Decode to bytes first
-  memset(nn_weights, 0, sizeof(nn_weights)); // Clear buffer first
+  // Clear weights
+  memset(nn_weights, 0, sizeof(nn_weights));
   
   int byte_count = 0;
-  uint8_t* bytes = (uint8_t*)nn_weights;  // Reuse buffer temporarily
-  int max_bytes = TOTAL_WEIGHTS * 4;
+  uint8_t* bytes = (uint8_t*)nn_weights;
+  int max_bytes = MAX_WEIGHTS * 4;
   
   for (int i = 0; i < len && byte_count < max_bytes; i += 4) {
     uint32_t n = 0;
@@ -277,32 +294,20 @@ bool loadWeightsFromBase64(const String& base64data) {
     }
   }
   
-
-  
-  // Now bytes contain the float data (little-endian)
-  // The data is already in nn_weights buffer since we decoded in-place
-  
-  int expected = TOTAL_WEIGHTS * 4;
-  if (byte_count < expected) {
-    Serial.print(F("Got ")); Serial.print(byte_count);
-    Serial.print(F(" bytes, expected ")); Serial.println(expected);
-    // Still try to use what we got
-  }
+  int float_count = byte_count / 4;
+  Serial.print(F("Loaded ")); Serial.print(float_count); Serial.println(F(" weights"));
   
   weights_loaded = true;
-  Serial.println(F("Weights loaded successfully"));
-  
-
   
   // Save to flash
   gesturePrefs.begin("gestures", false);
   gesturePrefs.putBytes("weights", nn_weights, sizeof(nn_weights));
   gesturePrefs.putInt("num_gestures", num_gestures);
-  // Persist labels and actions
   gesturePrefs.putBytes("labels", gesture_labels, sizeof(gesture_labels));
   gesturePrefs.putBytes("actions", gesture_actions, sizeof(gesture_actions));
   gesturePrefs.end();
   
+  Serial.println(F("Weights saved to flash"));
   return true;
 }
 
@@ -313,7 +318,6 @@ void setGestureLabel(int index, const char* label, const char* action) {
   strncpy(gesture_actions[index], action, 31);
   if (index >= num_gestures) num_gestures = index + 1;
   
-  // Save metadata update immediately (optional, or rely on deploy)
   gesturePrefs.begin("gestures", false);
   gesturePrefs.putBytes("labels", gesture_labels, sizeof(gesture_labels));
   gesturePrefs.putBytes("actions", gesture_actions, sizeof(gesture_actions));
@@ -323,28 +327,24 @@ void setGestureLabel(int index, const char* label, const char* action) {
 
 // ==================== Chunked Weight Transfer ====================
 
-// Start a new weight transfer (clears buffer)
 void startWeightTransfer() {
-  weights_loaded = false; // Disable inference explicitly
+  weights_loaded = false;
   weight_buffer = "";
-  weight_buffer.reserve(11000); // Pre-allocate to prevent fragmentation
+  weight_buffer.reserve(15000);
   weight_transfer_active = true;
   Serial.println(F("Weight transfer started"));
 }
 
-// Append a chunk of base64 weight data
 void appendWeightChunk(const String& chunk) {
   if (!weight_transfer_active) {
     startWeightTransfer();
   }
   weight_buffer += chunk;
-  // Reduce verbose logging
   if (weight_buffer.length() % 1000 < 50) {
-     Serial.print(F("."));
+    Serial.print(F("."));
   }
 }
 
-// Finalize weight transfer - decode and load
 bool finalizeWeights() {
   if (weight_buffer.length() < 100) {
     Serial.println(F("Weight buffer too small"));
@@ -352,10 +352,10 @@ bool finalizeWeights() {
     return false;
   }
   
-  Serial.print(F("Finalizing ")); Serial.print(weight_buffer.length()); Serial.println(F(" chars..."));
+  Serial.print(F("\nFinalizing ")); Serial.print(weight_buffer.length()); Serial.println(F(" chars..."));
   
   bool result = loadWeightsFromBase64(weight_buffer);
-  weight_buffer = "";  // Free memory
+  weight_buffer = "";
   weight_transfer_active = false;
   
   return result;
@@ -364,17 +364,15 @@ bool finalizeWeights() {
 // ==================== Initialization ====================
 
 void initGestureTrainer() {
-  // Load weights from flash
   gesturePrefs.begin("gestures", true);
   size_t len = gesturePrefs.getBytesLength("weights");
   if (len == sizeof(nn_weights)) {
     gesturePrefs.getBytes("weights", nn_weights, sizeof(nn_weights));
     weights_loaded = true;
     num_gestures = gesturePrefs.getInt("num_gestures", 0);
-    // Load labels and actions
     if (gesturePrefs.getBytesLength("labels") == sizeof(gesture_labels)) {
-       gesturePrefs.getBytes("labels", gesture_labels, sizeof(gesture_labels));
-       gesturePrefs.getBytes("actions", gesture_actions, sizeof(gesture_actions));
+      gesturePrefs.getBytes("labels", gesture_labels, sizeof(gesture_labels));
+      gesturePrefs.getBytes("actions", gesture_actions, sizeof(gesture_actions));
     }
     Serial.print(F("Loaded NN weights for "));
     Serial.print(num_gestures);
@@ -383,6 +381,8 @@ void initGestureTrainer() {
     Serial.println(F("No saved weights found"));
   }
   gesturePrefs.end();
+  
+  Serial.println(F("Gesture trainer ready (50 samples @ 40ms = 2s window)"));
 }
 
 // ==================== Control Functions ====================
@@ -390,6 +390,7 @@ void initGestureTrainer() {
 void setMatchingEnabled(bool enabled) {
   matching_enabled = enabled;
   sample_index = 0;
+  memset(sample_buffer, 0, sizeof(sample_buffer));
   Serial.print(F("Matching: ")); Serial.println(enabled ? F("ON") : F("OFF"));
 }
 
@@ -418,6 +419,8 @@ void clearAllGestures() {
   weights_loaded = false;
   num_gestures = 0;
   memset(nn_weights, 0, sizeof(nn_weights));
+  memset(gesture_labels, 0, sizeof(gesture_labels));
+  memset(gesture_actions, 0, sizeof(gesture_actions));
   gesturePrefs.begin("gestures", false);
   gesturePrefs.clear();
   gesturePrefs.end();

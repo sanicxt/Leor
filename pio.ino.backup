@@ -24,7 +24,7 @@ WebServer server(80);
 Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 
-#include "RoboEyes/src/FluxGarage_RoboEyes.h"
+#include "FluxGarage_RoboEyes.h"
 RoboEyes<Adafruit_SH1106G> roboEyes(display);
 
 String inputBuffer = "";

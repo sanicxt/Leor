@@ -13,7 +13,8 @@ export const bleState = $state({
     shuffleNeutralMax: 5,
     settings: {
         ew: 36, eh: 36, es: 10, er: 8,
-        mw: 20, lt: 1000, vt: 2000, bi: 3
+        mw: 20, lt: 1000, vt: 2000, bi: 3,
+        gs: 6, os: 12, ss: 10  // gaze speed, openness speed, squish speed
     }
 });
 
@@ -40,6 +41,9 @@ export function getSettingsMw() { return bleState.settings.mw; }
 export function getSettingsLt() { return bleState.settings.lt; }
 export function getSettingsVt() { return bleState.settings.vt; }
 export function getSettingsBi() { return bleState.settings.bi; }
+export function getSettingsGs() { return bleState.settings.gs; }
+export function getSettingsOs() { return bleState.settings.os; }
+export function getSettingsSs() { return bleState.settings.ss; }
 
 // Setters
 export function setShuffleEnabled(val: boolean) { bleState.shuffleEnabled = val; }
@@ -57,6 +61,9 @@ export function setSettingsMw(val: number) { bleState.settings.mw = val; }
 export function setSettingsLt(val: number) { bleState.settings.lt = val; }
 export function setSettingsVt(val: number) { bleState.settings.vt = val; }
 export function setSettingsBi(val: number) { bleState.settings.bi = val; }
+export function setSettingsGs(val: number) { bleState.settings.gs = val; }
+export function setSettingsOs(val: number) { bleState.settings.os = val; }
+export function setSettingsSs(val: number) { bleState.settings.ss = val; }
 
 export async function connect(): Promise<boolean> {
     try {
@@ -84,7 +91,7 @@ export async function connect(): Promise<boolean> {
             bleState.lastStatus = value;
 
             // Parse settings from response
-            const settingsParams = ['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi'];
+            const settingsParams = ['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss'];
             if (value.includes('=')) {
                 settingsParams.forEach(param => {
                     const match = value.match(new RegExp(`${param}=(\\d+(\\.\\d+)?)`));

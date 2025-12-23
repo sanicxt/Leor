@@ -11,6 +11,9 @@
         getSettingsLt,
         getSettingsVt,
         getSettingsBi,
+        getSettingsGs,
+        getSettingsOs,
+        getSettingsSs,
         setSettingsEw,
         setSettingsEh,
         setSettingsEs,
@@ -19,6 +22,9 @@
         setSettingsLt,
         setSettingsVt,
         setSettingsBi,
+        setSettingsGs,
+        setSettingsOs,
+        setSettingsSs,
     } from "$lib/ble.svelte";
 
     async function applySettings() {
@@ -37,6 +43,12 @@
 
         // Timings
         await sendCommand(`s:lt=${getSettingsLt()},vt=${getSettingsVt()}`);
+        await new Promise((r) => setTimeout(r, 50));
+
+        // Animation Speeds
+        await sendCommand(
+            `s:gs=${getSettingsGs()},os=${getSettingsOs()},ss=${getSettingsSs()}`,
+        );
     }
 
     async function syncSettings() {
@@ -253,6 +265,76 @@
                     value={getSettingsBi()}
                     oninput={(e) =>
                         setSettingsBi(parseFloat(e.currentTarget.value))}
+                    onchange={applySettings}
+                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                />
+            </div>
+        </div>
+    </div>
+
+    <!-- Animation Speeds -->
+    <div class="pt-4 border-t border-white/5">
+        <h4
+            class="text-zinc-400 text-xs font-bold uppercase tracking-wider mb-4"
+        >
+            Animation Speeds
+        </h4>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="space-y-2">
+                <div class="flex justify-between text-sm">
+                    <label class="text-zinc-300">Gaze</label>
+                    <span class="text-indigo-400 font-mono"
+                        >{getSettingsGs()}</span
+                    >
+                </div>
+                <input
+                    type="range"
+                    min="1"
+                    max="20"
+                    step="1"
+                    value={getSettingsGs()}
+                    oninput={(e) =>
+                        setSettingsGs(parseInt(e.currentTarget.value))}
+                    onchange={applySettings}
+                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                />
+            </div>
+
+            <div class="space-y-2">
+                <div class="flex justify-between text-sm">
+                    <label class="text-zinc-300">Blink</label>
+                    <span class="text-indigo-400 font-mono"
+                        >{getSettingsOs()}</span
+                    >
+                </div>
+                <input
+                    type="range"
+                    min="4"
+                    max="30"
+                    step="1"
+                    value={getSettingsOs()}
+                    oninput={(e) =>
+                        setSettingsOs(parseInt(e.currentTarget.value))}
+                    onchange={applySettings}
+                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                />
+            </div>
+
+            <div class="space-y-2">
+                <div class="flex justify-between text-sm">
+                    <label class="text-zinc-300">Squish</label>
+                    <span class="text-indigo-400 font-mono"
+                        >{getSettingsSs()}</span
+                    >
+                </div>
+                <input
+                    type="range"
+                    min="2"
+                    max="20"
+                    step="1"
+                    value={getSettingsSs()}
+                    oninput={(e) =>
+                        setSettingsSs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
                 />

@@ -47,10 +47,10 @@ float gForceAX, gForceAY, gForceAZ; // initialise g force accelerometer variable
 
 static unsigned long last_interval_ms = 0;
 
-// ==================== RoboEyes ====================
-#include "RoboEyes/src/FluxGarage_RoboEyes.h"
-RoboEyes<Adafruit_SH1106G> roboEyes(display);
-RoboEyes<Adafruit_SH1106G>* pRoboEyes = &roboEyes;  // Pointer for commands.h
+// ==================== MochiEyes ====================
+#include "MochiEyes.h"
+MochiEyes<Adafruit_SH1106G> mochiEyes(display);
+MochiEyes<Adafruit_SH1106G>* pMochiEyes = &mochiEyes;  // Pointer for commands.h
 
 // ==================== Gesture Training Overlay ====================
 // Called by gesture_trainer.h to draw training status on OLED
@@ -106,7 +106,7 @@ void setup() {
   
   // Initialize display
   display.begin(I2C_ADDRESS, true);
-  roboEyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, FRAME_RATE);
+  mochiEyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, FRAME_RATE);
   
   // Load settings from Preferences
   int ew = preferences.getInt("ew", 36);
@@ -121,14 +121,14 @@ void setup() {
   // pRoboEyes uses float for interval? No, setAutoblinker takes 'byte interval'.
   int bi = preferences.getInt("bi", 3);
   
-  roboEyes.setWidth(ew, ew);
-  roboEyes.setHeight(eh, eh);
-  roboEyes.setSpacebetween(es);
-  roboEyes.setBorderradius(er, er);
-  roboEyes.setMouthSize(mw, 6);
-  roboEyes.setLaughDuration(lt);
-  roboEyes.setLoveDuration(vt);
-  roboEyes.setAutoblinker(ON, bi, BLINK_VARIATION);
+  mochiEyes.setWidth(ew, ew);
+  mochiEyes.setHeight(eh, eh);
+  mochiEyes.setSpacebetween(es);
+  mochiEyes.setBorderradius(er, er);
+  mochiEyes.setMouthSize(mw, 6);
+  mochiEyes.setLaughDuration(lt);
+  mochiEyes.setLoveDuration(vt);
+  mochiEyes.setAutoblinker(true, (float)bi, (float)BLINK_VARIATION);
   
   Serial.println(F("✓ Display initialized & Settings loaded"));
   
@@ -154,8 +154,8 @@ void setup() {
   initGestureTrainer();
   
   // Ready!
-  roboEyes.setMood(DEFAULT);
-  roboEyes.setPosition(DEFAULT);
+  mochiEyes.setMood(0);  // DEFAULT
+  mochiEyes.setPosition(0);  // CENTER
   
   Serial.println(F("\n============================="));
   Serial.println(F("    leor Ready!"));
@@ -171,9 +171,9 @@ void loop() {
   // Check if in training mode
   bool training = isTraining();
   
-  // Update display - skip roboEyes when training
+  // Update display - skip mochiEyes when training
   if (!training) {
-    roboEyes.update();
+    mochiEyes.update();
   }
   
   // Draw streaming overlay if in streaming mode
@@ -289,9 +289,9 @@ void handleMPU6050() {
   if (isReacting && (now - reactionStartTime >= GESTURE_REACTION_MS)) {
     isReacting = false;
     resetEffects();
-    roboEyes.setMood(DEFAULT);
-    roboEyes.setPosition(DEFAULT);
-    roboEyes.setMouthType(1);
+    mochiEyes.setMood(DEFAULT);
+    mochiEyes.setPosition(DEFAULT);
+    mochiEyes.setMouthType(1);
     Serial.println(F("[GESTURE] Reaction ended, ready to detect"));
   }
   
@@ -303,7 +303,9 @@ void handleMPU6050() {
   int magnitudeInt = 0;
   float gxf = 0, gyf = 0, gzf = 0;
   
-
+  // EMA filtered values (persistent across calls)
+  static float filteredGX = 0, filteredGY = 0, filteredGZ = 0;
+  static const float EMA_ALPHA = 0.3f;  // 0.1 = very smooth, 0.5 = more responsive
   
   // Read MPU if available
   if (mpuAvailable) {
@@ -312,17 +314,27 @@ void handleMPU6050() {
       lastMpuRead = now;
       
       // Read gyro and accel data using new library
-      readGyroData(MPU_ADDRESS, rawGX, rawGY, rawGZ); // pass MPU6050 address and gyroscope values are written to 3 provided variables
-      rawGyroToDPS(rawGX, rawGY, rawGZ, dpsGX, dpsGY, dpsGZ); // provide the 3 raw gyroscope values and returns them in their dps (degrees per second) values
-      readAccelData(MPU_ADDRESS, rawAX, rawAY, rawAZ); // pass MPU6050 address and accelerometer values are written to 3 provided variables
-      rawAccelToGForce(rawAX, rawAY, rawAZ, gForceAX, gForceAY, gForceAZ); // provide the 3 raw accelerometer values and returns them in their g force values
+      readGyroData(MPU_ADDRESS, rawGX, rawGY, rawGZ);
+      rawGyroToDPS(rawGX, rawGY, rawGZ, dpsGX, dpsGY, dpsGZ);
+      readAccelData(MPU_ADDRESS, rawAX, rawAY, rawAZ);
+      rawAccelToGForce(rawAX, rawAY, rawAZ, gForceAX, gForceAY, gForceAZ);
       
-      // Convert dps to rad/s
-      gxf = dpsGX * (PI / 180.0f);
-      gyf = dpsGY * (PI / 180.0f);
-      gzf = dpsGZ * (PI / 180.0f);
+      // Convert dps to rad/s (raw values)
+      float rawGXf = dpsGX * (PI / 180.0f);
+      float rawGYf = dpsGY * (PI / 180.0f);
+      float rawGZf = dpsGZ * (PI / 180.0f);
       
-      // Calculate magnitude of angular velocity (gyroscope)
+      // Apply EMA low-pass filter for smoother data
+      filteredGX = EMA_ALPHA * rawGXf + (1.0f - EMA_ALPHA) * filteredGX;
+      filteredGY = EMA_ALPHA * rawGYf + (1.0f - EMA_ALPHA) * filteredGY;
+      filteredGZ = EMA_ALPHA * rawGZf + (1.0f - EMA_ALPHA) * filteredGZ;
+      
+      // Use filtered values
+      gxf = filteredGX;
+      gyf = filteredGY;
+      gzf = filteredGZ;
+      
+      // Calculate magnitude of angular velocity (from filtered data)
       magnitude = sqrt(gxf * gxf + gyf * gyf + gzf * gzf);
       magnitudeInt = (int)(magnitude * 100);
       

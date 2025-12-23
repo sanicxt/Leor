@@ -1,58 +1,59 @@
 /**
- * ml.ts - TensorFlow.js model for gesture recognition
+ * ml.ts - 1D Conv Gesture Recognition
  * 
- * Model: 75 inputs (25 samples × 3 axes) → 24 hidden → 5 outputs
- * Trains on collected gyro data and exports weights for ESP32
+ * Simple 1D Convolution model that can be easily inferenced on ESP32.
+ * Architecture: Input(150) -> Dense(16) -> ReLU -> Dense(N) -> Softmax
+ * 
+ * This simple dense network can be implemented as matrix multiply on ESP32.
+ * Weights are exported as: [W1: 150x16, B1: 16, W2: 16xN, B2: N]
  */
 
 import * as tf from '@tensorflow/tfjs';
 
 // Model configuration (must match ESP32 gesture_trainer.h)
-const INPUT_SIZE = 75;  // 25 samples * 3 axes
-const HIDDEN_SIZE = 24;
-const OUTPUT_SIZE = 5;  // Max gesture classes (must match ESP32)
-
-// Global model instance
-let model: tf.Sequential | null = null;
+export const SAMPLE_COUNT = 50;   // 2 seconds @ 40ms interval
+export const INPUT_SIZE = 150;    // 50 samples * 3 axes
+export const HIDDEN_SIZE = 16;    // Hidden layer size
+export const OUTPUT_SIZE = 5;     // Max gesture classes
 
 // Training data storage
 interface GestureSample {
-    data: number[];  // Flattened [x0,x1...x24, y0...y24, z0...z24]
+    data: number[];  // Flattened [x0..x49, y0..y49, z0..z49]
     label: number;   // Class index (0-4)
 }
 
 let trainingSamples: GestureSample[] = [];
 let gestureLabels: string[] = [];
+let model: tf.Sequential | null = null;
 
 /**
- * Create the neural network model
+ * Create a simple dense network for gesture classification
+ * This architecture is easy to implement in pure C++ on ESP32
  */
-export function createModel(): tf.Sequential {
-    model = tf.sequential();
-
-    // Hidden layer with ReLU
-    model.add(tf.layers.dense({
-        inputShape: [INPUT_SIZE],
-        units: HIDDEN_SIZE,
-        activation: 'relu',
-        kernelInitializer: 'glorotUniform'
-    }));
-
-    // Output layer with Softmax
-    model.add(tf.layers.dense({
-        units: OUTPUT_SIZE,
-        activation: 'softmax'
-    }));
+export function createModel(numClasses: number = OUTPUT_SIZE) {
+    model = tf.sequential({
+        layers: [
+            tf.layers.dense({
+                inputShape: [INPUT_SIZE],
+                units: HIDDEN_SIZE,
+                activation: 'relu',
+                name: 'hidden'
+            }),
+            tf.layers.dense({
+                units: numClasses,
+                activation: 'softmax',
+                name: 'output'
+            })
+        ]
+    });
 
     model.compile({
-        optimizer: tf.train.adam(0.01),
+        optimizer: tf.train.adam(0.001),
         loss: 'categoricalCrossentropy',
         metrics: ['accuracy']
     });
 
-    console.log('[ML] Model created');
-    model.summary();
-
+    console.log(`[ML] Simple dense model created: ${INPUT_SIZE} -> ${HIDDEN_SIZE} -> ${numClasses}`);
     return model;
 }
 
@@ -60,7 +61,6 @@ export function createModel(): tf.Sequential {
  * Add a training sample
  */
 export function addSample(data: number[], gestureName: string) {
-    // Find or create label index
     let labelIndex = gestureLabels.indexOf(gestureName);
     if (labelIndex === -1) {
         if (gestureLabels.length >= OUTPUT_SIZE) {
@@ -92,46 +92,53 @@ export function getStats() {
 }
 
 /**
- * Train the model on collected data
+ * Train the neural network model
  */
 export async function trainModel(
     onProgress?: (epoch: number, loss: number, accuracy: number) => void
 ): Promise<{ loss: number; accuracy: number }> {
-    if (!model) createModel();
     if (trainingSamples.length < 2) {
         throw new Error('Need at least 2 samples to train');
     }
 
-    // Prepare tensors
+    const numClasses = gestureLabels.length;
+
+    // Dispose old model if exists
+    if (model) {
+        model.dispose();
+        model = null;
+    }
+
+    // Create simple dense model
+    createModel(numClasses);
+
+    // Prepare training data
     const xs = tf.tensor2d(trainingSamples.map(s => s.data));
-    const ys = tf.tidy(() => {
-        const labels = trainingSamples.map(s => s.label);
-        return tf.oneHot(tf.tensor1d(labels, 'int32'), OUTPUT_SIZE);
-    });
+    const ys = tf.oneHot(tf.tensor1d(trainingSamples.map(s => s.label), 'int32'), numClasses);
 
-    console.log('[ML] Training on', trainingSamples.length, 'samples...');
+    console.log(`[ML] Training on ${trainingSamples.length} samples, ${numClasses} classes`);
 
-    // Train
+    // Train the model
     const history = await model!.fit(xs, ys, {
         epochs: 100,
         batchSize: Math.min(32, trainingSamples.length),
-        shuffle: true,
         validationSplit: 0.2,
+        shuffle: true,
         callbacks: {
             onEpochEnd: (epoch, logs) => {
                 if (onProgress && logs) {
-                    onProgress(epoch, logs.loss, logs.acc || 0);
+                    onProgress(epoch + 1, logs.loss as number, logs.acc as number);
                 }
             }
         }
     });
 
-    // Cleanup
+    // Cleanup tensors
     xs.dispose();
     ys.dispose();
 
     const finalLoss = history.history.loss[history.history.loss.length - 1] as number;
-    const finalAcc = (history.history.acc?.[history.history.acc.length - 1] || 0) as number;
+    const finalAcc = history.history.acc[history.history.acc.length - 1] as number;
 
     console.log(`[ML] Training complete. Loss: ${finalLoss.toFixed(4)}, Accuracy: ${(finalAcc * 100).toFixed(1)}%`);
 
@@ -140,65 +147,41 @@ export async function trainModel(
 
 /**
  * Export model weights as base64 for ESP32
- * 
- * Weight layout (must match ESP32):
- * - W1: [INPUT_SIZE × HIDDEN_SIZE] = 75 × 24 = 1800 floats
- * - B1: [HIDDEN_SIZE] = 24 floats
- * - W2: [HIDDEN_SIZE × OUTPUT_SIZE] = 24 × 5 = 120 floats
- * - B2: [OUTPUT_SIZE] = 5 floats
- * Total: 1949 floats
+ * Format: [W1 (150*16), B1 (16), W2 (16*N), B2 (N)]
+ * All as Float32 little-endian
  */
 export async function exportWeights(): Promise<string> {
-    if (!model) throw new Error('No model to export');
-
-    const weights: number[] = [];
-
-    // Get weights from layers
-    const layers = model.layers;
-
-    // Layer 0: Dense (hidden)
-    const w1 = layers[0].getWeights()[0];  // Kernel
-    const b1 = layers[0].getWeights()[1];  // Bias
-
-    // Layer 1: Dense (output)
-    const w2 = layers[1].getWeights()[0];
-    const b2 = layers[1].getWeights()[1];
-
-    // Flatten all weights in order
-    const w1Data = await w1.data();
-    const b1Data = await b1.data();
-    const w2Data = await w2.data();
-    const b2Data = await b2.data();
-
-    weights.push(...Array.from(w1Data));  // 1800 floats
-    weights.push(...Array.from(b1Data));  // 24 floats
-    weights.push(...Array.from(w2Data));  // 192 floats
-    weights.push(...Array.from(b2Data));  // 8 floats
-
-    console.log(`[ML] Exporting ${weights.length} weights`);
-
-    // Validate weights
-    for (let i = 0; i < weights.length; i++) {
-        if (!Number.isFinite(weights[i])) {
-            console.error(`[ML] Bad weight at index ${i}: ${weights[i]}`);
-            throw new Error(`Model training failed: Weight at index ${i} is ${weights[i]}`);
-        }
+    if (!model) {
+        throw new Error('No model trained yet');
     }
 
+    const weights = model.getWeights();
+    // weights[0] = W1 (150, 16), weights[1] = B1 (16)
+    // weights[2] = W2 (16, N),  weights[3] = B2 (N)
+
+    const allWeights: number[] = [];
+
+    for (const w of weights) {
+        const data = await w.data();
+        allWeights.push(...Array.from(data));
+    }
+
+    const numClasses = gestureLabels.length;
+    const expectedSize = (INPUT_SIZE * HIDDEN_SIZE) + HIDDEN_SIZE + (HIDDEN_SIZE * numClasses) + numClasses;
+
+    console.log(`[ML] Exporting ${allWeights.length} weights (expected ${expectedSize})`);
+    console.log(`[ML] W1: ${INPUT_SIZE}x${HIDDEN_SIZE}, B1: ${HIDDEN_SIZE}, W2: ${HIDDEN_SIZE}x${numClasses}, B2: ${numClasses}`);
+
     // Convert to Float32Array and then to base64
-    const float32 = new Float32Array(weights);
+    const float32 = new Float32Array(allWeights);
     const uint8 = new Uint8Array(float32.buffer);
 
-    // Base64 encode
     let binary = '';
     for (let i = 0; i < uint8.length; i++) {
         binary += String.fromCharCode(uint8[i]);
     }
-    const base64 = btoa(binary);
 
-    console.log(`[ML] Weights encoded: ${base64.length} chars`);
-
-    return base64;
+    return btoa(binary);
 }
 
 /**
@@ -209,14 +192,16 @@ export function getGestureLabels(): string[] {
 }
 
 /**
- * Clear all training data
+ * Clear all training data and reset model
  */
 export function clearData() {
     trainingSamples = [];
     gestureLabels = [];
-    model = null;
-    createModel();  // Recreate fresh model
-    console.log('[ML] Training data cleared');
+    if (model) {
+        model.dispose();
+        model = null;
+    }
+    console.log('[ML] Data and model cleared');
 }
 
 /**
@@ -226,11 +211,10 @@ export function deleteGesture(gestureName: string) {
     const labelIndex = gestureLabels.indexOf(gestureName);
     if (labelIndex === -1) return;
 
-    // Remove all samples for this gesture
     trainingSamples = trainingSamples.filter(s => s.label !== labelIndex);
-
-    // Re-index remaining samples if needed
     gestureLabels = gestureLabels.filter((_, i) => i !== labelIndex);
+
+    // Re-index remaining samples
     for (const sample of trainingSamples) {
         if (sample.label > labelIndex) {
             sample.label--;
@@ -241,32 +225,34 @@ export function deleteGesture(gestureName: string) {
 }
 
 /**
- * Run inference on a sample (for testing in browser)
+ * Run inference using the trained neural network
  */
 export async function predict(data: number[]): Promise<{ label: string; confidence: number }> {
-    if (!model) throw new Error('No model');
+    if (!model) throw new Error('No model trained');
 
     const input = tf.tensor2d([data]);
-    const output = model.predict(input) as tf.Tensor;
-    const predictions = await output.data();
+    const prediction = model.predict(input) as tf.Tensor;
+    const probabilities = await prediction.data();
 
-    input.dispose();
-    output.dispose();
-
-    let maxIdx = 0;
-    let maxVal = predictions[0];
-    for (let i = 1; i < predictions.length; i++) {
-        if (predictions[i] > maxVal) {
-            maxVal = predictions[i];
-            maxIdx = i;
+    let maxProb = 0;
+    let bestClass = 0;
+    for (let i = 0; i < probabilities.length; i++) {
+        if (probabilities[i] > maxProb) {
+            maxProb = probabilities[i];
+            bestClass = i;
         }
     }
 
+    input.dispose();
+    prediction.dispose();
+
     return {
-        label: gestureLabels[maxIdx] || `class_${maxIdx}`,
-        confidence: maxVal
+        label: gestureLabels[bestClass] || `class_${bestClass}`,
+        confidence: maxProb
     };
 }
 
-// Initialize model on import
-createModel();
+// Initialize on import
+console.log('[ML] Simple 1D gesture recognition ready');
+console.log(`[ML] Architecture: ${INPUT_SIZE} -> ${HIDDEN_SIZE} -> N classes`);
+console.log('[ML] Sampling: 50 samples @ 40ms = 2 sec window');
