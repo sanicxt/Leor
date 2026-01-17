@@ -132,6 +132,30 @@
         await sendCommand(`wobble ${mouthAnimDuration}`);
     }
 
+    // Reset all settings to defaults
+    async function resetToDefaults() {
+        // Default values matching config.h
+        setSettingsEw(36);
+        setSettingsEh(36);
+        setSettingsEs(10);
+        setSettingsEr(12);
+        setSettingsMw(20);
+        setSettingsBi(3);
+        setSettingsLt(1000);
+        setSettingsVt(2000);
+        setSettingsGs(6);
+        setSettingsOs(12);
+        setSettingsSs(10);
+        mouthAnimDuration = 1000;
+        transitionSpeed = 8;
+
+        // Apply to device
+        await applySettings();
+
+        // Also send reset command
+        await sendCommand("reset");
+    }
+
     onMount(() => {
         if (getConnected()) {
             sendCommand("s:");
@@ -177,6 +201,28 @@
                 </button>
             {/each}
         </div>
+
+        <!-- Reset Button -->
+        <button
+            onclick={resetToDefaults}
+            disabled={!bleState.connected}
+            class="w-full mt-3 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 text-rose-400 text-xs font-medium transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+        >
+            <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+            </svg>
+            Reset to Defaults
+        </button>
     </div>
 
     <!-- Main Settings Card -->
