@@ -80,6 +80,53 @@ static String bleProcessPayload(const String& payload) {
   return lastResponse;
 }
 
+// ==================== Notification Functions ====================
+
+// Send a large string in chunks if it exceeds MTU
+void sendBLEChunked(NimBLECharacteristic* pChar, const String& data) {
+  if (!deviceConnected || !pChar) return;
+
+  const int maxChunk = currentMTU - 3;
+  if (data.length() <= maxChunk) {
+    pChar->setValue(data.c_str());
+    pChar->notify();
+    return;
+  }
+
+  // Send in chunks
+  int sent = 0;
+  int total = data.length();
+  
+  // Optional: send a header or use a specific protocol
+  // For simplicity, we just send raw chunks. The frontend should reassemble or handle partials.
+  while (sent < total) {
+    int take = min(maxChunk, total - sent);
+    String chunk = data.substring(sent, sent + take);
+    
+    pChar->setValue(chunk.c_str());
+    pChar->notify();
+    
+    sent += take;
+    
+    // Tiny delay to allow the stack to process the notification queue
+    // but much smaller than the previous 20ms and non-blocking if possible
+    // In NimBLE, we can check if the queue is full, but a 5ms delay is usually safe.
+    if (sent < total) delay(5); 
+  }
+}
+
+// Send status notification
+void sendBLEStatus(const String& status) {
+  sendBLEChunked(pStatusChar, status);
+  lastActivityMs = millis();
+}
+
+// Send gesture notification
+void sendBLEGesture(const String& gesture) {
+  sendBLEChunked(pGestureChar, gesture);
+  lastActivityMs = millis();
+}
+
 // ==================== BLE Callbacks ====================
 
 // BLE Server Callbacks
@@ -90,6 +137,11 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
       lastActivityMs = millis();
       connectionCount++;
       Serial.println(F("✓ BLE Client connected!"));
+      
+      // Update connection parameters for better performance
+      // Min Interval: 24 (30ms), Max Interval: 48 (60ms), Latency: 0, Timeout: 180 (1.8s)
+      pServer->updateConnParams(connInfo.getConnHandle(), 24, 48, 0, 180);
+      
       sendBLEStatus("connected");
     };
 
@@ -116,33 +168,14 @@ class CommandCallbacks: public NimBLECharacteristicCallbacks {
       payload = bleTrimOneLine(payload);
       if (payload.length() == 0) return;
 
-      // Update activity timestamp
       lastActivityMs = millis();
-
-      // Limit payload size to prevent memory issues
-      const int kMaxPayload = min(240, (int)(currentMTU - 3));
-      if (payload.length() > kMaxPayload) {
-        payload = payload.substring(0, kMaxPayload);
-      }
-
       Serial.print(F("[BLE] RX: "));
       Serial.println(payload);
 
       String response = bleProcessPayload(payload);
       if (response.length() > 0) {
-        // Handle multi-line responses (split by \n)
-        int start = 0;
-        while (start < response.length()) {
-           int nl = response.indexOf('\n', start);
-           int end = (nl == -1) ? response.length() : nl;
-           String chunk = response.substring(start, end);
-           // bleTrimOneLine handles \r removal
-           chunk.trim();
-           if (chunk.length() > 0) {
-             sendBLEStatus(chunk);
-           }
-           start = end + 1;
-        }
+        // Send the entire response, letting chunking handle MTU limits
+        sendBLEStatus(response);
       }
     }
 };
@@ -162,36 +195,28 @@ String getBLEStatusInfo() {
   info += "  Connections: " + String(connectionCount) + "\n";
   info += "  Disconnects: " + String(disconnectionCount) + "\n";
   if (deviceConnected) {
-    uint32_t connectedSecs = (millis() - lastActivityMs) / 1000;
-    info += "  Idle: " + String(connectedSecs) + "s";
+    uint32_t connectedSecs = (millis() - (lastActivityMs > 0 ? lastActivityMs : millis())) / 1000;
+    info += "  Activity: " + String(connectedSecs) + "s ago";
   }
   return info;
 }
 
 // Restart BLE stack (for recovery)
 void restartBLE() {
-  Serial.println(F("[BLE] Restarting BLE stack..."));
-  
-  // Stop advertising first
+  Serial.println(F("[BLE] Restarting advertising..."));
   NimBLEDevice::getAdvertising()->stop();
-  
   delay(100);
-  
-  // Restart advertising
   if (NimBLEDevice::getAdvertising()->start()) {
     advStartedAtMs = millis();
-    Serial.println(F("[BLE] Advertising restarted"));
   }
 }
 
 // Initialize BLE
 void initBLE(const char* deviceName) {
-  Serial.println(F("Initializing BLE (NimBLE)..."));
+  Serial.println(F("Initializing NimBLE..."));
   
-  // Create BLE Device
   NimBLEDevice::init(deviceName);
   
-  // Create BLE Server
   pServer = NimBLEDevice::createServer();
   if (!pServer) {
     Serial.println(F("✗ Failed to create BLE server!"));
@@ -199,14 +224,12 @@ void initBLE(const char* deviceName) {
   }
   pServer->setCallbacks(new MyServerCallbacks());
 
-  // Create BLE Service
   NimBLEService *pService = pServer->createService(SERVICE_UUID);
   if (!pService) {
     Serial.println(F("✗ Failed to create BLE service!"));
     return;
   }
 
-  // Create Command Characteristic
   pCommandChar = pService->createCharacteristic(
                       COMMAND_CHAR_UUID,
                       NIMBLE_PROPERTY::WRITE |
@@ -216,7 +239,6 @@ void initBLE(const char* deviceName) {
     pCommandChar->setCallbacks(new CommandCallbacks());
   }
 
-  // Create Status Characteristic (Read + Notify)
   pStatusChar = pService->createCharacteristic(
                       STATUS_CHAR_UUID,
                       NIMBLE_PROPERTY::READ |
@@ -224,10 +246,8 @@ void initBLE(const char* deviceName) {
                     );
   if (pStatusChar) {
     pStatusChar->setValue("ready");
-    // NimBLE handles 2902 automatically
   }
 
-  // Create Gesture Characteristic (Read + Notify) 
   pGestureChar = pService->createCharacteristic(
                       GESTURE_CHAR_UUID,
                       NIMBLE_PROPERTY::READ |
@@ -235,32 +255,25 @@ void initBLE(const char* deviceName) {
                     );
   if (pGestureChar) {
     pGestureChar->setValue("idle");
-    // NimBLE handles 2902 automatically
   }
 
-  // Start the service
   pService->start();
 
-  // Configure and start advertising
   NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
+  pAdvertising->setName(deviceName);
   pAdvertising->addServiceUUID(SERVICE_UUID);
   pAdvertising->enableScanResponse(true);
   
-  // NimBLE simplifies connection parameters
   pAdvertising->start();
   advStartedAtMs = millis();
   
-  Serial.println(F("✓ BLE initialized!"));
-  Serial.print(F("  Device Name: "));
-  Serial.println(deviceName);
-  Serial.println(F("  Ready for connections"));
+  Serial.println(F("✓ NimBLE initialized!"));
 }
 
 // Handle BLE connection state (call from loop)
 void handleBLEConnection() {
   uint32_t now = millis();
   
-  // Track connection state changes
   if (deviceConnected && !oldDeviceConnected) {
     oldDeviceConnected = true;
   }
@@ -269,7 +282,6 @@ void handleBLEConnection() {
     oldDeviceConnected = false;
   }
 
-  // Restart advertising after disconnect
   if (!deviceConnected && advRestartAtMs != 0 && (int32_t)(now - advRestartAtMs) >= 0) {
     advRestartAtMs = 0;
     if (NimBLEDevice::getAdvertising()->start()) {
@@ -278,70 +290,19 @@ void handleBLEConnection() {
     }
   }
   
-  // Connection timeout detection (client connected but went silent)
   if (deviceConnected && lastActivityMs > 0) {
     if ((now - lastActivityMs) > BLE_CONNECTION_TIMEOUT_MS) {
-      Serial.println(F("[BLE] Connection timeout - client unresponsive"));
-      lastActivityMs = now;  // Reset to avoid spam
+      Serial.println(F("[BLE] Connection timeout warning"));
+      lastActivityMs = now;
     }
   }
   
-  // Advertising watchdog - restart if no connection for too long
   if (!deviceConnected && advStartedAtMs > 0) {
     if ((now - advStartedAtMs) > BLE_ADV_WATCHDOG_MS) {
-      Serial.println(F("[BLE] Advertising watchdog - restarting"));
+      Serial.println(F("[BLE] Watchdog restart"));
       restartBLE();
     }
   }
 }
 
-// ==================== Notification Functions ====================
-
-// Send status notification (rate-limited)
-void sendBLEStatus(const String& status) {
-  if (!deviceConnected || !pStatusChar) return;
-  
-  // Rate limiting to prevent flooding
-  uint32_t now = millis();
-  if ((now - lastNotifyMs) < BLE_NOTIFY_MIN_INTERVAL_MS) {
-    delay(BLE_NOTIFY_MIN_INTERVAL_MS - (now - lastNotifyMs));
-  }
-  
-  // Truncate to MTU
-  String safeStatus = status;
-  int maxLen = currentMTU - 3;
-  if (safeStatus.length() > maxLen) {
-    safeStatus = safeStatus.substring(0, maxLen);
-  }
-  
-  pStatusChar->setValue(safeStatus.c_str());
-  pStatusChar->notify();
-  lastNotifyMs = millis();
-  lastActivityMs = lastNotifyMs;
-}
-
-// Send gesture notification (rate-limited)
-void sendBLEGesture(const String& gesture) {
-  if (!deviceConnected || !pGestureChar) return;
-  
-  // Rate limiting
-  uint32_t now = millis();
-  if ((now - lastNotifyMs) < BLE_NOTIFY_MIN_INTERVAL_MS) {
-    delay(BLE_NOTIFY_MIN_INTERVAL_MS - (now - lastNotifyMs));
-  }
-  
-  // Truncate to MTU
-  String safeGesture = gesture;
-  int maxLen = currentMTU - 3;
-  if (safeGesture.length() > maxLen) {
-    safeGesture = safeGesture.substring(0, maxLen);
-  }
-  
-  pGestureChar->setValue(safeGesture.c_str());
-  pGestureChar->notify();
-  lastNotifyMs = millis();
-  lastActivityMs = lastNotifyMs;
-}
-
 #endif // BLE_MANAGER_H
-

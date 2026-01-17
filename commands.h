@@ -351,25 +351,25 @@ String handleCommand(String cmd) {
     int prefixLen = cmd.startsWith("s:") ? 2 : 4;
     String params = cmd.substring(prefixLen);
     
-    // If empty params, return current settings string for sync
+    // If empty params, return current settings as JSON for robust sync
     if (params.length() == 0) {
-      String current = "";
-      current += "ew=" + String(preferences.getInt("ew", 36)) + ",";
-      current += "eh=" + String(preferences.getInt("eh", 36)) + "\n";
-      
-      current += "es=" + String(preferences.getInt("es", 10)) + ",";
-      current += "er=" + String(preferences.getInt("er", 8)) + "\n";
-      
-      current += "mw=" + String(preferences.getInt("mw", 20)) + ",";
-      current += "lt=" + String(preferences.getInt("lt", 1000)) + "\n";
-      
-      current += "vt=" + String(preferences.getInt("vt", 2000)) + ",";
-      current += "bi=" + String(preferences.getInt("bi", 3)) + "\n";
-      
-      current += "gs=" + String(preferences.getInt("gs", 6)) + ",";
-      current += "os=" + String(preferences.getInt("os", 12)) + ",";
-      current += "ss=" + String(preferences.getInt("ss", 10));
-      return current;
+      String json = "{\"type\":\"sync\",\"settings\":{";
+      json += "\"ew\":" + String(preferences.getInt("ew", 36)) + ",";
+      json += "\"eh\":" + String(preferences.getInt("eh", 36)) + ",";
+      json += "\"es\":" + String(preferences.getInt("es", 10)) + ",";
+      json += "\"er\":" + String(preferences.getInt("er", 8)) + ",";
+      json += "\"mw\":" + String(preferences.getInt("mw", 20)) + ",";
+      json += "\"lt\":" + String(preferences.getInt("lt", 1000)) + ",";
+      json += "\"vt\":" + String(preferences.getInt("vt", 2000)) + ",";
+      json += "\"bi\":" + String(preferences.getInt("bi", 3)) + ",";
+      json += "\"gs\":" + String(preferences.getInt("gs", 6)) + ",";
+      json += "\"os\":" + String(preferences.getInt("os", 12)) + ",";
+      json += "\"ss\":" + String(preferences.getInt("ss", 10));
+      json += "},\"state\":{";
+      json += "\"shuf\":" + String(shuffleEnabled ? "1" : "0") + ",";
+      json += "\"mpu\":" + String(mpuVerbose ? "1" : "0");
+      json += "}}";
+      return json;
     }
     
     int idx = 0;

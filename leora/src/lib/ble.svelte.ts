@@ -97,11 +97,54 @@ export async function connect(): Promise<boolean> {
         const statusChar = await service.getCharacteristic(BLE_CONFIG.STATUS_CHAR_UUID);
         const gestureChar = await service.getCharacteristic(BLE_CONFIG.GESTURE_CHAR_UUID);
 
+        // Buffer for chunked status data
+        let statusBuffer = '';
+
         // Subscribe to status notifications
         await statusChar.startNotifications();
         statusChar.addEventListener('characteristicvaluechanged', (e) => {
-            const value = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
-            console.log('[BLE RX]', value);
+            const chunk = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
+            console.log('[BLE RX Chunk]', chunk);
+
+            // If it starts with '{' or we have stuff in the buffer, we are in a chunked JSON message
+            if (chunk.startsWith('{') || (statusBuffer.startsWith('{') && !statusBuffer.endsWith('}'))) {
+                statusBuffer += chunk;
+
+                // Try to parse if it looks complete
+                if (statusBuffer.endsWith('}')) {
+                    try {
+                        const data = JSON.parse(statusBuffer);
+                        console.log('[BLE RX JSON Sync]', data);
+
+                        if (data.type === 'sync') {
+                            if (data.settings) {
+                                Object.keys(data.settings).forEach(key => {
+                                    if (key in bleState.settings) {
+                                        (bleState.settings as any)[key] = data.settings[key];
+                                    } else if (key === 'bi') {
+                                        bleState.settings.bi = data.settings[key];
+                                    }
+                                });
+                            }
+                            if (data.state) {
+                                if ('shuf' in data.state) bleState.shuffleEnabled = (data.state.shuf === 1);
+                            }
+                        }
+
+                        bleState.lastStatus = 'Sync complete';
+                        statusBuffer = ''; // Clear buffer
+                        return;
+                    } catch (err) {
+                        // Not complete yet or invalid JSON, keep buffering
+                        console.log('Incomplete JSON chunk...');
+                    }
+                } else {
+                    return; // Wait for more chunks
+                }
+            }
+
+            // Fallback to legacy line-by-line parsing for non-JSON or broken messages
+            const value = chunk;
             bleState.lastStatus = value;
 
             // Parse appearance and gesture settings
@@ -127,22 +170,19 @@ export async function connect(): Promise<boolean> {
             }
 
             // Robust Shuffle Parsing with Regex
-            // Matches "Shuffle: ON" or "Shuffle: OFF" (case insensitive)
             const shuffleMatch = value.match(/shuffle:\s*(on|off)/i);
             if (shuffleMatch) {
                 const status = shuffleMatch[1].toUpperCase();
-                console.log('Shuffle Parsed:', status);
                 bleState.shuffleEnabled = (status === 'ON');
             }
 
-            // Parse expr range: expr=2-5
+            // Parse ranges
             const exprMatch = value.match(/expr=(\d+)-(\d+)/);
             if (exprMatch) {
                 bleState.shuffleExprMin = parseInt(exprMatch[1]);
                 bleState.shuffleExprMax = parseInt(exprMatch[2]);
             }
 
-            // Parse neutral range: neutral=2-5
             const neuMatch = value.match(/neutral=(\d+)-(\d+)/);
             if (neuMatch) {
                 bleState.shuffleNeutralMin = parseInt(neuMatch[1]);
