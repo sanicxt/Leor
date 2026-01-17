@@ -1,18 +1,20 @@
 /*
  * leor - Animated Robot Eyes for ESP32-C3
  * 
- * Features:
- * - Animated OLED robot eyes with expressions
- * - BLE (Bluetooth Low Energy) control interface
- * - Serial command interface
- * - MPU6050 accelerometer for gesture detection
- * - Gesture training and recognition
- * - Low power consumption with BLE
+ * Copyright (C) 2026 sanicxt
  * 
- * Hardware:
- * - ESP32-C3 Super Mini
- * - SH1106G 128x64 OLED display (I2C)
- * - MPU6050 Accelerometer/Gyroscope
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 // ==================== Libraries ====================

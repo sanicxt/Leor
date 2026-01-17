@@ -123,28 +123,38 @@ leora/
 
 ## Installation
 
-### Firmware
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/sanicxt/Leor.git
+cd Leor
+```
+
+### 2. Firmware (ESP32)
 
 1. Install Arduino IDE or Arduino CLI
 
 2. Install required libraries via Library Manager:
-   - Adafruit GFX Library
-   - Adafruit SH110X
-   - FastIMU
+   - Adafruit GFX Library (by Adafruit)
+   - Adafruit SH110X (by Adafruit)
+   - FastIMU (by Ashutosh Bhatt)
 
-3. Install the Edge Impulse library (included in this repository):
-   - In Arduino IDE: Sketch > Include Library > Add .ZIP Library
-   - Select `ei-leor-arduino-1.0.2.zip` from this project folder
+3. Download and Install the Edge Impulse library:
+   - Visit the [Edge Impulse Public Project](https://studio.edgeimpulse.com/public/879322/live).
+   - Clone the repository
+   - Go to **Deployment**.
+   - Search for **Arduino library** and click **Build**.
+   - In Arduino IDE: Sketch > Include Library > Add .ZIP Library and select the downloaded file.
 
 4. Open `pio.ino` in Arduino IDE
 
-5. Select board: ESP32-C3 Dev Module
+5. Select board: **ESP32-C3 Dev Module**
 
 6. Upload to device
 
 7. Keep device still during IMU calibration (first 2 seconds after boot)
 
-### Web Interface
+### 3. Web Interface
 
 1. Navigate to the `leora` directory
 
@@ -361,7 +371,7 @@ To train custom gestures:
 
 ## License
 
-This project is open source. See LICENSE file for details.
+This project is licensed under the **GNU General Public License v3**. See [LICENSE.md](file:///Users/sanic/pio/LICENSE.md) for details.
 
 ---
 
