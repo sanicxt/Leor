@@ -160,11 +160,21 @@ asyncio.run(main())
 
 ### Mouth
 
-`smile`, `frown`, `open`, `ooo`, `flat`, `talk`, `chew`, `wobble`
+**Shapes:** `smile`, `frown`, `open`, `ooo`, `flat`
+
+**Animations:**
+
+| Command | Description |
+|---------|-------------|
+| `talk N` | Talk animation for N milliseconds |
+| `chew N` | Chew animation for N milliseconds |
+| `wobble N` | Wobble animation for N milliseconds |
+
+Example: `talk 2000` (talk for 2 seconds)
 
 ### Actions
 
-`blink`, `wink` (left), `winkr` (right), `laugh`, `cry`
+`blink`, `wink` (left), `winkr` (right), `laugh`, `cry`, `reset`
 
 ### Look Direction
 

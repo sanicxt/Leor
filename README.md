@@ -23,11 +23,13 @@ Leor is an animated robot eyes project built on ESP32-C3 with OLED display, IMU-
 
 - **Animated OLED Eyes**: Smooth, expressive robot eyes with multiple moods and positions
 - **15+ Expressions**: Happy, sad, angry, confused, surprised, sleepy, curious, and more
+- **Mouth Animations**: Talk, chew, wobble animations with smooth shape transitions
 - **Gesture Recognition**: ML-based gesture detection using Edge Impulse (patpat, shake, swipe, pickup)
 - **BLE Control**: Low-power Bluetooth control from web browser or mobile app
 - **Expression Shuffle**: Random expression cycling for lifelike behavior
+- **Expression Presets**: Quick preset styles (Cute, Sleepy, Energetic, Robotic)
 - **Persistent Settings**: All settings saved to flash and restored on boot
-- **Web Interface**: Modern SvelteKit-based control panel with real-time feedback
+- **Web Interface**: Modern SvelteKit-based control panel with gradient styling and real-time feedback
 - **IMU Calibration**: Automatic gyroscope/accelerometer calibration at startup
 
 ---
@@ -178,12 +180,15 @@ cd Leor
 
 The web interface provides:
 
-- **Connection Panel**: BLE connect/disconnect with status indicator
+- **Premium Header**: Custom Leor robot logo with gradient styling
 - **Expression Grid**: Tap to trigger any of 15+ expressions
-- **Gesture Manager**: View gesture-to-expression mappings, toggle recognition
-- **Gesture Settings**: Adjust confidence threshold, cooldown, reaction time
-- **Shuffle Panel**: Configure random expression cycling
-- **Appearance Settings**: Adjust eye size, spacing, blink interval
+- **Quick Actions**: Keyboard shortcuts panel with pink/rose gradient
+- **Mouth Controls**: Shape selection and talk/chew/wobble animations
+- **Gaze Control**: Arrow-based directional pad for eye movement
+- **Gesture Manager**: View gesture-to-expression mappings with live detection
+- **Gesture Tuning**: Presets (Sensitive/Balanced/Strict) + fine controls
+- **Shuffle Panel**: Toggle + timing controls with Quick/Slow presets
+- **Appearance Settings**: Quick presets (Cute/Sleepy/Energetic/Robotic), eye geometry, mouth & animation controls, reset to defaults button
 
 ---
 
@@ -235,6 +240,20 @@ Commands can be sent via BLE or Serial. Format: `command` or `command=value`
 | `es=N` | Eye spacing (pixels) |
 | `er=N` | Eye roundness (pixels) |
 | `bi=N` | Blink interval (seconds) |
+| `reset` | Reset all settings to defaults |
+
+### Mouth Animation Commands
+
+| Command | Description |
+|---------|-------------|
+| `talk N` | Trigger talk animation for N ms |
+| `chew N` | Trigger chew animation for N ms |
+| `wobble N` | Trigger wobble animation for N ms |
+| `smile` | Set mouth to smile |
+| `frown` | Set mouth to frown |
+| `open` | Set mouth to open |
+| `ooo` | Set mouth to O shape |
+| `flat` | Set mouth to flat |
 
 ---
 
