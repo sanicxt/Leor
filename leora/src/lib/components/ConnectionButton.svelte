@@ -5,6 +5,7 @@
         getConnected,
         isWebBluetoothSupported,
     } from "$lib/ble.svelte";
+    import ShimmerButton from "$lib/components/ShimmerButton.svelte";
 
     let connecting = $state(false);
 
@@ -61,15 +62,41 @@
                 Disconnect
             </button>
         {:else}
-            <button
-                class="px-5 py-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400
-               text-white rounded-full text-sm font-medium transition-all shadow-lg shadow-indigo-500/20
-               hover:shadow-indigo-500/30 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            <ShimmerButton
+                shimmerColor="#ff4d4d"
+                shimmerDuration="2.5s"
+                shimmerSize="0.1em"
+                background="rgba(15, 12, 12, 1)"
+                class="px-5 py-2 min-w-[140px] shadow-red-500/10 border-white/5"
                 onclick={handleConnect}
                 disabled={connecting}
             >
-                {connecting ? "Connecting..." : "Connect"}
-            </button>
+                <div class="flex items-center gap-2.5">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        class="text-red-500"
+                    >
+                        <path
+                            d="M2 8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2Z"
+                        />
+                        <path d="m10 10 5 3-5 3Z" />
+                        <path d="M7 21h10" />
+                        <path d="m9 18 1 3" />
+                        <path d="m15 18-1 3" />
+                    </svg>
+                    <span class="text-base font-semibold tracking-tight">
+                        {connecting ? "Connecting..." : "Connect"}
+                    </span>
+                </div>
+            </ShimmerButton>
         {/if}
     </div>
 {/if}

@@ -1,197 +1,9 @@
 <script lang="ts">
-    import { sendCommand, getLastStatus } from "$lib/ble.svelte";
-    import * as ml from "$lib/ml";
+    import { sendCommand, bleState } from "$lib/ble.svelte";
 
-    // State
-    let matchEnabled = $state(false);
-    let isRecording = $state(false);
-    let isTraining = $state(false);
-    let isDeploying = $state(false);
-    let deployProgress = $state(0);
-    let currentGesture = $state("");
-    let sampleCount = $state(0);
-    let trainingProgress = $state({ epoch: 0, loss: 0, accuracy: 0 });
-    let stats = $state(ml.getStats());
-
-    // New gesture input - default to neutral if missing samples
-    let newGestureName = $state("neutral");
-    let newGestureAction = $state("neutral");
-    let liveGyro = $state({ x: 0, y: 0, z: 0 });
-
-    // Non-reactive buffer for sample collection
-    let sampleBuffer: number[] = [];
-
-    // Parse incoming gyro data from ESP32
-    $effect(() => {
-        const status = getLastStatus();
-        if (!status) return;
-
-        if (status.startsWith("gd:") && isRecording) {
-            const parts = status.substring(3).split(",");
-            if (parts.length === 3) {
-                const x = parseFloat(parts[0]);
-                const y = parseFloat(parts[1]);
-                const z = parseFloat(parts[2]);
-                liveGyro = { x, y, z };
-                sampleBuffer.push(x, y, z);
-                sampleCount = Math.floor(sampleBuffer.length / 3);
-            }
-        }
-    });
-
-    // Helper to check if neutral is ready
-    const neutralCount = $derived(stats.samplesPerGesture["neutral"] || 0);
-    const isNeutralReady = $derived(neutralCount >= 5);
-
-    async function startRecording() {
-        if (!currentGesture) {
-            currentGesture = newGestureName.trim();
-        }
-        if (!currentGesture) {
-            alert("Enter a gesture name first");
-            return;
-        }
-
-        sampleBuffer = [];
-        sampleCount = 0;
-        liveGyro = { x: 0, y: 0, z: 0 };
-        isRecording = true;
-        await sendCommand("gs");
-
-        setTimeout(() => {
-            if (isRecording) {
-                finishRecording();
-            }
-        }, 2500); // 2.5 sec to capture 50+ samples (BLE latency buffer)
-    }
-
-    async function finishRecording() {
-        isRecording = false;
-        await sendCommand("gx");
-
-        const numSamples = Math.floor(sampleBuffer.length / 3);
-        if (numSamples >= 3) {
-            const xs: number[] = [],
-                ys: number[] = [],
-                zs: number[] = [];
-            for (let i = 0; i < sampleBuffer.length; i += 3) {
-                xs.push(sampleBuffer[i]);
-                ys.push(sampleBuffer[i + 1]);
-                zs.push(sampleBuffer[i + 2]);
-            }
-
-            function resample(arr: number[], targetLen: number): number[] {
-                const result: number[] = [];
-                for (let i = 0; i < targetLen; i++) {
-                    const pos = (i / (targetLen - 1)) * (arr.length - 1);
-                    const low = Math.floor(pos);
-                    const high = Math.min(low + 1, arr.length - 1);
-                    const frac = pos - low;
-                    result.push(arr[low] * (1 - frac) + arr[high] * frac);
-                }
-                return result;
-            }
-
-            const flat = [
-                ...resample(xs, 50),
-                ...resample(ys, 50),
-                ...resample(zs, 50),
-            ];
-            ml.addSample(flat, currentGesture);
-            stats = ml.getStats();
-
-            // If just finished neutral and it's enough, clear name for next one
-            if (
-                currentGesture === "neutral" &&
-                ml.getStats().samplesPerGesture["neutral"] >= 5
-            ) {
-                newGestureName = "";
-                newGestureAction = "happy";
-            }
-        }
-    }
-
-    async function cancelRecording() {
-        isRecording = false;
-        await sendCommand("gx");
-        sampleBuffer = [];
-        sampleCount = 0;
-    }
-
-    async function trainModel() {
-        if (!isNeutralReady) {
-            alert(
-                "Please record at least 5 samples of 'neutral' first. This is mandatory for baseline matching.",
-            );
-            return;
-        }
-        if (stats.totalSamples < 2) {
-            alert("Need at least 2 gestures to train");
-            return;
-        }
-
-        isTraining = true;
-        await ml.trainModel((epoch: number, loss: number, acc: number) => {
-            trainingProgress = { epoch, loss, accuracy: acc };
-        });
-        isTraining = false;
-    }
-
-    async function deployModel() {
-        if (!isNeutralReady) {
-            alert("Neutral baseline missing. Record 5+ 'neutral' samples.");
-            return;
-        }
-        try {
-            const base64Weights = await ml.exportWeights();
-            isDeploying = true;
-            const chunkSize = 17;
-            for (let i = 0; i < base64Weights.length; i += chunkSize) {
-                await sendCommand(
-                    `gw+${base64Weights.substring(i, i + chunkSize)}`,
-                );
-                await new Promise((r) => setTimeout(r, 25));
-                deployProgress = Math.round(
-                    ((i + chunkSize) / base64Weights.length) * 100,
-                );
-            }
-            await sendCommand("gw!");
-
-            const labels = ml.getGestureLabels();
-            for (let i = 0; i < labels.length; i++) {
-                // Neutral action is always 'neutral' or nothing
-                const action =
-                    labels[i] === "neutral"
-                        ? "neutral"
-                        : newGestureAction || "happy";
-                await sendCommand(`gl=${i}:${labels[i]}:${action}`);
-            }
-        } catch (e) {
-            console.error("[Gesture] Deploy failed:", e);
-        } finally {
-            isDeploying = false;
-        }
-    }
-
-    async function toggleMatch() {
-        matchEnabled = !matchEnabled;
-        await sendCommand(`gm=${matchEnabled ? "1" : "0"}`);
-    }
-
-    function clearData() {
-        if (
-            confirm(
-                "Clear all training data? You will need to re-train the mandatory neutral gesture.",
-            )
-        ) {
-            ml.clearData();
-            stats = ml.getStats();
-            newGestureName = "neutral";
-            newGestureAction = "neutral";
-        }
-    }
-
-    const actions = [
+    // Available expressions that can be mapped to gestures
+    const expressions = [
+        "",
         "happy",
         "sad",
         "angry",
@@ -202,231 +14,256 @@
         "curious",
         "nervous",
         "knocked",
-        "neutral",
         "blink",
         "wink",
         "laugh",
         "cry",
     ];
+
+    // Edge Impulse model gestures (5 classes @ 23Hz)
+    // Order matches model output alphabetically
+    let gestures = $state([
+        {
+            name: "neutral",
+            action: "",
+            icon: "⏸️",
+            description: "Device at rest",
+        },
+        {
+            name: "patpat",
+            action: "happy",
+            icon: "👋",
+            description: "Gentle pats",
+        },
+        {
+            name: "pickup",
+            action: "curious",
+            icon: "🤲",
+            description: "Lift up device",
+        },
+        {
+            name: "shake",
+            action: "confused",
+            icon: "🔄",
+            description: "Shake motion",
+        },
+        {
+            name: "swipe",
+            action: "surprised",
+            icon: "👉",
+            description: "Swipe gesture",
+        },
+    ]);
+
+    // State
+    let matchEnabled = $state(false);
+    let lastDetectedGesture = $state("");
+    let detectionCount = $state(0);
+    let clearTimer: ReturnType<typeof setTimeout> | null = null;
+    let editingGesture = $state<string | null>(null);
+
+    // Watch for gesture matches in BLE status
+    $effect(() => {
+        const status = bleState.lastStatus;
+        if (!status || !status.startsWith("gm:")) return;
+
+        const gesture = status.substring(3);
+        if (gesture === lastDetectedGesture) return;
+
+        lastDetectedGesture = gesture;
+        detectionCount++;
+
+        if (clearTimer) clearTimeout(clearTimer);
+        clearTimer = setTimeout(() => {
+            lastDetectedGesture = "";
+        }, 3000);
+    });
+
+    async function toggleMatch() {
+        matchEnabled = !matchEnabled;
+        await sendCommand(`gm=${matchEnabled ? "1" : "0"}`);
+    }
+
+    async function updateGestureMapping(
+        gestureName: string,
+        newAction: string,
+    ) {
+        const gesture = gestures.find((g) => g.name === gestureName);
+        if (gesture) {
+            gesture.action = newAction;
+            // Send update to device: ga=index:action
+            const index = gestures.findIndex((g) => g.name === gestureName);
+            await sendCommand(`ga=${index}:${newAction}`);
+        }
+        editingGesture = null;
+    }
+
+    function getActionEmoji(action: string): string {
+        const emojis: Record<string, string> = {
+            happy: "😊",
+            sad: "😢",
+            angry: "😠",
+            love: "😍",
+            surprised: "😮",
+            confused: "😵",
+            sleepy: "😴",
+            curious: "🤔",
+            nervous: "😰",
+            knocked: "🤕",
+            blink: "😉",
+            wink: "😜",
+            laugh: "😂",
+            cry: "😭",
+        };
+        return emojis[action] || "😐";
+    }
 </script>
 
 <div
-    class="bg-zinc-900/40 border border-white/5 rounded-3xl p-6 backdrop-blur-md space-y-6"
+    class="bg-zinc-900/40 border border-white/5 rounded-3xl p-6 backdrop-blur-md space-y-5"
 >
+    <!-- Header -->
     <div class="flex items-center justify-between flex-wrap gap-3">
-        <h3 class="text-zinc-400 text-xs font-bold tracking-widest uppercase">
-            Gesture Training
-            {#if isRecording}
+        <div>
+            <h3
+                class="text-zinc-400 text-xs font-bold tracking-widest uppercase"
+            >
+                Gesture Recognition
+            </h3>
+            <p class="text-zinc-600 text-[10px] mt-1">
+                Edge Impulse • 5 gestures @ 23Hz
+            </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            {#if matchEnabled}
                 <span
-                    class="ml-2 px-2 py-0.5 bg-rose-500/20 text-rose-400 rounded-full text-xs animate-pulse"
+                    class="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-bold animate-pulse"
                 >
-                    Recording... {sampleCount}/50
+                    ACTIVE
                 </span>
             {/if}
-        </h3>
-
-        <div class="flex items-center gap-2">
-            <span class="text-xs text-zinc-400">Matching</span>
             <button
-                class="w-12 h-6 rounded-full transition-all duration-300 relative {matchEnabled
-                    ? 'bg-indigo-500 shadow-lg shadow-indigo-500/20'
-                    : 'bg-zinc-700'}"
+                class="w-14 h-7 rounded-full transition-all duration-300 relative {matchEnabled
+                    ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30'
+                    : 'bg-zinc-700'} disabled:opacity-50"
                 onclick={toggleMatch}
+                disabled={!bleState.connected}
+                aria-label="Toggle gesture matching"
             >
                 <span
-                    class="absolute left-0 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 {matchEnabled
+                    class="absolute left-0.5 top-0.5 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow {matchEnabled
                         ? 'translate-x-7'
-                        : 'translate-x-1'}"
+                        : 'translate-x-0'}"
                 ></span>
             </button>
         </div>
     </div>
 
-    <div class="space-y-4">
-        {#if !isNeutralReady}
-            <div
-                class="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4"
-            >
-                <div
-                    class="text-indigo-300 text-sm font-medium mb-1 flex items-center gap-2"
-                >
-                    <span
-                        class="w-2 h-2 rounded-full bg-indigo-400 animate-ping"
-                    ></span>
-                    Mandatory: Neutral Training
-                </div>
-                <p class="text-zinc-400 text-xs leading-relaxed">
-                    Record at least 5 samples of you <b
-                        >holding the device still</b
-                    >. This baseline is required for accurate gesture detection.
-                </p>
-                <div
-                    class="mt-3 h-1.5 bg-zinc-800 rounded-full overflow-hidden"
-                >
-                    <div
-                        class="h-full bg-indigo-500 transition-all duration-500"
-                        style="width: {(neutralCount / 5) * 100}%"
-                    ></div>
-                </div>
-            </div>
-        {/if}
-
-        <div class="flex flex-col sm:flex-row gap-2">
-            <input
-                type="text"
-                bind:value={newGestureName}
-                placeholder="Gesture name"
-                class="flex-1 bg-zinc-800/50 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50"
-                onchange={() => (currentGesture = newGestureName.trim())}
-                disabled={!isNeutralReady && newGestureName === "neutral"}
-            />
-            <select
-                bind:value={newGestureAction}
-                class="bg-zinc-800/50 border border-white/10 rounded-xl px-4 py-2 text-sm text-white"
-                disabled={!isNeutralReady && newGestureName === "neutral"}
-            >
-                {#each actions as action}
-                    <option value={action}>{action}</option>
-                {/each}
-            </select>
-        </div>
-
-        <button
-            class="w-full px-4 py-3 {isRecording
-                ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 border-rose-500/20'} rounded-xl border transition-all font-medium"
-            onclick={isRecording ? cancelRecording : startRecording}
+    <!-- Last Detection Display -->
+    {#if lastDetectedGesture}
+        <div
+            class="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-2xl p-4"
         >
-            {isRecording ? "⏹ Cancel Recording" : "⏺ Record Sample"}
-        </button>
-
-        {#if isRecording}
-            <div
-                class="bg-zinc-800/50 rounded-xl p-4 border border-rose-500/30 text-center"
-            >
-                <div
-                    class="text-[10px] text-rose-400 uppercase tracking-widest mb-2 font-bold"
-                >
-                    📡 Sampling...
+            <div class="text-center">
+                <div class="text-4xl mb-2">
+                    {gestures.find((g) => g.name === lastDetectedGesture)
+                        ?.icon || "❓"} → {getActionEmoji(
+                        gestures.find((g) => g.name === lastDetectedGesture)
+                            ?.action || "",
+                    )}
                 </div>
-                <div class="flex justify-center gap-8">
-                    <div>
-                        <div class="text-[10px] text-zinc-500">X</div>
-                        <div class="text-sm font-mono">
-                            {liveGyro.x.toFixed(2)}
-                        </div>
-                    </div>
-                    <div>
-                        <div class="text-[10px] text-zinc-500">Y</div>
-                        <div class="text-sm font-mono">
-                            {liveGyro.y.toFixed(2)}
-                        </div>
-                    </div>
-                    <div>
-                        <div class="text-[10px] text-zinc-500">Z</div>
-                        <div class="text-sm font-mono">
-                            {liveGyro.z.toFixed(2)}
-                        </div>
-                    </div>
+                <div class="text-indigo-300 text-lg font-bold capitalize">
+                    {lastDetectedGesture}
+                </div>
+                <div class="text-zinc-500 text-xs">
+                    Detection #{detectionCount}
                 </div>
             </div>
-        {/if}
-
-        <div class="bg-zinc-800/30 rounded-xl p-4 border border-white/5">
-            <div
-                class="text-[10px] text-zinc-500 uppercase tracking-widest mb-3 font-bold"
-            >
-                Active Gestures
-            </div>
-            <div class="space-y-2">
-                <!-- Always show neutral if not enough samples -->
-                {#if !stats.gestures.includes("neutral")}
-                    <div
-                        class="flex items-center justify-between bg-zinc-700/20 rounded-lg px-3 py-2 border border-dashed border-zinc-600"
-                    >
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm text-zinc-400">neutral</span>
-                            <span
-                                class="px-1.5 py-0.5 rounded-md bg-zinc-800 text-zinc-500 text-[9px] font-bold"
-                                >REQUIRED</span
-                            >
-                        </div>
-                        <span class="text-[10px] text-zinc-600">0 samples</span>
-                    </div>
-                {/if}
-
-                {#each stats.gestures as gesture}
-                    <div
-                        class="flex items-center justify-between bg-zinc-700/30 rounded-lg px-3 py-2 border border-white/5"
-                    >
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm text-white">{gesture}</span>
-                            {#if gesture === "neutral"}
-                                <span
-                                    class="px-1.5 py-0.5 rounded-md {isNeutralReady
-                                        ? 'bg-indigo-500/20 text-indigo-400'
-                                        : 'bg-rose-500/20 text-rose-400'} text-[9px] font-bold"
-                                >
-                                    {isNeutralReady ? "OK" : "REQUIRED"}
-                                </span>
-                            {/if}
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="text-[10px] text-zinc-500"
-                                >{stats.samplesPerGesture[gesture] || 0} samples</span
-                            >
-                            <button
-                                class="text-rose-400/50 hover:text-rose-400 px-1"
-                                onclick={() => {
-                                    ml.deleteGesture(gesture);
-                                    stats = ml.getStats();
-                                }}
-                            >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    ><path d="M3 6h18" /><path
-                                        d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"
-                                    /><path
-                                        d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"
-                                    /></svg
-                                >
-                            </button>
-                        </div>
-                    </div>
-                {/each}
-            </div>
         </div>
+    {/if}
 
-        <div class="flex gap-2">
-            <button
-                class="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl border border-white/5 transition-all text-xs font-medium disabled:opacity-30"
-                onclick={trainModel}
-                disabled={!isNeutralReady || isTraining}
-            >
-                {isTraining ? "Training..." : "🧠 Train"}
-            </button>
-            <button
-                class="flex-1 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 rounded-xl border border-indigo-500/20 transition-all text-xs font-medium disabled:opacity-30"
-                onclick={deployModel}
-                disabled={!isNeutralReady || isDeploying}
-            >
-                {isDeploying ? `Deploying ${deployProgress}%` : "📤 Deploy"}
-            </button>
-        </div>
-
-        <button
-            class="w-full py-2 hover:text-rose-400 text-zinc-600 transition-all text-[10px] uppercase font-bold tracking-widest"
-            onclick={clearData}
+    <!-- Gesture Mappings -->
+    <div class="space-y-2">
+        <div
+            class="text-[10px] text-zinc-500 uppercase tracking-widest font-bold"
         >
-            Reset All Training Data
-        </button>
+            Gesture → Expression Mappings
+        </div>
+
+        {#each gestures as gesture, i}
+            <div
+                class="flex items-center justify-between bg-zinc-800/50 rounded-xl px-4 py-3 border transition-all {lastDetectedGesture ===
+                gesture.name
+                    ? 'border-indigo-500/50 bg-indigo-500/10'
+                    : 'border-white/5'}"
+            >
+                <div class="flex items-center gap-3">
+                    <span class="text-xl">{gesture.icon}</span>
+                    <div>
+                        <div class="text-white font-medium capitalize text-sm">
+                            {gesture.name}
+                        </div>
+                        <div class="text-zinc-600 text-[10px]">
+                            {gesture.description}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    {#if gesture.name === "neutral"}
+                        <span class="text-zinc-600 text-xs">baseline</span>
+                    {:else if editingGesture === gesture.name}
+                        <select
+                            class="bg-zinc-700 border border-indigo-500/50 rounded-lg px-2 py-1 text-sm text-white"
+                            value={gesture.action}
+                            onchange={(e) =>
+                                updateGestureMapping(
+                                    gesture.name,
+                                    (e.target as HTMLSelectElement).value,
+                                )}
+                            onblur={() => (editingGesture = null)}
+                        >
+                            {#each expressions.filter((e) => e !== "") as expr}
+                                <option value={expr}>{expr}</option>
+                            {/each}
+                        </select>
+                    {:else}
+                        <button
+                            class="flex items-center gap-2 px-3 py-1.5 bg-zinc-700/50 hover:bg-zinc-700 rounded-lg transition-all border border-white/5"
+                            onclick={() => (editingGesture = gesture.name)}
+                            disabled={!bleState.connected}
+                        >
+                            <span class="text-lg"
+                                >{getActionEmoji(gesture.action)}</span
+                            >
+                            <span class="text-indigo-400 text-sm"
+                                >{gesture.action}</span
+                            >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="text-zinc-500"
+                                ><path d="M12 20h9"></path><path
+                                    d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
+                                ></path></svg
+                            >
+                        </button>
+                    {/if}
+                </div>
+            </div>
+        {/each}
+    </div>
+
+    <!-- Info -->
+    <div class="text-center text-zinc-600 text-[10px]">
+        Tap expression to change mapping • Changes sync to device
     </div>
 </div>

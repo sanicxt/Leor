@@ -3,6 +3,7 @@
     import {
         sendCommand,
         getConnected,
+        bleState,
         getSettingsEw,
         getSettingsEh,
         getSettingsEs,
@@ -28,24 +29,14 @@
     } from "$lib/ble.svelte";
 
     async function applySettings() {
-        // Send in small chunks to avoid MTU limits (20 bytes safe limit)
-        // Eyes Dimensions
         await sendCommand(`s:ew=${getSettingsEw()},eh=${getSettingsEh()}`);
         await new Promise((r) => setTimeout(r, 50));
-
-        // Eyes Style (Spacing/Roundness)
         await sendCommand(`s:es=${getSettingsEs()},er=${getSettingsEr()}`);
         await new Promise((r) => setTimeout(r, 50));
-
-        // Mouth & Blink
         await sendCommand(`s:mw=${getSettingsMw()},bi=${getSettingsBi()}`);
         await new Promise((r) => setTimeout(r, 50));
-
-        // Timings
         await sendCommand(`s:lt=${getSettingsLt()},vt=${getSettingsVt()}`);
         await new Promise((r) => setTimeout(r, 50));
-
-        // Animation Speeds
         await sendCommand(
             `s:gs=${getSettingsGs()},os=${getSettingsOs()},ss=${getSettingsSs()}`,
         );
@@ -53,7 +44,6 @@
 
     async function syncSettings() {
         if (getConnected()) {
-            console.log("Manual sync requested");
             await sendCommand("s:");
         }
     }
@@ -66,16 +56,25 @@
 </script>
 
 <div
-    class="bg-zinc-900/40 border border-white/5 rounded-3xl p-6 backdrop-blur-md space-y-6"
+    class="bg-zinc-900/40 border border-white/5 rounded-3xl p-6 backdrop-blur-md space-y-5"
 >
+    <!-- Header -->
     <div class="flex items-center justify-between">
-        <h3 class="text-zinc-400 text-xs font-bold tracking-widest uppercase">
-            Appearance & Behavior
-        </h3>
+        <div>
+            <h3
+                class="text-zinc-400 text-xs font-bold tracking-widest uppercase"
+            >
+                Appearance
+            </h3>
+            <p class="text-zinc-600 text-[10px] mt-1">
+                Customize eye geometry and animation
+            </p>
+        </div>
         <button
             onclick={syncSettings}
-            class="p-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-indigo-400 transition-colors"
-            title="Refresh Settings from Device"
+            disabled={!bleState.connected}
+            class="p-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-indigo-400 transition-colors disabled:opacity-50"
+            title="Refresh from device"
         >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -87,7 +86,6 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                class="w-4 h-4"
             >
                 <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
@@ -97,20 +95,20 @@
         </button>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <!-- Eyes -->
-        <div class="space-y-4">
-            <h4
-                class="text-zinc-400 text-xs font-bold uppercase tracking-wider"
-            >
-                Eye Geometry
-            </h4>
+    <!-- Eye Geometry -->
+    <div class="space-y-4">
+        <h4
+            class="text-zinc-500 text-[10px] font-bold uppercase tracking-wider"
+        >
+            Eye Geometry
+        </h4>
 
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
             <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Width (ew)</label>
-                    <span class="text-indigo-400 font-mono"
-                        >{getSettingsEw()}</span
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Width</label>
+                    <span class="text-indigo-400 font-mono text-sm"
+                        >{getSettingsEw()}px</span
                     >
                 </div>
                 <input
@@ -121,15 +119,16 @@
                     oninput={(e) =>
                         setSettingsEw(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
                 />
             </div>
 
             <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Height (eh)</label>
-                    <span class="text-indigo-400 font-mono"
-                        >{getSettingsEh()}</span
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Height</label>
+                    <span class="text-indigo-400 font-mono text-sm"
+                        >{getSettingsEh()}px</span
                     >
                 </div>
                 <input
@@ -140,15 +139,16 @@
                     oninput={(e) =>
                         setSettingsEh(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
                 />
             </div>
 
             <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Spacing (es)</label>
-                    <span class="text-indigo-400 font-mono"
-                        >{getSettingsEs()}</span
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Spacing</label>
+                    <span class="text-indigo-400 font-mono text-sm"
+                        >{getSettingsEs()}px</span
                     >
                 </div>
                 <input
@@ -159,15 +159,16 @@
                     oninput={(e) =>
                         setSettingsEs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
                 />
             </div>
 
             <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Roundness (er)</label>
-                    <span class="text-indigo-400 font-mono"
-                        >{getSettingsEr()}</span
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Roundness</label>
+                    <span class="text-indigo-400 font-mono text-sm"
+                        >{getSettingsEr()}px</span
                     >
                 </div>
                 <input
@@ -178,24 +179,27 @@
                     oninput={(e) =>
                         setSettingsEr(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
                 />
             </div>
         </div>
+    </div>
 
-        <!-- Mouth & Behavior -->
-        <div class="space-y-4">
-            <h4
-                class="text-zinc-400 text-xs font-bold uppercase tracking-wider"
-            >
-                Mouth & Behavior
-            </h4>
+    <!-- Mouth & Timings -->
+    <div class="space-y-4 pt-4 border-t border-white/5">
+        <h4
+            class="text-zinc-500 text-[10px] font-bold uppercase tracking-wider"
+        >
+            Mouth & Timings
+        </h4>
 
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
             <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Mouth Width (mw)</label>
-                    <span class="text-indigo-400 font-mono"
-                        >{getSettingsMw()}</span
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Mouth Width</label>
+                    <span class="text-indigo-400 font-mono text-sm"
+                        >{getSettingsMw()}px</span
                     >
                 </div>
                 <input
@@ -206,55 +210,16 @@
                     oninput={(e) =>
                         setSettingsMw(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
                 />
             </div>
 
             <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Laugh Time (ms)</label>
-                    <span class="text-indigo-400 font-mono"
-                        >{getSettingsLt()}</span
-                    >
-                </div>
-                <input
-                    type="range"
-                    min="500"
-                    max="5000"
-                    step="100"
-                    value={getSettingsLt()}
-                    oninput={(e) =>
-                        setSettingsLt(parseInt(e.currentTarget.value))}
-                    onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
-                />
-            </div>
-
-            <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Love Time (ms)</label>
-                    <span class="text-indigo-400 font-mono"
-                        >{getSettingsVt()}</span
-                    >
-                </div>
-                <input
-                    type="range"
-                    min="500"
-                    max="5000"
-                    step="100"
-                    value={getSettingsVt()}
-                    oninput={(e) =>
-                        setSettingsVt(parseInt(e.currentTarget.value))}
-                    onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
-                />
-            </div>
-
-            <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Blink Interval (s)</label>
-                    <span class="text-indigo-400 font-mono"
-                        >{getSettingsBi()}</span
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Blink Interval</label>
+                    <span class="text-indigo-400 font-mono text-sm"
+                        >{getSettingsBi()}s</span
                     >
                 </div>
                 <input
@@ -266,24 +231,77 @@
                     oninput={(e) =>
                         setSettingsBi(parseFloat(e.currentTarget.value))}
                     onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
                 />
+                <p class="text-zinc-600 text-[10px]">
+                    Time between auto-blinks
+                </p>
+            </div>
+
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Laugh Duration</label>
+                    <span class="text-indigo-400 font-mono text-sm"
+                        >{getSettingsLt()}ms</span
+                    >
+                </div>
+                <input
+                    type="range"
+                    min="500"
+                    max="5000"
+                    step="100"
+                    value={getSettingsLt()}
+                    oninput={(e) =>
+                        setSettingsLt(parseInt(e.currentTarget.value))}
+                    onchange={applySettings}
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
+                />
+                <p class="text-zinc-600 text-[10px]">
+                    How long laugh expression plays
+                </p>
+            </div>
+
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Love Duration</label>
+                    <span class="text-indigo-400 font-mono text-sm"
+                        >{getSettingsVt()}ms</span
+                    >
+                </div>
+                <input
+                    type="range"
+                    min="500"
+                    max="5000"
+                    step="100"
+                    value={getSettingsVt()}
+                    oninput={(e) =>
+                        setSettingsVt(parseInt(e.currentTarget.value))}
+                    onchange={applySettings}
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
+                />
+                <p class="text-zinc-600 text-[10px]">
+                    How long love expression plays
+                </p>
             </div>
         </div>
     </div>
 
     <!-- Animation Speeds -->
-    <div class="pt-4 border-t border-white/5">
+    <div class="space-y-4 pt-4 border-t border-white/5">
         <h4
-            class="text-zinc-400 text-xs font-bold uppercase tracking-wider mb-4"
+            class="text-zinc-500 text-[10px] font-bold uppercase tracking-wider"
         >
-            Animation Speeds
+            Animation Speed
         </h4>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+        <div class="grid grid-cols-3 gap-4">
             <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Gaze</label>
-                    <span class="text-indigo-400 font-mono"
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Gaze</label>
+                    <span class="text-indigo-400 font-mono text-sm"
                         >{getSettingsGs()}</span
                     >
                 </div>
@@ -291,19 +309,19 @@
                     type="range"
                     min="1"
                     max="20"
-                    step="1"
                     value={getSettingsGs()}
                     oninput={(e) =>
                         setSettingsGs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
                 />
             </div>
 
             <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Blink</label>
-                    <span class="text-indigo-400 font-mono"
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Blink</label>
+                    <span class="text-indigo-400 font-mono text-sm"
                         >{getSettingsOs()}</span
                     >
                 </div>
@@ -311,19 +329,19 @@
                     type="range"
                     min="4"
                     max="30"
-                    step="1"
                     value={getSettingsOs()}
                     oninput={(e) =>
                         setSettingsOs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
                 />
             </div>
 
             <div class="space-y-2">
-                <div class="flex justify-between text-sm">
-                    <label class="text-zinc-300">Squish</label>
-                    <span class="text-indigo-400 font-mono"
+                <div class="flex items-center justify-between">
+                    <label class="text-zinc-300 text-sm">Squish</label>
+                    <span class="text-indigo-400 font-mono text-sm"
                         >{getSettingsSs()}</span
                     >
                 </div>
@@ -331,14 +349,15 @@
                     type="range"
                     min="2"
                     max="20"
-                    step="1"
                     value={getSettingsSs()}
                     oninput={(e) =>
                         setSettingsSs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
-                    class="w-full accent-indigo-500 bg-zinc-700 rounded-lg h-1.5 cursor-pointer"
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
                 />
             </div>
         </div>
+        <p class="text-zinc-600 text-[10px]">Higher = faster animations</p>
     </div>
 </div>

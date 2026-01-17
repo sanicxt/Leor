@@ -9,7 +9,12 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include "MochiEyes.h"
-#include "gesture_trainer.h"
+#include "ei_gesture.h"
+
+// Re-define DEFAULT after Edge Impulse include (ges_inferencing.h has #undef DEFAULT)
+#ifndef DEFAULT
+#define DEFAULT 0
+#endif
 
 // Forward declaration - will be set in main sketch
 extern MochiEyes<Adafruit_SH1106G>* pMochiEyes;
@@ -26,8 +31,24 @@ extern uint32_t shuffleNeutralMinMs;
 extern uint32_t shuffleNeutralMaxMs;
 extern bool shuffleNeedsInit;
 
-
-
+// ==================== Stub functions for deprecated gesture_trainer.h features ====================
+// Edge Impulse model is pre-trained, so weight transfer functions are not needed
+inline void appendWeightChunk(const String& chunk) { /* no-op */ }
+inline bool finalizeWeights() { return false; }
+inline bool loadWeightsFromBase64(const String& data) { return false; }
+inline void setGestureLabel(int index, const char* name, const char* action) { /* no-op */ }
+inline void clearAllGestures() { /* no-op */ }
+inline String listGestures() { 
+    // Return Edge Impulse model classes
+    String json = "[";
+    for (int i = 0; i < EI_CLASSIFIER_LABEL_COUNT; i++) {
+        if (i > 0) json += ",";
+        json += "{\"n\":\"" + String(ei_classifier_inferencing_categories[i]) + "\",\"a\":\"\"}";
+    }
+    json += "]";
+    return json;
+}
+inline bool isTraining() { return false; }  // EI model is pre-trained
 
 // Reset all effects to default
 void resetEffects() {
@@ -130,7 +151,7 @@ String handleCommand(String cmd) {
     resetEffects();
     pMochiEyes->setMood(DEFAULT);
     pMochiEyes->setCuriosity(ON);
-    pMochiEyes->setPosition(N);
+    pMochiEyes->setPosition(POS_N);
     pMochiEyes->blink();
     pMochiEyes->setMouthType(3);
     Serial.println(F("Expression: Surprised"));
@@ -145,7 +166,7 @@ String handleCommand(String cmd) {
   else if (cmd == "sleepy") {
     resetEffects();
     pMochiEyes->setMood(TIRED);
-    pMochiEyes->setPosition(SW);
+    pMochiEyes->setPosition(POS_SW);
     pMochiEyes->setMouthType(5);
     Serial.println(F("Expression: Sleepy"));
   }
@@ -153,7 +174,7 @@ String handleCommand(String cmd) {
     resetEffects();
     pMochiEyes->setMood(DEFAULT);
     pMochiEyes->setCuriosity(ON);
-    pMochiEyes->setPosition(E);
+    pMochiEyes->setPosition(POS_E);
     pMochiEyes->setMouthType(4);
     Serial.println(F("Expression: Curious"));
   }
@@ -162,7 +183,7 @@ String handleCommand(String cmd) {
     pMochiEyes->setMood(DEFAULT);
     pMochiEyes->setSweat(ON);
     pMochiEyes->setCuriosity(ON);
-    pMochiEyes->setPosition(N);  // Use N instead of NW - left eye gets bigger with curious mode
+    pMochiEyes->setPosition(POS_N);  // Use POS_N instead of NW - left eye gets bigger with curious mode
     pMochiEyes->setMouthType(2);
     Serial.println(F("Expression: Nervous"));
   }
@@ -260,35 +281,35 @@ String handleCommand(String cmd) {
     Serial.println(F("Position: Center"));
   }
   else if (cmd == "n" || cmd == "up") {
-    pMochiEyes->setPosition(N);
+    pMochiEyes->setPosition(POS_N);
     Serial.println(F("Position: North"));
   }
   else if (cmd == "ne") {
-    pMochiEyes->setPosition(NE);
+    pMochiEyes->setPosition(POS_NE);
     Serial.println(F("Position: North-East"));
   }
   else if (cmd == "e" || cmd == "right") {
-    pMochiEyes->setPosition(E);
+    pMochiEyes->setPosition(POS_E);
     Serial.println(F("Position: East"));
   }
   else if (cmd == "se") {
-    pMochiEyes->setPosition(SE);
+    pMochiEyes->setPosition(POS_SE);
     Serial.println(F("Position: South-East"));
   }
   else if (cmd == "s" || cmd == "down") {
-    pMochiEyes->setPosition(S);
+    pMochiEyes->setPosition(POS_S);
     Serial.println(F("Position: South"));
   }
   else if (cmd == "sw") {
-    pMochiEyes->setPosition(SW);
+    pMochiEyes->setPosition(POS_SW);
     Serial.println(F("Position: South-West"));
   }
   else if (cmd == "w" || cmd == "left") {
-    pMochiEyes->setPosition(W);
+    pMochiEyes->setPosition(POS_W);
     Serial.println(F("Position: West"));
   }
   else if (cmd == "nw") {
-    pMochiEyes->setPosition(NW);
+    pMochiEyes->setPosition(POS_NW);
     Serial.println(F("Position: North-West"));
   }
 
@@ -427,6 +448,19 @@ String handleCommand(String cmd) {
     }
     return "gl:err";
   }
+  // ga=index:action = set gesture action mapping (from frontend)
+  else if (cmd.startsWith("ga=")) {
+    String params = cmd.substring(3);
+    int sep = params.indexOf(':');
+    if (sep > 0) {
+      int index = params.substring(0, sep).toInt();
+      String action = params.substring(sep + 1);
+      action.trim();
+      setGestureAction(index, action);
+      return "ga:ok";
+    }
+    return "ga:err";
+  }
   // gm=1 or gm=0 = enable/disable matching
   else if (cmd.startsWith("gm=")) {
     String val = cmd.substring(3);
@@ -443,6 +477,37 @@ String handleCommand(String cmd) {
   // gi = get gesture info
   else if (cmd == "gi") {
     return listGestures();
+  }
+  // gs: = get gesture settings
+  else if (cmd == "gs:") {
+    return getGestureSettings();
+  }
+  // grt=1500 = set reaction time in ms
+  else if (cmd.startsWith("grt=")) {
+    int val = cmd.substring(4).toInt();
+    if (val >= 500 && val <= 10000) {
+      setGestureReactionTime(val);
+      return "grt:" + String(val);
+    }
+    return "grt:err";
+  }
+  // gcf=70 = set confidence threshold (percent)
+  else if (cmd.startsWith("gcf=")) {
+    int val = cmd.substring(4).toInt();
+    if (val >= 30 && val <= 99) {
+      setGestureConfidence(val);
+      return "gcf:" + String(val);
+    }
+    return "gcf:err";
+  }
+  // gcd=2000 = set cooldown in ms
+  else if (cmd.startsWith("gcd=")) {
+    int val = cmd.substring(4).toInt();
+    if (val >= 500 && val <= 10000) {
+      setGestureCooldown(val);
+      return "gcd:" + String(val);
+    }
+    return "gcd:err";
   }
 
   // ==================== BLE COMMANDS ====================

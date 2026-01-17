@@ -20,7 +20,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
-#include <mpu6050.h>
+#include "FastIMU.h"
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
@@ -34,18 +34,89 @@
 Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Preferences preferences;
 
-// ==================== New MPU6050 Library ====================
-#define MPU_ADDRESS 0x68 // mpu6050 address is 0x69 if AD0 pin is powered - otherwise it's 0x68
+// ==================== FastIMU ====================
+#define IMU_ADDRESS 0x68
 
-float rawGX, rawGY, rawGZ; // initialise raw gyroscope variables
-float rawAX, rawAY, rawAZ; // initialise raw accelerometer variables
-float dpsGX, dpsGY, dpsGZ; // initialise dps gyroscope variables
-float gForceAX, gForceAY, gForceAZ; // initialise g force accelerometer variables
+// Use IMU_Generic for counterfeit sensors
+IMU_Generic IMU;
+calData calib = { 0 };
+AccelData accelData;
+GyroData gyroData;
+bool mpuAvailable = false;
+bool mpuCalibrated = false;
 
-#define FREQUENCY_HZ 50 // sampling frequency in Hz (adjust as needed)
+// For compatibility with existing code
+float dpsGX, dpsGY, dpsGZ;
+float gForceAX, gForceAY, gForceAZ;
+
+#define FREQUENCY_HZ 50
 #define INTERVAL_MS (1000 / (FREQUENCY_HZ))
 
 static unsigned long last_interval_ms = 0;
+
+// Draw calibration screen on OLED
+void drawCalibrationScreen(int progress, const char* status) {
+    display.clearDisplay();
+    
+    // Title
+    display.setTextSize(1);
+    display.setTextColor(SH110X_WHITE);
+    display.setCursor(20, 5);
+    display.print(F("IMU CALIBRATION"));
+    
+    // Status message
+    display.setCursor(10, 25);
+    display.print(status);
+    
+    // Progress bar background
+    display.drawRect(10, 42, 108, 12, SH110X_WHITE);
+    
+    // Progress bar fill
+    int fillWidth = map(progress, 0, 100, 0, 104);
+    display.fillRect(12, 44, fillWidth, 8, SH110X_WHITE);
+    
+    // Percentage
+    display.setCursor(50, 56);
+    display.print(progress);
+    display.print(F("%"));
+    
+    display.display();
+}
+
+// Calibrate IMU with OLED display
+void calibrateIMU() {
+    Serial.println(F("  Calibrating IMU (keep still)..."));
+    
+    drawCalibrationScreen(0, "Keep device STILL");
+    delay(500);
+    
+    // FastIMU handles calibration internally
+    drawCalibrationScreen(20, "Sampling gyro...");
+    delay(200);
+    
+    IMU.calibrateAccelGyro(&calib);
+    
+    drawCalibrationScreen(80, "Calculating bias...");
+    delay(200);
+    
+    // Re-init with calibration
+    IMU.init(calib, IMU_ADDRESS);
+    
+    mpuCalibrated = true;
+    
+    drawCalibrationScreen(100, "Calibration done!");
+    delay(500);
+    
+    Serial.println(F(" Done!"));
+    Serial.print(F("  Gyro bias: "));
+    Serial.print(calib.gyroBias[0], 2); Serial.print(", ");
+    Serial.print(calib.gyroBias[1], 2); Serial.print(", ");
+    Serial.println(calib.gyroBias[2], 2);
+    Serial.print(F("  Accel bias: "));
+    Serial.print(calib.accelBias[0], 2); Serial.print(", ");
+    Serial.print(calib.accelBias[1], 2); Serial.print(", ");
+    Serial.println(calib.accelBias[2], 2);
+}
 
 // ==================== MochiEyes ====================
 #include "MochiEyes.h"
@@ -57,14 +128,13 @@ MochiEyes<Adafruit_SH1106G>* pMochiEyes = &mochiEyes;  // Pointer for commands.h
 void drawTrainingOverlay(const char* status, int progress);
 
 // ==================== Modules ====================
-#include "gesture_trainer.h"
 #include "commands.h"
 #include "ble_manager.h"
 
 // ==================== State Variables ====================
 String inputBuffer = "";
-bool mpuAvailable = false;
 unsigned long lastMpuRead = 0;
+unsigned long GESTURE_REACTION_MS = 1500;  // Modifiable reaction time (default 1.5s)
 unsigned long reactionStartTime = 0;
 bool isReacting = false;
 
@@ -142,16 +212,23 @@ void setup() {
   // Initialize BLE (low power alternative to WiFi)
   initBLE(BLE_DEVICE_NAME);
   
-  // Initialize MPU6050 sensor (new library)
-  wakeSensor(MPU_ADDRESS); // wakes sensor from sleep mode
-  mpuAvailable = true; // assume available for now
-  Serial.println(F("✓ MPU6050 ready"));
+  // Initialize IMU with FastIMU
+  Wire.setClock(400000);  // 400kHz I2C for faster IMU reads
+  int err = IMU.init(calib, IMU_ADDRESS);
+  if (err != 0) {
+    Serial.print(F("IMU init error: "));
+    Serial.println(err);
+    mpuAvailable = false;
+  } else {
+    mpuAvailable = true;
+    Serial.println(F("✓ IMU ready (FastIMU)"));
+    
+    // Calibrate with OLED display
+    calibrateIMU();
+  }
   
-  // Calibrate gyro
-  calibrateGyro();
-  
-  // Initialize gesture trainer
-  initGestureTrainer();
+  // Initialize Edge Impulse gesture recognition
+  initEIGesture();
   
   // Ready!
   mochiEyes.setMood(0);  // DEFAULT
@@ -303,9 +380,26 @@ void handleMPU6050() {
   int magnitudeInt = 0;
   float gxf = 0, gyf = 0, gzf = 0;
   
-  // EMA filtered values (persistent across calls)
+  // ==================== Preprocessing State (persistent) ====================
+  
+  // EMA low-pass filter for gyro (noise reduction)
   static float filteredGX = 0, filteredGY = 0, filteredGZ = 0;
   static const float EMA_ALPHA = 0.3f;  // 0.1 = very smooth, 0.5 = more responsive
+  
+  // Moving average buffers for gyro (alternative smoothing)
+  static const int GYRO_MA_SIZE = 5;
+  static float maBufferX[GYRO_MA_SIZE] = {0};
+  static float maBufferY[GYRO_MA_SIZE] = {0};
+  static float maBufferZ[GYRO_MA_SIZE] = {0};
+  static int maIndex = 0;
+  
+  // High-pass filter for accelerometer (gravity removal)
+  static float hpAccelX = 0, hpAccelY = 0, hpAccelZ = 0;
+  static float prevAccelX = 0, prevAccelY = 0, prevAccelZ = 0;
+  static const float ACCEL_HP_ALPHA = 0.8f;  // High-pass: 0.8 = strong gravity removal
+  
+  // Preprocessed accelerometer output (gravity-free)
+  static float linearAccelX = 0, linearAccelY = 0, linearAccelZ = 0;
   
   // Read MPU if available
   if (mpuAvailable) {
@@ -313,28 +407,67 @@ void handleMPU6050() {
     if (now - lastMpuRead >= MPU_SAMPLE_RATE_MS) {
       lastMpuRead = now;
       
-      // Read gyro and accel data using new library
-      readGyroData(MPU_ADDRESS, rawGX, rawGY, rawGZ);
-      rawGyroToDPS(rawGX, rawGY, rawGZ, dpsGX, dpsGY, dpsGZ);
-      readAccelData(MPU_ADDRESS, rawAX, rawAY, rawAZ);
-      rawAccelToGForce(rawAX, rawAY, rawAZ, gForceAX, gForceAY, gForceAZ);
+      // Read gyro and accel data using FastIMU
+      IMU.update();
+      IMU.getGyro(&gyroData);
+      IMU.getAccel(&accelData);
+      
+      // FastIMU already applies calibration, just copy to compatibility vars
+      dpsGX = gyroData.gyroX;
+      dpsGY = gyroData.gyroY;
+      dpsGZ = gyroData.gyroZ;
+      gForceAX = accelData.accelX;
+      gForceAY = accelData.accelY;
+      gForceAZ = accelData.accelZ;
+      
+      // ==================== Gyro Preprocessing ====================
       
       // Convert dps to rad/s (raw values)
       float rawGXf = dpsGX * (PI / 180.0f);
       float rawGYf = dpsGY * (PI / 180.0f);
       float rawGZf = dpsGZ * (PI / 180.0f);
       
-      // Apply EMA low-pass filter for smoother data
+      // Method 1: EMA low-pass filter (current default)
       filteredGX = EMA_ALPHA * rawGXf + (1.0f - EMA_ALPHA) * filteredGX;
       filteredGY = EMA_ALPHA * rawGYf + (1.0f - EMA_ALPHA) * filteredGY;
       filteredGZ = EMA_ALPHA * rawGZf + (1.0f - EMA_ALPHA) * filteredGZ;
       
-      // Use filtered values
+      // Method 2: Moving average (alternative - uncomment to use)
+      // maBufferX[maIndex] = rawGXf;
+      // maBufferY[maIndex] = rawGYf;
+      // maBufferZ[maIndex] = rawGZf;
+      // maIndex = (maIndex + 1) % GYRO_MA_SIZE;
+      // float maGX = 0, maGY = 0, maGZ = 0;
+      // for (int i = 0; i < GYRO_MA_SIZE; i++) {
+      //   maGX += maBufferX[i]; maGY += maBufferY[i]; maGZ += maBufferZ[i];
+      // }
+      // filteredGX = maGX / GYRO_MA_SIZE;
+      // filteredGY = maGY / GYRO_MA_SIZE;
+      // filteredGZ = maGZ / GYRO_MA_SIZE;
+      
+      // Use filtered gyro values
       gxf = filteredGX;
       gyf = filteredGY;
       gzf = filteredGZ;
       
-      // Calculate magnitude of angular velocity (from filtered data)
+      // ==================== Accelerometer High-Pass Filter ====================
+      // Removes gravity (DC component), leaving only dynamic acceleration (movement)
+      // Formula: hp[n] = alpha * (hp[n-1] + accel[n] - accel[n-1])
+      
+      hpAccelX = ACCEL_HP_ALPHA * (hpAccelX + gForceAX - prevAccelX);
+      hpAccelY = ACCEL_HP_ALPHA * (hpAccelY + gForceAY - prevAccelY);
+      hpAccelZ = ACCEL_HP_ALPHA * (hpAccelZ + gForceAZ - prevAccelZ);
+      
+      prevAccelX = gForceAX;
+      prevAccelY = gForceAY;
+      prevAccelZ = gForceAZ;
+      
+      // Linear acceleration (gravity removed) - available for gesture detection
+      linearAccelX = hpAccelX;
+      linearAccelY = hpAccelY;
+      linearAccelZ = hpAccelZ;
+      
+      // Calculate magnitude of angular velocity (from filtered gyro data)
       magnitude = sqrt(gxf * gxf + gyf * gyf + gzf * gzf);
       magnitudeInt = (int)(magnitude * 100);
       
@@ -349,20 +482,28 @@ void handleMPU6050() {
         Serial.print(gyf);
         Serial.print(F(",gz="));
         Serial.print(gzf);
+        Serial.print(F(",laX="));
+        Serial.print(linearAccelX, 3);
+        Serial.print(F(",laY="));
+        Serial.print(linearAccelY, 3);
+        Serial.print(F(",laZ="));
+        Serial.print(linearAccelZ, 3);
         Serial.print(F(",streaming="));
         Serial.println(isStreaming() ? 1 : 0);
       }
       
       // Handle streaming mode (sends data to browser) - INSIDE the read block
-      if (isStreaming()) {
-
-        
-        processGyroForStreaming(gxf, gyf, gzf);
+      if (isEIStreaming()) {
+        // Use °/s gyro and raw g-force accel (same as data forwarder training format)
+        streamEISample(dpsGX, dpsGY, dpsGZ, gForceAX, gForceAY, gForceAZ);
       }
       
-      // Handle inference mode (runs local NN) - INSIDE the read block
-      if (isMatchingEnabled()) {
-        processGyroForInference(gxf, gyf, gzf);
+      // Handle inference mode (runs Edge Impulse NN) - INSIDE the read block
+      if (isEIMatchingEnabled()) {
+        // IMPORTANT: Must match training data format!
+        // Gyro: degrees per second (°/s) - NOT rad/s
+        // Accel: raw g-force - NOT high-pass filtered
+        processEISample(dpsGX, dpsGY, dpsGZ, gForceAX, gForceAY, gForceAZ);
       }
     }
   }

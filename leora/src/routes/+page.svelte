@@ -1,6 +1,6 @@
 <script lang="ts">
     import { fly, fade } from "svelte/transition";
-    import FlickeringGrid from "$lib/components/FlickeringGrid.svelte";
+    import MasterBackground from "$lib/components/MasterBackground.svelte";
     import AnimatedTabs from "$lib/components/AnimatedTabs.svelte";
     import ShimmerButton from "$lib/components/ShimmerButton.svelte";
     import { cn } from "$lib/utils";
@@ -23,6 +23,7 @@
     import ShufflePanel from "$lib/components/ShufflePanel.svelte";
     import AppearanceSettings from "$lib/components/AppearanceSettings.svelte";
     import GestureManager from "$lib/components/GestureManager.svelte";
+    import GestureSettings from "$lib/components/GestureSettings.svelte";
 
     import {
         getConnected,
@@ -52,17 +53,8 @@
 <div
     class="min-h-screen bg-black text-white font-sans selection:bg-pink-500/30 overflow-hidden relative"
 >
-    <!-- Background: Flickering Grid -->
-    <div class="fixed inset-0 z-0 w-full h-full bg-black">
-        <FlickeringGrid
-            class="z-0 absolute inset-0 size-full [mask-image:radial-gradient(circle_at_center,white_40%,transparent_100%)]"
-            squareSize={4}
-            gridGap={6}
-            color="#6B7280"
-            maxOpacity={0.5}
-            flickerChance={0.1}
-        />
-    </div>
+    <!-- Background: Master Grid & Lights -->
+    <MasterBackground />
 
     <!-- Content Area -->
     <main class="relative z-10 h-screen overflow-y-auto pb-32 scrollbar-hide">
@@ -203,17 +195,19 @@
             {:else if activeTab === "settings"}
                 <div
                     in:fly={{ y: 20, duration: 300 }}
-                    class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto"
+                    class="max-w-6xl mx-auto space-y-6"
                 >
-                    <!-- Shuffle Panel -->
-                    <div class="lg:col-span-2">
+                    <!-- Mobile: Stack vertically. Desktop: 2-column grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Left: Shuffle Mode -->
                         <ShufflePanel />
+
+                        <!-- Right: Gesture Tuning -->
+                        <GestureSettings />
                     </div>
 
-                    <!-- Appearance -->
-                    <div class="lg:col-span-2">
-                        <AppearanceSettings />
-                    </div>
+                    <!-- Full width: Appearance -->
+                    <AppearanceSettings />
                 </div>
             {:else if activeTab === "gestures"}
                 <div

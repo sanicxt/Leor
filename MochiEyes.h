@@ -40,15 +40,15 @@ static uint8_t MAINCOLOR = 1;
 #define ANGRY 2
 #define HAPPY 3
 
-// Position constants
-#define N 1   // north
-#define NE 2  // north-east
-#define E 3   // east
-#define SE 4  // south-east
-#define S 5   // south
-#define SW 6  // south-west
-#define W 7   // west
-#define NW 8  // north-west
+// Position constants (prefixed to avoid ESP-DSP collision)
+#define POS_N 1   // north
+#define POS_NE 2  // north-east
+#define POS_E 3   // east
+#define POS_SE 4  // south-east
+#define POS_S 5   // south
+#define POS_SW 6  // south-west
+#define POS_W 7   // west
+#define POS_NW 8  // north-west
 
 // ============================================================================
 // MOUTH SHAPES

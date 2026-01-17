@@ -2,24 +2,16 @@
     import ShufflePanel from "$lib/components/ShufflePanel.svelte";
     import AppearanceSettings from "$lib/components/AppearanceSettings.svelte";
     import GestureManager from "$lib/components/GestureManager.svelte";
+    import GestureSettings from "$lib/components/GestureSettings.svelte";
     import { base } from "$app/paths";
-    import FlickeringGrid from "$lib/components/FlickeringGrid.svelte";
+    import MasterBackground from "$lib/components/MasterBackground.svelte";
 </script>
 
 <div
     class="min-h-screen bg-black text-white font-sans selection:bg-indigo-500/30 relative"
 >
-    <!-- Background: Flickering Grid -->
-    <div class="fixed inset-0 z-0 w-full h-full bg-black">
-        <FlickeringGrid
-            class="z-0 absolute inset-0 size-full [mask-image:radial-gradient(circle_at_center,white_40%,transparent_100%)]"
-            squareSize={4}
-            gridGap={6}
-            color="#6B7280"
-            maxOpacity={0.5}
-            flickerChance={0.1}
-        />
-    </div>
+    <!-- Background: Master Grid & Lights -->
+    <MasterBackground />
 
     <!-- Header -->
     <header
@@ -48,7 +40,7 @@
         </h1>
     </header>
 
-    <main class="p-4 sm:p-6 max-w-2xl mx-auto space-y-6 pb-32">
+    <main class="p-4 sm:p-6 max-w-2xl mx-auto space-y-6 pb-32 relative z-10">
         <section>
             <ShufflePanel />
         </section>
@@ -59,6 +51,10 @@
 
         <section>
             <GestureManager />
+        </section>
+
+        <section>
+            <GestureSettings />
         </section>
 
         <!-- Placeholder for future settings -->

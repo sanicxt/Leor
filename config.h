@@ -29,7 +29,7 @@ const char* BLE_DEVICE_NAME = "Leor";
 #define MPU_SAMPLE_RATE_MS 20     // Read interval in ms
 #define GESTURE_MAG_MIN 2.0f      // Min magnitude (rad/s) to start gesture sampling
 #define GESTURE_COOLDOWN_MS 1500  // Cooldown after gesture match before next detection
-#define GESTURE_REACTION_MS 1500  // How long to show reaction expression
+// Note: GESTURE_REACTION_MS is now a modifiable variable in pio.ino
 
 // ==================== Autoblinker Settings ====================
 #define BLINK_INTERVAL 3          // Base interval in seconds
