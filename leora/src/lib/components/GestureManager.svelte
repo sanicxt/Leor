@@ -1,5 +1,10 @@
 <script lang="ts">
-    import { sendCommand, bleState } from "$lib/ble.svelte";
+    import {
+        sendCommand,
+        bleState,
+        getGestureMatching,
+        setGestureMatching,
+    } from "$lib/ble.svelte";
 
     // Available expressions that can be mapped to gestures
     const expressions = [
@@ -56,7 +61,6 @@
     ]);
 
     // State
-    let matchEnabled = $state(false);
     let lastDetectedGesture = $state("");
     let detectionCount = $state(0);
     let clearTimer: ReturnType<typeof setTimeout> | null = null;
@@ -80,8 +84,9 @@
     });
 
     async function toggleMatch() {
-        matchEnabled = !matchEnabled;
-        await sendCommand(`gm=${matchEnabled ? "1" : "0"}`);
+        const newVal = !getGestureMatching();
+        setGestureMatching(newVal);
+        await sendCommand(`gm=${newVal ? "1" : "0"}`);
     }
 
     async function updateGestureMapping(
@@ -136,7 +141,7 @@
         </div>
 
         <div class="flex items-center gap-3">
-            {#if matchEnabled}
+            {#if getGestureMatching()}
                 <span
                     class="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-bold animate-pulse"
                 >
@@ -144,7 +149,7 @@
                 </span>
             {/if}
             <button
-                class="w-14 h-7 rounded-full transition-all duration-300 relative {matchEnabled
+                class="w-14 h-7 rounded-full transition-all duration-300 relative {getGestureMatching()
                     ? 'bg-emerald-500 shadow-lg shadow-emerald-500/30'
                     : 'bg-zinc-700'} disabled:opacity-50"
                 onclick={toggleMatch}
@@ -152,7 +157,7 @@
                 aria-label="Toggle gesture matching"
             >
                 <span
-                    class="absolute left-0.5 top-0.5 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow {matchEnabled
+                    class="absolute left-0.5 top-0.5 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow {getGestureMatching()
                         ? 'translate-x-7'
                         : 'translate-x-0'}"
                 ></span>

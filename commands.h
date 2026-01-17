@@ -467,7 +467,7 @@ String handleCommand(String cmd) {
     val.trim();
     bool enable = (val == "1");
     setMatchingEnabled(enable);
-    return enable ? "gm:1" : "gm:0";
+    return enable ? "gm=1" : "gm=0";
   }
   // gc = clear all gestures
   else if (cmd == "gc") {
@@ -487,7 +487,7 @@ String handleCommand(String cmd) {
     int val = cmd.substring(4).toInt();
     if (val >= 500 && val <= 10000) {
       setGestureReactionTime(val);
-      return "grt:" + String(val);
+      return "rt=" + String(val);
     }
     return "grt:err";
   }
@@ -496,7 +496,7 @@ String handleCommand(String cmd) {
     int val = cmd.substring(4).toInt();
     if (val >= 30 && val <= 99) {
       setGestureConfidence(val);
-      return "gcf:" + String(val);
+      return "cf=" + String(val);
     }
     return "gcf:err";
   }
@@ -505,7 +505,7 @@ String handleCommand(String cmd) {
     int val = cmd.substring(4).toInt();
     if (val >= 500 && val <= 10000) {
       setGestureCooldown(val);
-      return "gcd:" + String(val);
+      return "cd=" + String(val);
     }
     return "gcd:err";
   }

@@ -1,43 +1,28 @@
 <script lang="ts">
-    import { sendCommand, bleState } from "$lib/ble.svelte";
+    import {
+        sendCommand,
+        bleState,
+        getGestureReactionTime,
+        setGestureReactionTime,
+        getGestureConfidence,
+        setGestureConfidence,
+        getGestureCooldown,
+        setGestureCooldown,
+    } from "$lib/ble.svelte";
 
-    // Gesture tuning parameters (with defaults)
-    let reactionTime = $state(1500); // ms to show expression
-    let confidence = $state(70); // % threshold (0-100)
-    let cooldown = $state(2000); // ms between detections
-
-    // Sync with device on connect
-    $effect(() => {
-        if (bleState.connected) {
-            // Request current values (would need firmware support)
-            sendCommand("gs:");
-        }
-    });
-
-    // Parse settings from BLE status
-    $effect(() => {
-        const status = bleState.lastStatus;
-        if (!status?.startsWith("gs:")) return;
-
-        // Parse format: gs:rt=1500,cf=70,cd=2000
-        const match = status.match(/rt=(\d+)/);
-        if (match) reactionTime = parseInt(match[1]);
-        const cfMatch = status.match(/cf=(\d+)/);
-        if (cfMatch) confidence = parseInt(cfMatch[1]);
-        const cdMatch = status.match(/cd=(\d+)/);
-        if (cdMatch) cooldown = parseInt(cdMatch[1]);
-    });
-
-    async function updateReactionTime() {
-        await sendCommand(`grt=${reactionTime}`);
+    async function updateReactionTime(val: number) {
+        setGestureReactionTime(val);
+        await sendCommand(`grt=${val}`);
     }
 
-    async function updateConfidence() {
-        await sendCommand(`gcf=${confidence}`);
+    async function updateConfidence(val: number) {
+        setGestureConfidence(val);
+        await sendCommand(`gcf=${val}`);
     }
 
-    async function updateCooldown() {
-        await sendCommand(`gcd=${cooldown}`);
+    async function updateCooldown(val: number) {
+        setGestureCooldown(val);
+        await sendCommand(`gcd=${val}`);
     }
 </script>
 
@@ -58,7 +43,7 @@
         <div class="flex items-center justify-between">
             <label class="text-zinc-300 text-sm">Expression Duration</label>
             <span class="text-indigo-400 font-mono text-sm"
-                >{(reactionTime / 1000).toFixed(1)}s</span
+                >{(getGestureReactionTime() / 1000).toFixed(1)}s</span
             >
         </div>
         <input
@@ -66,8 +51,9 @@
             min="500"
             max="5000"
             step="100"
-            bind:value={reactionTime}
-            onchange={updateReactionTime}
+            value={getGestureReactionTime()}
+            onchange={(e) =>
+                updateReactionTime(parseInt(e.currentTarget.value))}
             disabled={!bleState.connected}
             class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
         />
@@ -80,15 +66,17 @@
     <div class="space-y-2">
         <div class="flex items-center justify-between">
             <label class="text-zinc-300 text-sm">Confidence Threshold</label>
-            <span class="text-indigo-400 font-mono text-sm">{confidence}%</span>
+            <span class="text-indigo-400 font-mono text-sm"
+                >{getGestureConfidence()}%</span
+            >
         </div>
         <input
             type="range"
             min="50"
             max="95"
             step="5"
-            bind:value={confidence}
-            onchange={updateConfidence}
+            value={getGestureConfidence()}
+            onchange={(e) => updateConfidence(parseInt(e.currentTarget.value))}
             disabled={!bleState.connected}
             class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
         />
@@ -102,7 +90,7 @@
         <div class="flex items-center justify-between">
             <label class="text-zinc-300 text-sm">Detection Cooldown</label>
             <span class="text-indigo-400 font-mono text-sm"
-                >{(cooldown / 1000).toFixed(1)}s</span
+                >{(getGestureCooldown() / 1000).toFixed(1)}s</span
             >
         </div>
         <input
@@ -110,8 +98,8 @@
             min="500"
             max="5000"
             step="250"
-            bind:value={cooldown}
-            onchange={updateCooldown}
+            value={getGestureCooldown()}
+            onchange={(e) => updateCooldown(parseInt(e.currentTarget.value))}
             disabled={!bleState.connected}
             class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
         />

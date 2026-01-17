@@ -53,9 +53,11 @@ void setGestureReactionTime(int ms) {
 
 // Get current settings (for BLE query)
 String getGestureSettings() {
-    return "gs:rt=" + String(GESTURE_REACTION_MS) + 
-           ",cf=" + String((int)(ei_confidence_threshold * 100)) +
-           ",cd=" + String(ei_cooldown_ms);
+    String resp = "gs:rt=" + String(GESTURE_REACTION_MS) + "\n";
+    resp += "cf=" + String((int)(ei_confidence_threshold * 100)) + "\n";
+    resp += "cd=" + String(ei_cooldown_ms) + "\n";
+    resp += "gm=" + String(ei_matching_enabled ? "1" : "0");
+    return resp;
 }
 
 // ==================== Forward Declarations ====================

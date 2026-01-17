@@ -15,7 +15,11 @@ export const bleState = $state({
         ew: 36, eh: 36, es: 10, er: 8,
         mw: 20, lt: 1000, vt: 2000, bi: 3,
         gs: 6, os: 12, ss: 10  // gaze speed, openness speed, squish speed
-    }
+    },
+    gestureMatching: false,
+    gestureReactionTime: 1500,
+    gestureConfidence: 70,
+    gestureCooldown: 2000
 });
 
 // BLE device and characteristics
@@ -45,6 +49,11 @@ export function getSettingsGs() { return bleState.settings.gs; }
 export function getSettingsOs() { return bleState.settings.os; }
 export function getSettingsSs() { return bleState.settings.ss; }
 
+export function getGestureMatching() { return bleState.gestureMatching; }
+export function getGestureReactionTime() { return bleState.gestureReactionTime; }
+export function getGestureConfidence() { return bleState.gestureConfidence; }
+export function getGestureCooldown() { return bleState.gestureCooldown; }
+
 // Setters
 export function setShuffleEnabled(val: boolean) { bleState.shuffleEnabled = val; }
 export function setShuffleExprMin(val: number) { bleState.shuffleExprMin = val; }
@@ -64,6 +73,11 @@ export function setSettingsBi(val: number) { bleState.settings.bi = val; }
 export function setSettingsGs(val: number) { bleState.settings.gs = val; }
 export function setSettingsOs(val: number) { bleState.settings.os = val; }
 export function setSettingsSs(val: number) { bleState.settings.ss = val; }
+
+export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
+export function setGestureReactionTime(val: number) { bleState.gestureReactionTime = val; }
+export function setGestureConfidence(val: number) { bleState.gestureConfidence = val; }
+export function setGestureCooldown(val: number) { bleState.gestureCooldown = val; }
 
 export async function connect(): Promise<boolean> {
     try {
@@ -90,15 +104,24 @@ export async function connect(): Promise<boolean> {
             console.log('[BLE RX]', value);
             bleState.lastStatus = value;
 
-            // Parse settings from response
-            const settingsParams = ['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss'];
-            if (value.includes('=')) {
-                settingsParams.forEach(param => {
+            // Parse appearance and gesture settings
+            const params = ['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss', 'rt', 'cf', 'cd', 'gm'];
+            if (value.includes('=') || value.includes('gs:')) {
+                params.forEach(param => {
                     const match = value.match(new RegExp(`${param}=(\\d+(\\.\\d+)?)`));
                     if (match) {
                         const val = parseFloat(match[1]);
-                        // safely update nested state
-                        (bleState.settings as any)[param] = val;
+                        if (['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss'].includes(param)) {
+                            (bleState.settings as any)[param] = val;
+                        } else if (param === 'rt') {
+                            bleState.gestureReactionTime = val;
+                        } else if (param === 'cf') {
+                            bleState.gestureConfidence = val;
+                        } else if (param === 'cd') {
+                            bleState.gestureCooldown = val;
+                        } else if (param === 'gm') {
+                            bleState.gestureMatching = (val === 1);
+                        }
                     }
                 });
             }
@@ -150,6 +173,12 @@ export async function connect(): Promise<boolean> {
             setTimeout(async () => {
                 console.log('Requesting Appearance Settings...');
                 await sendCommand('s:');
+
+                // Final sync: Gesture Settings
+                setTimeout(async () => {
+                    console.log('Requesting Gesture Settings...');
+                    await sendCommand('gs:');
+                }, 300);
             }, 300);
         }, 300);
 
