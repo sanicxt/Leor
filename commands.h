@@ -52,6 +52,10 @@ inline bool isTraining() { return false; }  // EI model is pre-trained
 
 // Reset all effects to default
 void resetEffects() {
+  // Reset emotions
+  pMochiEyes->resetEmotions();
+  
+  // Reset effects
   pMochiEyes->setCuriosity(OFF);
   pMochiEyes->setHFlicker(OFF);
   pMochiEyes->setVFlicker(OFF);
@@ -59,6 +63,9 @@ void resetEffects() {
   pMochiEyes->setIdleMode(OFF);
   pMochiEyes->setEyebrows(false);
   pMochiEyes->setKnocked(OFF);
+  
+  // Reset gaze to center
+  pMochiEyes->setGaze(0, 0);
 }
 
 // Print help menu to Serial

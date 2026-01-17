@@ -127,18 +127,21 @@ struct EyeParams {
     float fatigue;
     float love;
     
-    // Mouth
+    // Mouth (independent from eyes)
     float mouthOpenness;    // 0 = closed, 1 = open
-    MouthShape mouthShape;
+    MouthShape mouthShape;  // Current shape being displayed
+    MouthShape targetMouthShape; // Target shape to transition to
+    float mouthTransition;  // 0 = at current shape, 1 = at target shape
     
     // Special effects
     float heartScale;       // 0 = no heart, 1 = full size
     float heartPulse;       // For pulsing animation
     float tearProgress;     // 0 = no tears, >0 = tears falling
     float spiralAngle;      // For knocked/dizzy effect
-    bool sweat;
+    float knockedIntensity; // 0 = normal, 1 = full spiral (smooth)
+    float sweatIntensity;   // 0 = no sweat, 1 = full sweat (smooth)
+    float curiousIntensity; // 0 = normal, 1 = curious mode (smooth)
     bool cyclops;
-    bool curious;           // One eye bigger, moves left-right
     float curiousPhase;     // Animation phase for left-right movement
     
     // Flicker effects (frame-local, not smoothed)
@@ -158,13 +161,16 @@ struct EyeParams {
         love = 0.0f;
         mouthOpenness = 0.0f;
         mouthShape = MOUTH_SMILE;
+        targetMouthShape = MOUTH_SMILE;
+        mouthTransition = 1.0f;  // Already at target
         heartScale = 0.0f;
         heartPulse = 0.0f;
         tearProgress = 0.0f;
         spiralAngle = 0.0f;
-        sweat = false;
+        knockedIntensity = 0.0f;
+        sweatIntensity = 0.0f;
+        curiousIntensity = 0.0f;
         cyclops = false;
-        curious = false;
         curiousPhase = 0.0f;
         hFlicker = 0.0f;
         vFlicker = 0.0f;
@@ -188,6 +194,9 @@ struct ImpulseTargets {
     float love;
     float mouthOpenness;
     float heartScale;
+    float knockedIntensity;  // Target for knocked effect
+    float sweatIntensity;    // Target for sweat effect
+    float curiousIntensity;  // Target for curious mode
     
     // Animation speeds (units per second)
     float opennessSpeed;
@@ -196,6 +205,7 @@ struct ImpulseTargets {
     float emotionSpeed;
     float mouthSpeed;
     float heartSpeed;
+    float effectSpeed;       // Speed for knocked/sweat/curious transitions
     
     void reset() {
         openness = 1.0f;
@@ -210,6 +220,9 @@ struct ImpulseTargets {
         love = 0.0f;
         mouthOpenness = 0.0f;
         heartScale = 0.0f;
+        knockedIntensity = 0.0f;
+        sweatIntensity = 0.0f;
+        curiousIntensity = 0.0f;
         
         opennessSpeed = 12.0f;   // Faster blink
         squishSpeed = 10.0f;     // Snappier squish
@@ -217,6 +230,7 @@ struct ImpulseTargets {
         emotionSpeed = 5.0f;     // Faster emotion transitions
         mouthSpeed = 15.0f;      // Snappier mouth
         heartSpeed = 8.0f;       // Faster heart transition
+        effectSpeed = 4.0f;      // Speed for effect transitions
     }
 };
 
@@ -245,7 +259,10 @@ struct AnimationTimers {
     float cryRemaining;
     float confusedRemaining;
     float laughRemaining;
-    float knockedActive;  // 0 = off, >0 = on
+    
+    // Mouth animations
+    float mouthAnimRemaining;
+    int mouthAnimType;  // 1=talk, 2=chew, 3=wobble
     
     // Auto-blink
     float blinkCooldown;
@@ -264,7 +281,8 @@ struct AnimationTimers {
         cryRemaining = 0.0f;
         confusedRemaining = 0.0f;
         laughRemaining = 0.0f;
-        knockedActive = 0.0f;
+        mouthAnimRemaining = 0.0f;
+        mouthAnimType = 0;
         
         blinkCooldown = 2.0f;
         blinkInterval = 3.0f;
@@ -344,6 +362,11 @@ private:
         
         params.mouthOpenness = smoothDamp(params.mouthOpenness, targets.mouthOpenness, targets.mouthSpeed, dt);
         params.heartScale = smoothDamp(params.heartScale, targets.heartScale, targets.heartSpeed, dt);
+        
+        // Smooth effect transitions
+        params.knockedIntensity = smoothDamp(params.knockedIntensity, targets.knockedIntensity, targets.effectSpeed, dt);
+        params.sweatIntensity = smoothDamp(params.sweatIntensity, targets.sweatIntensity, targets.effectSpeed, dt);
+        params.curiousIntensity = smoothDamp(params.curiousIntensity, targets.curiousIntensity, targets.effectSpeed, dt);
     }
     
     // ========================================================================
@@ -351,13 +374,52 @@ private:
     // ========================================================================
     
     void updateTimers(float dt) {
+        // === MOUTH TRANSITION (independent from eyes) ===
+        // Smoothly transition mouth to target shape
+        if (params.mouthShape != params.targetMouthShape) {
+            params.mouthTransition += dt * 8.0f;  // Transition speed
+            if (params.mouthTransition >= 1.0f) {
+                params.mouthShape = params.targetMouthShape;
+                params.mouthTransition = 1.0f;
+            }
+        }
+        
+        // Knocked overrides mouth to OOO
+        if (params.knockedIntensity > 0.5f) {
+            params.mouthShape = MOUTH_OOO;
+        }
+        
+        // Mouth animations (talk, chew, wobble)
+        if (timers.mouthAnimRemaining > 0) {
+            timers.mouthAnimRemaining -= dt;
+            float t = timers.mouthAnimRemaining;
+            
+            switch (timers.mouthAnimType) {
+                case 1: // Talk - rapid open/close with varying amplitude
+                    targets.mouthOpenness = (sinf(t * 25.0f) * 0.5f + 0.5f) * 
+                                           (0.3f + sinf(t * 5.0f) * 0.2f);
+                    break;
+                case 2: // Chew - asymmetric jaw movement
+                    targets.mouthOpenness = fabsf(sinf(t * 8.0f)) * 0.6f;
+                    break;
+                case 3: // Wobble - mouth position oscillates left/right
+                    // Use mouthOpenness variation to simulate wobble since we can't move mouth X
+                    targets.mouthOpenness = 0.2f + sinf(t * 12.0f) * 0.15f;
+                    break;
+            }
+        } else if (timers.mouthAnimType != 0) {
+            targets.mouthOpenness = 0.0f;
+            timers.mouthAnimType = 0;
+        }
+        
+        // === EYE ANIMATIONS (separate from mouth) ===
+        
         // Love animation
         if (timers.loveRemaining > 0) {
             timers.loveRemaining -= dt;
             targets.love = 1.0f;
             targets.heartScale = 1.0f;
-            params.heartPulse += dt * 10.0f;  // Faster pulse frequency
-            params.mouthShape = MOUTH_SMILE;
+            params.heartPulse += dt * 10.0f;
         } else if (params.love > 0.01f) {
             targets.love = 0.0f;
             targets.heartScale = 0.0f;
@@ -366,22 +428,19 @@ private:
         // Cry animation
         if (timers.cryRemaining > 0) {
             timers.cryRemaining -= dt;
-            params.tearProgress += dt * 40.0f;  // Tear speed
+            params.tearProgress += dt * 40.0f;
             if (params.tearProgress > layout.screenH) {
                 params.tearProgress = 0.0f;
             }
-            params.mouthShape = MOUTH_FROWN;
             targets.fatigue = 0.5f;
         } else {
             params.tearProgress = 0.0f;
         }
         
-        // Confused animation - eyes shake left AND right
+        // Confused animation - eyes shake
         if (timers.confusedRemaining > 0) {
             timers.confusedRemaining -= dt;
-            // Stronger horizontal flicker - shakes both directions
-            params.hFlicker = sinf(timers.confusedRemaining * 50.0f) * 8.0f;  // Faster, wider shake
-            params.mouthShape = MOUTH_OOO;
+            params.hFlicker = sinf(timers.confusedRemaining * 50.0f) * 8.0f;
         } else {
             params.hFlicker = 0.0f;
         }
@@ -389,10 +448,8 @@ private:
         // Laugh animation
         if (timers.laughRemaining > 0) {
             timers.laughRemaining -= dt;
-            // Vertical bounce + mouth animation
             params.vFlicker = sinf(timers.laughRemaining * 20.0f) * 2.0f;
             targets.mouthOpenness = (sinf(timers.laughRemaining * 12.0f) + 1.0f) * 0.5f;
-            params.mouthShape = MOUTH_SMILE;
             targets.joy = 1.0f;
         } else {
             params.vFlicker = 0.0f;
@@ -402,14 +459,13 @@ private:
             }
         }
         
-        // Knocked (spiral eyes) - persists until turned off
-        if (timers.knockedActive > 0) {
-            params.spiralAngle += dt * 5.0f;
-            params.mouthShape = MOUTH_OOO;
+        // Knocked (spiral eyes)
+        if (params.knockedIntensity > 0.1f) {
+            params.spiralAngle += dt * 8.0f;
         }
         
-        // Auto-blink
-        if (timers.autoBlink && timers.knockedActive <= 0) {
+        // Auto-blink (disabled when knocked)
+        if (timers.autoBlink && params.knockedIntensity < 0.5f) {
             timers.blinkCooldown -= dt;
             if (timers.blinkCooldown <= 0) {
                 blink();
@@ -429,11 +485,11 @@ private:
             }
         }
         
-        // Curious mode - eyes move left-right, one eye bigger
-        if (params.curious) {
+        // Curious mode - use intensity for smooth eye size change
+        if (params.curiousIntensity > 0.1f) {
             params.curiousPhase += dt * 1.5f;  // Slow left-right movement
             // Oscillate gaze between left and right
-            targets.gazeX = sinf(params.curiousPhase) * 0.8f;
+            targets.gazeX = sinf(params.curiousPhase) * 0.8f * params.curiousIntensity;
             targets.gazeY = 0.0f;
         }
     }
@@ -507,13 +563,13 @@ private:
         // Parallax scale bias: eyes slightly larger when looking away from center
         float parallaxScale = 1.0f + fabsf(params.gazeX) * 0.05f;
         
-        // Curious mode: one eye bigger based on gaze direction
+        // Curious mode: one eye bigger based on gaze direction (uses smooth intensity)
         float leftScale = 1.0f;
         float rightScale = 1.0f;
-        if (params.curious) {
+        if (params.curiousIntensity > 0.01f) {
             // When looking right (gazeX > 0), right eye gets bigger
             // When looking left (gazeX < 0), left eye gets bigger
-            float curiousAmount = 0.25f;  // 25% size difference
+            float curiousAmount = 0.25f * params.curiousIntensity;  // 25% size difference, scaled by intensity
             leftScale = 1.0f - params.gazeX * curiousAmount;   // Bigger when looking left
             rightScale = 1.0f + params.gazeX * curiousAmount;  // Bigger when looking right
         }
@@ -785,35 +841,44 @@ private:
     
     void drawSpiral(int16_t cx, int16_t cy, int16_t maxRadius) {
         float angle = params.spiralAngle;
-        float radius = 2;
+        float radius = 3;  // Start slightly bigger
         int prevX = cx, prevY = cy;
         
         while (radius < maxRadius) {
             int x = cx + (int)(cosf(angle) * radius);
             int y = cy + (int)(sinf(angle) * radius);
+            // Draw thicker lines (3 pixels wide)
             display->drawLine(prevX, prevY, x, y, MAINCOLOR);
             display->drawLine(prevX + 1, prevY, x + 1, y, MAINCOLOR);
+            display->drawLine(prevX, prevY + 1, x, y + 1, MAINCOLOR);
             prevX = x;
             prevY = y;
-            angle += 0.3f;
-            radius += 0.4f;
+            angle += 0.25f;   // Tighter spiral (was 0.3)
+            radius += 0.5f;   // Faster growth (was 0.4)
         }
     }
     
     void drawKnockedOverlay() {
-        if (timers.knockedActive <= 0) return;
+        if (params.knockedIntensity < 0.05f) return;
         
-        int16_t spiralR = min(render.leftW, render.leftH) / 2 - 2;
-        if (spiralR < 8) spiralR = 8;
+        // Make spiral fill most of the eye (bigger radius)
+        int16_t spiralR = min(render.leftW, render.leftH) / 2 + 4;  // Added +4 for bigger spiral
+        if (spiralR < 12) spiralR = 12;
         
-        // Clear eyes
-        display->fillRoundRect(render.leftX - 1, render.leftY - 1,
-                               render.leftW + 2, render.leftH + 2,
-                               render.borderRadius, BGCOLOR);
-        if (!params.cyclops) {
-            display->fillRoundRect(render.rightX - 1, render.rightY - 1,
-                                   render.rightW + 2, render.rightH + 2,
+        // Scale spiral by intensity for fade-in effect
+        spiralR = (int16_t)(spiralR * params.knockedIntensity);
+        if (spiralR < 6) spiralR = 6;
+        
+        // Clear eyes (partial based on intensity)
+        if (params.knockedIntensity > 0.5f) {
+            display->fillRoundRect(render.leftX - 1, render.leftY - 1,
+                                   render.leftW + 2, render.leftH + 2,
                                    render.borderRadius, BGCOLOR);
+            if (!params.cyclops) {
+                display->fillRoundRect(render.rightX - 1, render.rightY - 1,
+                                       render.rightW + 2, render.rightH + 2,
+                                       render.borderRadius, BGCOLOR);
+            }
         }
         
         drawSpiral(render.leftX + render.leftW / 2, 
@@ -825,10 +890,10 @@ private:
     }
     
     void drawSweat() {
-        if (!params.sweat) return;
+        if (params.sweatIntensity < 0.1f) return;
         
         for (int i = 0; i < 3; i++) {
-            sweatY[i] += 0.5f;
+            sweatY[i] += 0.5f * params.sweatIntensity;
             if (sweatY[i] > 20 + random(10)) {
                 // Reset drop
                 if (i == 0) sweatX[i] = random(30);
@@ -845,9 +910,13 @@ private:
             }
             if (sweatSize[i] < 1) sweatSize[i] = 1;
             
-            display->fillRoundRect((int16_t)sweatX[i], (int16_t)sweatY[i],
-                                   (int16_t)sweatSize[i], (int16_t)(sweatSize[i] * 1.5f),
-                                   3, MAINCOLOR);
+            // Scale size by intensity for fade effect
+            float scaledSize = sweatSize[i] * params.sweatIntensity;
+            if (scaledSize >= 1.0f) {
+                display->fillRoundRect((int16_t)sweatX[i], (int16_t)sweatY[i],
+                                       (int16_t)scaledSize, (int16_t)(scaledSize * 1.5f),
+                                       3, MAINCOLOR);
+            }
         }
     }
 
@@ -951,7 +1020,10 @@ public:
     }
     
     void setMouthShape(MouthShape shape) {
-        params.mouthShape = shape;
+        if (params.mouthShape != shape) {
+            params.targetMouthShape = shape;
+            params.mouthTransition = 0.0f;  // Start transition
+        }
     }
     
     void setMouthOpenness(float target, float speed = 10.0f) {
@@ -984,11 +1056,25 @@ public:
     }
     
     void resetEmotions() {
+        // Reset emotion targets
         targets.joy = 0.0f;
         targets.anger = 0.0f;
         targets.fatigue = 0.0f;
         targets.love = 0.0f;
         targets.heartScale = 0.0f;
+        
+        // Reset openness to fully open
+        targets.openness = 1.0f;
+        targets.leftOpenness = 1.0f;
+        targets.rightOpenness = 1.0f;
+        
+        // Stop timed animations
+        timers.loveRemaining = 0.0f;
+        timers.cryRemaining = 0.0f;
+        timers.confusedRemaining = 0.0f;
+        timers.laughRemaining = 0.0f;
+        timers.mouthAnimRemaining = 0.0f;
+        timers.mouthAnimType = 0;
     }
     
     // ========================================================================
@@ -1004,14 +1090,25 @@ public:
     
     void wink(bool left) {
         if (left) {
+            // Close left eye
             targets.leftOpenness = 0.0f;
             params.leftOpenness = 0.0f;
             targets.leftOpenness = 1.0f;
+            // Right eye squints a little in sympathy
+            params.rightOpenness = 0.7f;
+            targets.rightOpenness = 1.0f;
         } else {
+            // Close right eye
             targets.rightOpenness = 0.0f;
             params.rightOpenness = 0.0f;
             targets.rightOpenness = 1.0f;
+            // Left eye squints a little in sympathy
+            params.leftOpenness = 0.7f;
+            targets.leftOpenness = 1.0f;
         }
+        // Add a slight squish for extra character
+        params.squish = 0.95f;
+        targets.squish = 1.0f;
     }
     
     void close() {
@@ -1041,15 +1138,16 @@ public:
     }
     
     void setKnocked(bool on) {
-        timers.knockedActive = on ? 1.0f : 0.0f;
+        targets.knockedIntensity = on ? 1.0f : 0.0f;
         if (on) {
             params.spiralAngle = 0.0f;
-            params.mouthShape = MOUTH_OOO;
+            // Blink first for dramatic effect
+            blink();
         }
     }
     
     void setSweat(bool on) {
-        params.sweat = on;
+        targets.sweatIntensity = on ? 1.0f : 0.0f;
     }
     
     void setCyclops(bool on) {
@@ -1159,14 +1257,16 @@ public:
     }
     
     void setMouthType(int type) {
+        MouthShape shape = MOUTH_SMILE;
         switch (type) {
-            case 1: params.mouthShape = MOUTH_SMILE; break;
-            case 2: params.mouthShape = MOUTH_FROWN; break;
-            case 3: params.mouthShape = MOUTH_OPEN; break;
-            case 4: params.mouthShape = MOUTH_OOO; break;
-            case 5: params.mouthShape = MOUTH_FLAT; break;
-            default: params.mouthShape = MOUTH_SMILE; break;
+            case 1: shape = MOUTH_SMILE; break;
+            case 2: shape = MOUTH_FROWN; break;
+            case 3: shape = MOUTH_OPEN; break;
+            case 4: shape = MOUTH_OOO; break;
+            case 5: shape = MOUTH_FLAT; break;
+            default: shape = MOUTH_SMILE; break;
         }
+        setMouthShape(shape);  // Use transition system
     }
     
     void setMouthEnabled(bool enabled) {
@@ -1182,7 +1282,7 @@ public:
     }
     
     void setCuriosity(bool on) {
-        params.curious = on;
+        targets.curiousIntensity = on ? 1.0f : 0.0f;
         if (on) {
             params.curiousPhase = 0.0f;
         }
@@ -1211,10 +1311,9 @@ public:
     void anim_knocked() { setKnocked(true); }
     
     void startMouthAnim(int anim, unsigned long duration) {
-        // Map to laugh for now
-        if (anim == 1 || anim == 4) {
-            triggerLaugh(duration / 1000.0f);
-        }
+        // anim: 1=talk, 2=chew, 3=wobble
+        timers.mouthAnimRemaining = duration / 1000.0f;
+        timers.mouthAnimType = anim;
     }
 };
 
