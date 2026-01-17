@@ -1,5 +1,5 @@
 /*
- * ble_manager.h - Robust BLE manager for leor
+ * ble_manager.h - Robust BLE manager for leor using NimBLE
  * Replaces WiFi with low-power Bluetooth Low Energy
  */
 
@@ -7,10 +7,7 @@
 #define BLE_MANAGER_H
 
 #include <Arduino.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include <NimBLEDevice.h>
 #include "config.h"
 
 // Implemented in commands.h
@@ -23,10 +20,10 @@ String handleCommand(String cmd);
 #define GESTURE_CHAR_UUID   "d1e5f0a1-2b3c-4d5e-6f7a-8b9c0d1e2f3a"
 
 // ==================== State Variables ====================
-static BLEServer* pServer = NULL;
-static BLECharacteristic* pCommandChar = NULL;
-static BLECharacteristic* pStatusChar = NULL;
-static BLECharacteristic* pGestureChar = NULL;
+static NimBLEServer* pServer = NULL;
+static NimBLECharacteristic* pCommandChar = NULL;
+static NimBLECharacteristic* pStatusChar = NULL;
+static NimBLECharacteristic* pGestureChar = NULL;
 
 // Connection state
 static bool deviceConnected = false;
@@ -86,8 +83,8 @@ static String bleProcessPayload(const String& payload) {
 // ==================== BLE Callbacks ====================
 
 // BLE Server Callbacks
-class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
+class MyServerCallbacks: public NimBLEServerCallbacks {
+    void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override {
       deviceConnected = true;
       advRestartAtMs = 0;
       lastActivityMs = millis();
@@ -96,18 +93,23 @@ class MyServerCallbacks: public BLEServerCallbacks {
       sendBLEStatus("connected");
     };
 
-    void onDisconnect(BLEServer* pServer) {
+    void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override {
       deviceConnected = false;
       disconnectionCount++;
-      Serial.println(F("✗ BLE Client disconnected"));
+      Serial.printf("✗ BLE Client disconnected - reason: %d\n", reason);
       // Restart advertising shortly after disconnect (non-blocking)
       advRestartAtMs = millis() + 250;
+    }
+
+    void onMTUChange(uint16_t MTU, NimBLEConnInfo& connInfo) override {
+      currentMTU = MTU;
+      Serial.printf("MTU updated: %u\n", MTU);
     }
 };
 
 // Command Characteristic Callback
-class CommandCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic) {
+class CommandCallbacks: public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo& connInfo) override {
       if (!pCharacteristic) return;
       
       String payload = String(pCharacteristic->getValue().c_str());
@@ -171,15 +173,12 @@ void restartBLE() {
   Serial.println(F("[BLE] Restarting BLE stack..."));
   
   // Stop advertising first
-  if (pServer) {
-    BLEDevice::getAdvertising()->stop();
-  }
+  NimBLEDevice::getAdvertising()->stop();
   
   delay(100);
   
   // Restart advertising
-  if (pServer) {
-    pServer->startAdvertising();
+  if (NimBLEDevice::getAdvertising()->start()) {
     advStartedAtMs = millis();
     Serial.println(F("[BLE] Advertising restarted"));
   }
@@ -187,16 +186,13 @@ void restartBLE() {
 
 // Initialize BLE
 void initBLE(const char* deviceName) {
-  Serial.println(F("Initializing BLE..."));
+  Serial.println(F("Initializing BLE (NimBLE)..."));
   
   // Create BLE Device
-  BLEDevice::init(deviceName);
-  
-  // Set MTU (must be done before creating server on some ESP-IDF versions)
-  BLEDevice::setMTU(BLE_MTU_REQUEST);
+  NimBLEDevice::init(deviceName);
   
   // Create BLE Server
-  pServer = BLEDevice::createServer();
+  pServer = NimBLEDevice::createServer();
   if (!pServer) {
     Serial.println(F("✗ Failed to create BLE server!"));
     return;
@@ -204,17 +200,17 @@ void initBLE(const char* deviceName) {
   pServer->setCallbacks(new MyServerCallbacks());
 
   // Create BLE Service
-  BLEService *pService = pServer->createService(SERVICE_UUID);
+  NimBLEService *pService = pServer->createService(SERVICE_UUID);
   if (!pService) {
     Serial.println(F("✗ Failed to create BLE service!"));
     return;
   }
 
-  // Create Command Characteristic (Write + Write No Response for speed)
+  // Create Command Characteristic
   pCommandChar = pService->createCharacteristic(
                       COMMAND_CHAR_UUID,
-                      BLECharacteristic::PROPERTY_WRITE |
-                      BLECharacteristic::PROPERTY_WRITE_NR
+                      NIMBLE_PROPERTY::WRITE |
+                      NIMBLE_PROPERTY::WRITE_NR
                     );
   if (pCommandChar) {
     pCommandChar->setCallbacks(new CommandCallbacks());
@@ -223,50 +219,40 @@ void initBLE(const char* deviceName) {
   // Create Status Characteristic (Read + Notify)
   pStatusChar = pService->createCharacteristic(
                       STATUS_CHAR_UUID,
-                      BLECharacteristic::PROPERTY_READ |
-                      BLECharacteristic::PROPERTY_NOTIFY
+                      NIMBLE_PROPERTY::READ |
+                      NIMBLE_PROPERTY::NOTIFY
                     );
   if (pStatusChar) {
-    pStatusChar->addDescriptor(new BLE2902());
     pStatusChar->setValue("ready");
+    // NimBLE handles 2902 automatically
   }
 
   // Create Gesture Characteristic (Read + Notify) 
   pGestureChar = pService->createCharacteristic(
                       GESTURE_CHAR_UUID,
-                      BLECharacteristic::PROPERTY_READ |
-                      BLECharacteristic::PROPERTY_NOTIFY
+                      NIMBLE_PROPERTY::READ |
+                      NIMBLE_PROPERTY::NOTIFY
                     );
   if (pGestureChar) {
-    pGestureChar->addDescriptor(new BLE2902());
     pGestureChar->setValue("idle");
+    // NimBLE handles 2902 automatically
   }
 
   // Start the service
   pService->start();
 
   // Configure and start advertising
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(true);
+  pAdvertising->enableScanResponse(true);
   
-  // Connection parameters for iOS compatibility
-  pAdvertising->setMinPreferred(0x06);
-  pAdvertising->setMaxPreferred(0x12);
-
-  // Advertising interval (units of 0.625ms)
-  // 0x400 = 640ms, 0x800 = 1280ms (slower = lower power)
-  pAdvertising->setMinInterval(0x400);
-  pAdvertising->setMaxInterval(0x800);
-
-  BLEDevice::startAdvertising();
+  // NimBLE simplifies connection parameters
+  pAdvertising->start();
   advStartedAtMs = millis();
   
   Serial.println(F("✓ BLE initialized!"));
   Serial.print(F("  Device Name: "));
   Serial.println(deviceName);
-  Serial.print(F("  Requested MTU: "));
-  Serial.println(BLE_MTU_REQUEST);
   Serial.println(F("  Ready for connections"));
 }
 
@@ -286,8 +272,7 @@ void handleBLEConnection() {
   // Restart advertising after disconnect
   if (!deviceConnected && advRestartAtMs != 0 && (int32_t)(now - advRestartAtMs) >= 0) {
     advRestartAtMs = 0;
-    if (pServer) {
-      pServer->startAdvertising();
+    if (NimBLEDevice::getAdvertising()->start()) {
       advStartedAtMs = now;
       Serial.println(F("[BLE] Advertising restarted"));
     }
@@ -297,8 +282,6 @@ void handleBLEConnection() {
   if (deviceConnected && lastActivityMs > 0) {
     if ((now - lastActivityMs) > BLE_CONNECTION_TIMEOUT_MS) {
       Serial.println(F("[BLE] Connection timeout - client unresponsive"));
-      // Note: We can't force disconnect on ESP32, but we log it
-      // The client will eventually disconnect naturally
       lastActivityMs = now;  // Reset to avoid spam
     }
   }
@@ -361,3 +344,4 @@ void sendBLEGesture(const String& gesture) {
 }
 
 #endif // BLE_MANAGER_H
+
