@@ -67,7 +67,9 @@ enum MouthShape : int8_t {
     MOUTH_FROWN = 1,
     MOUTH_OPEN = 2,
     MOUTH_OOO = 3,
-    MOUTH_FLAT = 4
+    MOUTH_FLAT = 4,
+    MOUTH_W = 5,    // UwU cat mouth
+    MOUTH_D = 6     // XD open mouth
 };
 
 // ============================================================================
@@ -141,6 +143,8 @@ struct EyeParams {
     float knockedIntensity; // 0 = normal, 1 = full spiral (smooth)
     float sweatIntensity;   // 0 = no sweat, 1 = full sweat (smooth)
     float curiousIntensity; // 0 = normal, 1 = curious mode (smooth)
+    float uwuIntensity;     // 0 = normal, 1 = full UwU face (smooth)
+    float xdIntensity;      // 0 = normal, 1 = full >U< face (smooth)
     bool cyclops;
     float curiousPhase;     // Animation phase for left-right movement
     
@@ -170,6 +174,8 @@ struct EyeParams {
         knockedIntensity = 0.0f;
         sweatIntensity = 0.0f;
         curiousIntensity = 0.0f;
+        uwuIntensity = 0.0f;
+        xdIntensity = 0.0f;
         cyclops = false;
         curiousPhase = 0.0f;
         hFlicker = 0.0f;
@@ -197,6 +203,8 @@ struct ImpulseTargets {
     float knockedIntensity;  // Target for knocked effect
     float sweatIntensity;    // Target for sweat effect
     float curiousIntensity;  // Target for curious mode
+    float uwuIntensity;      // Target for UwU effect
+    float xdIntensity;       // Target for >U< effect
     
     // Animation speeds (units per second)
     float opennessSpeed;
@@ -223,6 +231,8 @@ struct ImpulseTargets {
         knockedIntensity = 0.0f;
         sweatIntensity = 0.0f;
         curiousIntensity = 0.0f;
+        uwuIntensity = 0.0f;
+        xdIntensity = 0.0f;
         
         opennessSpeed = 12.0f;   // Faster blink
         squishSpeed = 10.0f;     // Snappier squish
@@ -259,6 +269,8 @@ struct AnimationTimers {
     float cryRemaining;
     float confusedRemaining;
     float laughRemaining;
+    float uwuRemaining;
+    float xdRemaining;
     
     // Mouth animations
     float mouthAnimRemaining;
@@ -277,11 +289,14 @@ struct AnimationTimers {
     bool idleMode;
     
     void reset() {
+        confusedRemaining = 0.0f;
         loveRemaining = 0.0f;
         cryRemaining = 0.0f;
-        confusedRemaining = 0.0f;
         laughRemaining = 0.0f;
-        mouthAnimRemaining = 0.0f;
+        uwuRemaining = 0.0f;
+        xdRemaining = 0.0f;
+        
+        idleMode = true;
         mouthAnimType = 0;
         
         blinkCooldown = 2.0f;
@@ -367,6 +382,8 @@ private:
         params.knockedIntensity = smoothDamp(params.knockedIntensity, targets.knockedIntensity, targets.effectSpeed, dt);
         params.sweatIntensity = smoothDamp(params.sweatIntensity, targets.sweatIntensity, targets.effectSpeed, dt);
         params.curiousIntensity = smoothDamp(params.curiousIntensity, targets.curiousIntensity, targets.effectSpeed, dt);
+        params.uwuIntensity = smoothDamp(params.uwuIntensity, targets.uwuIntensity, targets.effectSpeed, dt);
+        params.xdIntensity = smoothDamp(params.xdIntensity, targets.xdIntensity, targets.effectSpeed, dt);
     }
     
     // ========================================================================
@@ -433,8 +450,10 @@ private:
                 params.tearProgress = 0.0f;
             }
             targets.fatigue = 0.5f;
-        } else {
+        } else if (params.tearProgress > 0 || params.fatigue > 0.01f) {
+            // Reset tears and fatigue when cry ends
             params.tearProgress = 0.0f;
+            targets.fatigue = 0.0f;
         }
         
         // Confused animation - eyes shake
@@ -491,6 +510,22 @@ private:
             // Oscillate gaze between left and right
             targets.gazeX = sinf(params.curiousPhase) * 0.8f * params.curiousIntensity;
             targets.gazeY = 0.0f;
+        }
+        
+        // UwU timer - eyes only, no joy override
+        if (timers.uwuRemaining > 0) {
+            timers.uwuRemaining -= dt;
+            targets.uwuIntensity = 1.0f;
+        } else if (params.uwuIntensity > 0.01f) {
+            targets.uwuIntensity = 0.0f;
+        }
+        
+        // XD (>U<) timer - eyes only, no joy override
+        if (timers.xdRemaining > 0) {
+            timers.xdRemaining -= dt;
+            targets.xdIntensity = 1.0f;
+        } else if (params.xdIntensity > 0.01f) {
+            targets.xdIntensity = 0.0f;
         }
     }
     
@@ -740,6 +775,50 @@ private:
                 // Flat line with rounded ends
                 display->fillRoundRect(mx + 2, my + 2, mw - 4, 3, 1, MAINCOLOR);
                 break;
+                
+            case MOUTH_W: {
+                // UwU cat mouth (two curved bumps forming a 'w')
+                int16_t centerX = mx + mw / 2;
+                int16_t bumpR = mw / 5;
+                int16_t wHeight = 6;
+                
+                for (int16_t thick = 0; thick < 2; thick++) {
+                    // Left bump
+                    for (int16_t angle = 0; angle <= 180; angle += 6) {
+                        float rad = angle * 3.14159f / 180.0f;
+                        int16_t px = centerX - bumpR - (int16_t)(bumpR * cosf(rad));
+                        int16_t py = my + thick + (int16_t)(wHeight * sinf(rad));
+                        display->drawPixel(px, py, MAINCOLOR);
+                        display->drawPixel(px + 1, py, MAINCOLOR);
+                    }
+                    // Right bump
+                    for (int16_t angle = 0; angle <= 180; angle += 6) {
+                        float rad = angle * 3.14159f / 180.0f;
+                        int16_t px = centerX + bumpR + (int16_t)(bumpR * cosf(rad));
+                        int16_t py = my + thick + (int16_t)(wHeight * sinf(rad));
+                        display->drawPixel(px, py, MAINCOLOR);
+                        display->drawPixel(px - 1, py, MAINCOLOR);
+                    }
+                }
+                break;
+            }
+                
+            case MOUTH_D: {
+                // XD open mouth (filled D/U shape)
+                int16_t centerX = mx + mw / 2;
+                int16_t radius = mw / 3;
+                int16_t dHeight = 10;
+                
+                // Draw filled semi-circle
+                for (int16_t angle = 0; angle <= 180; angle++) {
+                    float rad = angle * 3.14159f / 180.0f;
+                    int16_t x = centerX + (int16_t)(radius * cosf(rad));
+                    int16_t y = my + (int16_t)(dHeight * sinf(rad));
+                    display->drawLine(centerX, my, x, y, MAINCOLOR);
+                }
+                display->fillTriangle(mx + mw/2 - radius, my, mx + mw/2 + radius, my, centerX, my + dHeight, MAINCOLOR);
+                break;
+            }
         }
     }
     
@@ -814,6 +893,260 @@ private:
         }
     }
     
+    void drawUwUOverlay() {
+        if (params.uwuIntensity < 0.1f) return;
+        
+        float intensity = params.uwuIntensity;
+        
+        // Center positions for eyes
+        int16_t leftCX = render.leftX + render.leftW / 2;
+        int16_t leftCY = render.leftY + render.leftH / 2;
+        int16_t rightCX = render.rightX + render.rightW / 2;
+        int16_t rightCY = render.rightY + render.rightH / 2;
+        
+        // Clear eye areas when intensity is high enough
+        if (intensity > 0.5f) {
+            display->fillRoundRect(render.leftX - 2, render.leftY - 2,
+                                   render.leftW + 4, render.leftH + 4,
+                                   render.borderRadius, BGCOLOR);
+            if (!params.cyclops) {
+                display->fillRoundRect(render.rightX - 2, render.rightY - 2,
+                                       render.rightW + 4, render.rightH + 4,
+                                       render.borderRadius, BGCOLOR);
+            }
+            // Clear mouth area to replace it with w mouth
+            display->fillRect(render.mouthX - 2, render.mouthY - 2, 
+                             render.mouthW + 4, render.mouthH + 6, BGCOLOR);
+        }
+        
+        // === U-SHAPED EYES (thick top legs, thinning at bottom curve) ===
+        int16_t uWidth = (int16_t)(render.leftW * 0.6f * intensity);
+        int16_t uHeight = (int16_t)(render.leftH * 0.7f * intensity);
+        if (uWidth < 12) uWidth = 12;
+        if (uHeight < 14) uHeight = 14;
+        
+        auto drawU = [&](int16_t cx, int16_t cy, bool mirror) {
+            int16_t halfW = uWidth / 2;
+            int16_t legH = uHeight - halfW;
+            
+            // Asymmetrical Thickness Profile
+            // Swapped: Thin Start -> Middle -> Thick End
+            float startR = 1.0f;   // Start (Thin)
+            float medR = 2.0f;     // Middle
+            float endR = 3.0f;     // End (Thick)
+            
+            int16_t totalSteps = legH * 2 + (int16_t)(3.14159f * halfW);
+            
+            for (int16_t step = 0; step <= totalSteps; step++) {
+                float t = (float)step / (float)totalSteps;
+                int16_t px, py;
+                float radius;
+                
+                if (t < 0.35f) {
+                    // Left leg going down
+                    float legT = t / 0.35f;
+                    px = cx - halfW;
+                    py = cy - uHeight/2 + (int16_t)(legT * legH);
+                    
+                    if (!mirror) {
+                        // Standard (Left Eye): Start -> Medium
+                        radius = startR + legT * (medR - startR);
+                    } else {
+                        // Mirrored (Right Eye): End -> Medium
+                        radius = endR - legT * (endR - medR);
+                    }
+                } else if (t > 0.65f) {
+                    // Right leg going up
+                    float legT = (t - 0.65f) / 0.35f; // 0 at bottom, 1 at top
+                    px = cx + halfW;
+                    py = cy - uHeight/2 + legH - (int16_t)(legT * legH);
+                    
+                    if (!mirror) {
+                        // Standard (Left Eye): Medium -> End (Thick)
+                        radius = medR + legT * (endR - medR);
+                    } else {
+                        // Mirrored (Right Eye): Medium -> Start (Thin)
+                        radius = medR - legT * (medR - startR);
+                    }
+                } else {
+                    // Bottom curve
+                    float curveT = (t - 0.35f) / 0.3f;
+                    float angle = 3.14159f * curveT;
+                    px = cx - (int16_t)(halfW * cosf(angle));
+                    py = cy - uHeight/2 + legH + (int16_t)(halfW * sinf(angle));
+                    radius = medR;
+                }
+                
+                if (radius >= 1.0f) {
+                    display->fillCircle(px, py, (int16_t)radius, MAINCOLOR);
+                } else {
+                    display->drawPixel(px, py, MAINCOLOR);
+                }
+            }
+        };
+        
+        drawU(leftCX, leftCY, false); // Left eye: Thin -> Thick
+        if (!params.cyclops) {
+            drawU(rightCX, rightCY, true); // Right eye: Thick -> Thin (Mirrored)
+        }
+        
+        // === COMPACT W MOUTH (thick middle, thin edges) ===
+        int16_t mouthCX = layout.centerX;
+        int16_t mouthY = render.mouthY + 1;
+        int16_t wWidth = (int16_t)(26 * intensity);
+        int16_t wHeight = (int16_t)(10 * intensity);
+        if (wWidth < 14) wWidth = 14;
+        if (wHeight < 6) wHeight = 6;
+        int16_t bumpR = wWidth / 4;
+        
+        // Draw W bumps with varying thickness
+        // Left Bump: 180 (Edge/Thin) -> 0 (Center/Thick)
+        // Right Bump: 180 (Edge/Thin) -> 0 (Center/Thick)
+        
+        float edgeThick = 1.0f;
+        float centerThick = 2.5f;
+        
+        // Left Bump
+        for (int16_t angle = 0; angle <= 180; angle += 4) {
+            float t = (float)(180 - angle) / 180.0f; // 0 at Edge, 1 at Center
+            float rad = angle * 3.14159f / 180.0f;
+            int16_t px = mouthCX - bumpR - (int16_t)(bumpR * cosf(rad));
+            int16_t py = mouthY + (int16_t)(wHeight * sinf(rad));
+            
+            float radius = edgeThick + t * (centerThick - edgeThick);
+            if (radius > 1.0f) display->fillCircle(px, py, (int16_t)radius, MAINCOLOR);
+            else display->drawPixel(px, py, MAINCOLOR);
+        }
+        
+        // Right Bump
+        for (int16_t angle = 0; angle <= 180; angle += 4) {
+            float t = (float)(180 - angle) / 180.0f; // 0 at Edge, 1 at Center
+            float rad = angle * 3.14159f / 180.0f;
+            int16_t px = mouthCX + bumpR + (int16_t)(bumpR * cosf(rad));
+            int16_t py = mouthY + (int16_t)(wHeight * sinf(rad));
+            
+            float radius = edgeThick + t * (centerThick - edgeThick);
+             if (radius > 1.0f) display->fillCircle(px, py, (int16_t)radius, MAINCOLOR);
+            else display->drawPixel(px, py, MAINCOLOR);
+        }
+        
+        // === SOLID BLUSH OVALS (soft rounded look) ===
+        if (intensity > 0.3f) {
+            int16_t blushW = (int16_t)(14 * intensity);
+            int16_t blushH = (int16_t)(5 * intensity);
+            int16_t blushY = leftCY + uHeight/2 + 2;
+            
+            // Left blush
+            display->fillRoundRect(render.leftX + render.leftW/2 - uWidth/2 - blushW/2 - 4, 
+                                   blushY, blushW, blushH, 10, MAINCOLOR);
+                                   
+            // Right blush
+            if (!params.cyclops) {
+                display->fillRoundRect(render.rightX + render.rightW/2 + uWidth/2 - blushW/2 + 4,
+                                       blushY, blushW, blushH, 10, MAINCOLOR);
+            }
+        }
+    }
+    
+    void drawXDOverlay() {
+        if (params.xdIntensity < 0.1f) return;
+        
+        float intensity = params.xdIntensity;
+        
+        // Center positions
+        int16_t leftCX = render.leftX + render.leftW / 2;
+        int16_t leftCY = render.leftY + render.leftH / 2;
+        int16_t rightCX = render.rightX + render.rightW / 2;
+        int16_t rightCY = render.rightY + render.rightH / 2;
+        
+        // Clear eye areas
+        if (intensity > 0.5f) {
+            display->fillRoundRect(render.leftX - 2, render.leftY - 2,
+                                   render.leftW + 4, render.leftH + 4,
+                                   render.borderRadius, BGCOLOR);
+            if (!params.cyclops) {
+                display->fillRoundRect(render.rightX - 2, render.rightY - 2,
+                                       render.rightW + 4, render.rightH + 4,
+                                       render.borderRadius, BGCOLOR);
+            }
+            // Clear mouth area
+            display->fillRect(render.mouthX - 4, render.mouthY - 2, 
+                             render.mouthW + 8, render.mouthH + 8, BGCOLOR);
+        }
+        
+        // === > < EYES ===
+        int16_t eyeSize = (int16_t)(render.leftW * 0.7f * intensity);
+        if (eyeSize < 12) eyeSize = 12;
+        int16_t stroke = 3;
+        
+        // Helper to draw chevron
+        auto drawChevron = [&](int16_t cx, int16_t cy, bool pointRight) {
+            int16_t hSize = eyeSize / 2;
+            int16_t vSize = eyeSize / 2;
+            
+            if (pointRight) {
+                // > Shape (Left Eye)
+                // Top stroke: Top-Left to Right-Center
+                for (int i=0; i<stroke; i++) {
+                    display->drawLine(cx - hSize, cy - vSize + i, cx + hSize, cy + i, MAINCOLOR);
+                    display->drawLine(cx - hSize, cy - vSize + i - 1, cx + hSize, cy + i - 1, MAINCOLOR);
+                }
+                // Bottom stroke: Bottom-Left to Right-Center
+                for (int i=0; i<stroke; i++) {
+                    display->drawLine(cx - hSize, cy + vSize - i, cx + hSize, cy - i, MAINCOLOR);
+                    display->drawLine(cx - hSize, cy + vSize - i + 1, cx + hSize, cy - i + 1, MAINCOLOR);
+                }
+            } else {
+                // < Shape (Right Eye)
+                // Top stroke: Top-Right to Left-Center
+                for (int i=0; i<stroke; i++) {
+                    display->drawLine(cx + hSize, cy - vSize + i, cx - hSize, cy + i, MAINCOLOR);
+                    display->drawLine(cx + hSize, cy - vSize + i - 1, cx - hSize, cy + i - 1, MAINCOLOR);
+                }
+                // Bottom stroke: Bottom-Right to Left-Center
+                for (int i=0; i<stroke; i++) {
+                    display->drawLine(cx + hSize, cy + vSize - i, cx - hSize, cy - i, MAINCOLOR);
+                    display->drawLine(cx + hSize, cy + vSize - i + 1, cx - hSize, cy - i + 1, MAINCOLOR);
+                }
+            }
+        };
+        
+        drawChevron(leftCX, leftCY, true);  // >
+        if (!params.cyclops) {
+            drawChevron(rightCX, rightCY, false); // <
+        }
+        
+        // === OPEN MOUTH (D shape / Open U) ===
+        // Filled maroon/red based on request, but we only have MAINCOLOR/BGCOLOR?
+        // Usually index 0 is bg, 1 is main. If we want red we need color support.
+        // Assuming monochrome OLED/LCD for now, so filled with MAINCOLOR
+        
+        int16_t mouthW = (int16_t)(20 * intensity);
+        int16_t mouthH = (int16_t)(14 * intensity);
+        int16_t mouthX = layout.centerX - mouthW/2;
+        int16_t mouthY = render.mouthY;
+        
+        // Draw filled semi-circle/U for open mouth
+        // Top edge is flat or slightly curved down
+        
+        // Using fillCircle and rect to make a D shape
+        int16_t radius = mouthW / 2;
+        
+        // Draw top flat part
+        // display->fillRect(mouthX, mouthY, mouthW, 2, MAINCOLOR);
+        
+        // Draw bottom filled arc
+        for (int16_t angle = 0; angle <= 180; angle++) {
+            float rad = angle * 3.14159f / 180.0f;
+            // Draw lines from center-top to edge
+            int16_t x = layout.centerX + (int16_t)(radius * cosf(rad));
+            int16_t y = mouthY + (int16_t)(mouthH * sinf(rad));
+            display->drawLine(layout.centerX, mouthY, x, y, MAINCOLOR);
+        }
+        // Fill the rest to be sure
+        display->fillTriangle(mouthX, mouthY, mouthX + mouthW, mouthY, layout.centerX, mouthY + mouthH, MAINCOLOR);
+    }
+
     void drawTears() {
         if (params.tearProgress <= 0) return;
         
@@ -994,6 +1327,8 @@ public:
         drawMouth();
         drawSweat();
         drawLoveOverlay();
+        drawUwUOverlay();
+        drawXDOverlay();
         drawTears();
         drawKnockedOverlay();
         display->display();
@@ -1119,30 +1454,66 @@ public:
         targets.openness = 1.0f;
     }
     
+    // Helper to clear all overlay expression timers/intensities (for mutual exclusivity)
+    void clearAllOverlays() {
+        timers.loveRemaining = 0.0f;
+        timers.cryRemaining = 0.0f;
+        timers.laughRemaining = 0.0f;
+        timers.uwuRemaining = 0.0f;
+        timers.xdRemaining = 0.0f;
+        timers.confusedRemaining = 0.0f;
+        
+        targets.knockedIntensity = 0.0f;
+        targets.uwuIntensity = 0.0f;
+        targets.xdIntensity = 0.0f;
+        targets.love = 0.0f;
+        targets.fatigue = 0.0f;
+        
+        params.tearProgress = 0.0f;
+        params.hFlicker = 0.0f;
+        params.vFlicker = 0.0f;
+    }
+    
     void triggerLove(float durationSec = 2.0f) {
+        clearAllOverlays();  // Cancel other expressions
         timers.loveRemaining = durationSec;
         params.heartPulse = 0.0f;
     }
     
     void triggerCry(float durationSec = 3.0f) {
+        clearAllOverlays();
         timers.cryRemaining = durationSec;
         params.tearProgress = 0.0f;
     }
     
     void triggerConfused(float durationSec = 0.5f) {
+        clearAllOverlays();
         timers.confusedRemaining = durationSec;
     }
     
+    void triggerUwU(float duration) {
+        clearAllOverlays();
+        timers.uwuRemaining = duration;
+    }
+    
+    void triggerXD(float duration) {
+        clearAllOverlays();
+        timers.xdRemaining = duration;
+    }
+    
     void triggerLaugh(float durationSec = 1.0f) {
+        clearAllOverlays();
         timers.laughRemaining = durationSec;
     }
     
     void setKnocked(bool on) {
-        targets.knockedIntensity = on ? 1.0f : 0.0f;
         if (on) {
+            clearAllOverlays();  // Cancel other expressions
+            targets.knockedIntensity = 1.0f;
             params.spiralAngle = 0.0f;
-            // Blink first for dramatic effect
             blink();
+        } else {
+            targets.knockedIntensity = 0.0f;
         }
     }
     
@@ -1264,6 +1635,8 @@ public:
             case 3: shape = MOUTH_OPEN; break;
             case 4: shape = MOUTH_OOO; break;
             case 5: shape = MOUTH_FLAT; break;
+            case 6: shape = MOUTH_W; break;    // UwU mouth
+            case 7: shape = MOUTH_D; break;    // XD mouth
             default: shape = MOUTH_SMILE; break;
         }
         setMouthShape(shape);  // Use transition system

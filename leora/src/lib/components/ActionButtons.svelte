@@ -5,8 +5,6 @@
         { cmd: "blink", label: "Blink" },
         { cmd: "wink", label: "Wink L" },
         { cmd: "winkr", label: "Wink R" },
-        { cmd: "laugh", label: "Laugh" },
-        { cmd: "cry", label: "Cry" },
     ];
 </script>
 

@@ -33,12 +33,16 @@
         await sendCommand(`sh:n=${min}-${max}`);
     }
 
-    // Quick shuffle presets
+    // Quick shuffle presets - just update sliders and send values
     async function applyQuickChange() {
-        await sendCommand("sh:quick");
+        // Fast: 1-2s expressions, 0.5-1.5s neutral
+        await handleExprChange(1, 2);
+        await handleNeutralChange(1, 2);
     }
     async function applySlowChange() {
-        await sendCommand("sh:slow");
+        // Slow: 4-8s expressions, 3-6s neutral
+        await handleExprChange(4, 8);
+        await handleNeutralChange(3, 6);
     }
 </script>
 

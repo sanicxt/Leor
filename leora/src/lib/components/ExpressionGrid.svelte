@@ -12,6 +12,10 @@
         "curious",
         "nervous",
         "knocked",
+        "uwu",
+        "xd",
+        "laugh",
+        "cry",
         "neutral",
         "idle",
     ];

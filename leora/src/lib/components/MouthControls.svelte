@@ -1,7 +1,7 @@
 <script lang="ts">
     import { sendCommand } from "$lib/ble.svelte";
 
-    const mouthTypes = ["smile", "frown", "open", "ooo", "flat"];
+    const mouthTypes = ["smile", "frown", "open", "ooo", "flat", "uwum", "xdm"];
     const mouthAnims = ["talk", "chew", "wobble"];
 </script>
 

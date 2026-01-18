@@ -3,6 +3,7 @@
     import AppearanceSettings from "$lib/components/AppearanceSettings.svelte";
     import GestureManager from "$lib/components/GestureManager.svelte";
     import GestureSettings from "$lib/components/GestureSettings.svelte";
+    import PowerSettings from "$lib/components/PowerSettings.svelte";
     import { base } from "$app/paths";
     import MasterBackground from "$lib/components/MasterBackground.svelte";
 </script>
@@ -57,14 +58,21 @@
             <GestureSettings />
         </section>
 
-        <!-- Placeholder for future settings -->
+        <section>
+            <PowerSettings />
+        </section>
+
+        <!-- About Section -->
         <section>
             <div
-                class="bg-zinc-900/40 border border-white/5 rounded-3xl p-6 backdrop-blur-md text-zinc-400 text-sm space-y-2"
+                class="bg-gradient-to-br from-zinc-900/60 to-zinc-950/40 border border-white/10 rounded-3xl p-6 backdrop-blur-xl text-zinc-400 text-sm space-y-2 relative overflow-hidden"
             >
+                <div
+                    class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16"
+                ></div>
                 <div class="mb-4">
                     <h3
-                        class="text-zinc-400 text-xs font-bold tracking-widest uppercase"
+                        class="text-zinc-500 text-[10px] font-bold tracking-[0.2em] uppercase"
                     >
                         About
                     </h3>

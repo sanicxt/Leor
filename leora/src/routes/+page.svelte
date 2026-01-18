@@ -24,6 +24,7 @@
     import AppearanceSettings from "$lib/components/AppearanceSettings.svelte";
     import GestureManager from "$lib/components/GestureManager.svelte";
     import GestureSettings from "$lib/components/GestureSettings.svelte";
+    import PowerSettings from "$lib/components/PowerSettings.svelte";
 
     import {
         getConnected,
@@ -418,6 +419,9 @@
 
                     <!-- Full width: Appearance -->
                     <AppearanceSettings />
+
+                    <!-- Power Management -->
+                    <PowerSettings />
                 </div>
             {:else if activeTab === "gestures"}
                 <div

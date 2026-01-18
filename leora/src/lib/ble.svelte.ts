@@ -23,7 +23,8 @@ export const bleState = $state({
     gestureReactionTime: 1500,
     gestureConfidence: 70,
     gestureCooldown: 2000,
-    gestureMappings: [] as GestureMapping[]  // synced from ESP32
+    gestureMappings: [] as GestureMapping[],  // synced from ESP32
+    bleLowPowerMode: false  // BLE power saving mode
 });
 
 // BLE device and characteristics
@@ -189,6 +190,13 @@ export async function connect(): Promise<boolean> {
                 });
             }
 
+            // Parse BLE low power mode (ble:lp=0 or ble:lp=1)
+            const bleLpMatch = value.match(/ble:lp=(\d)/);
+            if (bleLpMatch) {
+                bleState.bleLowPowerMode = (bleLpMatch[1] === '1');
+                console.log('[BLE] Low power mode:', bleState.bleLowPowerMode ? 'ON' : 'OFF');
+            }
+
             // Robust Shuffle Parsing with Regex
             const shuffleMatch = value.match(/shuffle:\s*(on|off)/i);
             if (shuffleMatch) {
@@ -243,6 +251,12 @@ export async function connect(): Promise<boolean> {
                     setTimeout(async () => {
                         console.log('Requesting Gesture Mappings...');
                         await sendCommand('gi');
+
+                        // Request BLE Power Status
+                        setTimeout(async () => {
+                            console.log('Requesting BLE Power Status...');
+                            await sendCommand('ble:');
+                        }, 300);
                     }, 300);
                 }, 300);
             }, 300);

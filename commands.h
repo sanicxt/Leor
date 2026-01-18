@@ -244,17 +244,46 @@ String handleCommand(String cmd) {
     pMochiEyes->setMouthType(5);
     Serial.println(F("Mouth: Flat"));
   }
-  else if (cmd == "talk") {
-    pMochiEyes->startMouthAnim(1, 3000);
-    Serial.println(F("Mouth: Talking"));
+  else if (cmd == "uwum") {
+    pMochiEyes->setMouthType(6);
+    Serial.println(F("Mouth: UwU"));
   }
-  else if (cmd == "chew") {
-    pMochiEyes->startMouthAnim(2, 2000);
-    Serial.println(F("Mouth: Chewing"));
+  else if (cmd == "xdm") {
+    pMochiEyes->setMouthType(7);
+    Serial.println(F("Mouth: XD"));
   }
-  else if (cmd == "wobble") {
-    pMochiEyes->startMouthAnim(3, 2000);
-    Serial.println(F("Mouth: Wobbling"));
+  else if (cmd.startsWith("talk")) {
+    int duration = 3000;
+    int spacePos = cmd.indexOf(' ');
+    if (spacePos > 0) {
+      duration = cmd.substring(spacePos + 1).toInt();
+      if (duration < 100) duration = 100;
+      if (duration > 10000) duration = 10000;
+    }
+    pMochiEyes->startMouthAnim(1, duration);
+    Serial.print(F("Mouth: Talking for ")); Serial.print(duration); Serial.println(F("ms"));
+  }
+  else if (cmd.startsWith("chew")) {
+    int duration = 2000;
+    int spacePos = cmd.indexOf(' ');
+    if (spacePos > 0) {
+      duration = cmd.substring(spacePos + 1).toInt();
+      if (duration < 100) duration = 100;
+      if (duration > 10000) duration = 10000;
+    }
+    pMochiEyes->startMouthAnim(2, duration);
+    Serial.print(F("Mouth: Chewing for ")); Serial.print(duration); Serial.println(F("ms"));
+  }
+  else if (cmd.startsWith("wobble")) {
+    int duration = 2000;
+    int spacePos = cmd.indexOf(' ');
+    if (spacePos > 0) {
+      duration = cmd.substring(spacePos + 1).toInt();
+      if (duration < 100) duration = 100;
+      if (duration > 10000) duration = 10000;
+    }
+    pMochiEyes->startMouthAnim(3, duration);
+    Serial.print(F("Mouth: Wobbling for ")); Serial.print(duration); Serial.println(F("ms"));
   }
 
   // ==================== ACTIONS ====================
@@ -279,6 +308,14 @@ String handleCommand(String cmd) {
   else if (cmd == "cry") {
     pMochiEyes->anim_cry();
     Serial.println(F("Action: Cry"));
+  }
+  else if (cmd == "uwu") {
+    pMochiEyes->triggerUwU(3.0f); // Default 3 seconds
+    Serial.println(F("Expression: UwU"));
+  }
+  else if (cmd == "xd") {
+    pMochiEyes->triggerXD(3.0f);
+    Serial.println(F("Expression: XD"));
   }
   // knocked moved to expressions
 
@@ -517,8 +554,19 @@ String handleCommand(String cmd) {
     return "gcd:err";
   }
 
-  // ==================== BLE COMMANDS ====================
-  // ... (omitted for brevity, assume matches original) ...
+  // ==================== BLE POWER COMMANDS ====================
+  // ble: = get BLE power status
+  else if (cmd == "ble:") {
+    String resp = "ble:lp=" + String(getBLELowPowerMode() ? "1" : "0");
+    return resp;
+  }
+  // ble:lp=1/0 = set low power mode
+  else if (cmd.startsWith("ble:lp=")) {
+    int val = cmd.substring(7).toInt();
+    setBLELowPowerMode(val == 1);
+    preferences.putBool("ble_lp", val == 1);
+    return "ble:lp=" + String(val == 1 ? "1" : "0");
+  }
 
   // ==================== EXPRESSION SHUFFLE (short: sh:, long: shuffle:) ====================
   else if (cmd.startsWith("sh:") || cmd.startsWith("shuffle:")) {
@@ -548,6 +596,24 @@ String handleCommand(String cmd) {
         changed = true;
       } else if (token == "off" || token == "0") {
         shuffleEnabled = false;
+        changed = true;
+      } else if (token == "quick") {
+        // Quick preset: fast expression cycling
+        shuffleExprMinMs = 1000;
+        shuffleExprMaxMs = 2000;
+        shuffleNeutralMinMs = 500;
+        shuffleNeutralMaxMs = 1500;
+        shuffleEnabled = true;
+        turnedOn = true;
+        changed = true;
+      } else if (token == "slow") {
+        // Slow preset: calm, relaxed cycling
+        shuffleExprMinMs = 4000;
+        shuffleExprMaxMs = 8000;
+        shuffleNeutralMinMs = 3000;
+        shuffleNeutralMaxMs = 6000;
+        shuffleEnabled = true;
+        turnedOn = true;
         changed = true;
       } else if (token.startsWith("expr=") || token.startsWith("e=")) {
         // expr=2-5 or expr=3 (fixed duration)

@@ -31,6 +31,9 @@ static bool oldDeviceConnected = false;
 static uint32_t advRestartAtMs = 0;
 static uint32_t advStartedAtMs = 0;
 
+// Power saving state
+static bool bleLowPowerMode = false;  // Low power mode flag
+
 // Robustness tracking
 static uint32_t lastActivityMs = 0;
 static uint32_t lastNotifyMs = 0;
@@ -138,9 +141,14 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
       connectionCount++;
       Serial.println(F("✓ BLE Client connected!"));
       
-      // Update connection parameters for better performance
-      // Min Interval: 24 (30ms), Max Interval: 48 (60ms), Latency: 0, Timeout: 180 (1.8s)
-      pServer->updateConnParams(connInfo.getConnHandle(), 24, 48, 0, 180);
+      // Update connection parameters based on power mode
+      if (bleLowPowerMode) {
+        // Low power: slower connection (saves battery, ~100-200ms)
+        pServer->updateConnParams(connInfo.getConnHandle(), 80, 160, 0, 400);
+      } else {
+        // Performance: faster connection (lower latency, ~30-60ms)
+        pServer->updateConnParams(connInfo.getConnHandle(), 24, 48, 0, 180);
+      }
       
       sendBLEStatus("connected");
     };
@@ -196,9 +204,48 @@ String getBLEStatusInfo() {
   info += "  Disconnects: " + String(disconnectionCount) + "\n";
   if (deviceConnected) {
     uint32_t connectedSecs = (millis() - (lastActivityMs > 0 ? lastActivityMs : millis())) / 1000;
-    info += "  Activity: " + String(connectedSecs) + "s ago";
+    info += "  Activity: " + String(connectedSecs) + "s ago\n";
   }
+  info += "  Power Mode: " + String(bleLowPowerMode ? "Low" : "High");
   return info;
+}
+
+// ==================== Power Management ====================
+
+// Set BLE low power mode
+void setBLELowPowerMode(bool enabled) {
+  bleLowPowerMode = enabled;
+  
+  if (enabled) {
+    // Low power: reduce TX power to -3dBm
+    NimBLEDevice::setPower(BLE_TX_POWER_LOW);
+    Serial.println(F("[BLE] Low power mode ON (-3dBm)"));
+  } else {
+    // High power: increase TX power to +9dBm
+    NimBLEDevice::setPower(BLE_TX_POWER_HIGH);
+    Serial.println(F("[BLE] Low power mode OFF (+9dBm)"));
+  }
+  
+  // Update advertising interval based on power mode
+  NimBLEAdvertising* pAdv = NimBLEDevice::getAdvertising();
+  if (pAdv) {
+    pAdv->stop();
+    if (enabled) {
+      pAdv->setMinInterval(BLE_ADV_INTERVAL_SLOW * 1.6);  // Convert ms to 0.625ms units
+      pAdv->setMaxInterval(BLE_ADV_INTERVAL_SLOW * 1.6 * 2);
+    } else {
+      pAdv->setMinInterval(BLE_ADV_INTERVAL_FAST * 1.6);
+      pAdv->setMaxInterval(BLE_ADV_INTERVAL_FAST * 1.6 * 2);
+    }
+    if (!deviceConnected) {
+      pAdv->start();
+    }
+  }
+}
+
+// Get BLE low power mode status
+bool getBLELowPowerMode() {
+  return bleLowPowerMode;
 }
 
 // Restart BLE stack (for recovery)

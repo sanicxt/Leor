@@ -225,18 +225,18 @@
         </button>
     </div>
 
-    <!-- Main Settings Card -->
+    <!-- Eye Appearance Card -->
     <div
-        class="bg-zinc-900/50 border border-white/5 rounded-2xl p-5 backdrop-blur-md space-y-6"
+        class="bg-gradient-to-br from-indigo-950/40 to-purple-950/30 border border-indigo-500/20 rounded-2xl p-5 backdrop-blur-lg space-y-6"
     >
         <!-- Header -->
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-3">
                 <div
-                    class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center"
+                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20"
                 >
                     <svg
-                        class="w-4 h-4 text-white"
+                        class="w-5 h-5 text-white"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -256,10 +256,8 @@
                     </svg>
                 </div>
                 <div>
-                    <h3 class="text-white text-sm font-semibold">
-                        Eye Appearance
-                    </h3>
-                    <p class="text-zinc-500 text-xs">
+                    <h3 class="text-white font-semibold">Eye Appearance</h3>
+                    <p class="text-indigo-300/60 text-xs">
                         Customize geometry & style
                     </p>
                 </div>
@@ -436,14 +434,14 @@
 
     <!-- Mouth & Animations Card -->
     <div
-        class="bg-zinc-900/50 border border-white/5 rounded-2xl p-5 backdrop-blur-md space-y-5"
+        class="bg-gradient-to-br from-pink-950/40 to-rose-950/30 border border-pink-500/20 rounded-2xl p-5 backdrop-blur-lg space-y-5"
     >
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 mb-2">
             <div
-                class="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center"
+                class="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-pink-500/20"
             >
                 <svg
-                    class="w-4 h-4 text-white"
+                    class="w-5 h-5 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -457,10 +455,8 @@
                 </svg>
             </div>
             <div>
-                <h3 class="text-white text-sm font-semibold">
-                    Mouth & Animations
-                </h3>
-                <p class="text-zinc-500 text-xs">
+                <h3 class="text-white font-semibold">Mouth & Animations</h3>
+                <p class="text-pink-300/60 text-xs">
                     Control expressions & timing
                 </p>
             </div>
@@ -571,14 +567,14 @@
 
     <!-- Animation Speeds Card -->
     <div
-        class="bg-zinc-900/50 border border-white/5 rounded-2xl p-5 backdrop-blur-md space-y-5"
+        class="bg-gradient-to-br from-emerald-950/40 to-teal-950/30 border border-emerald-500/20 rounded-2xl p-5 backdrop-blur-lg space-y-5"
     >
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 mb-2">
             <div
-                class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center"
+                class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20"
             >
                 <svg
-                    class="w-4 h-4 text-white"
+                    class="w-5 h-5 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -592,10 +588,8 @@
                 </svg>
             </div>
             <div>
-                <h3 class="text-white text-sm font-semibold">
-                    Animation Speeds
-                </h3>
-                <p class="text-zinc-500 text-xs">How fast things move</p>
+                <h3 class="text-white font-semibold">Animation Speeds</h3>
+                <p class="text-emerald-300/60 text-xs">How fast things move</p>
             </div>
         </div>
 
@@ -663,16 +657,16 @@
         </p>
     </div>
 
-    <!-- Expression Durations -->
+    <!-- Expression Durations Card -->
     <div
-        class="bg-zinc-900/50 border border-white/5 rounded-2xl p-5 backdrop-blur-md space-y-4"
+        class="bg-gradient-to-br from-amber-950/40 to-orange-950/30 border border-amber-500/20 rounded-2xl p-5 backdrop-blur-lg space-y-4"
     >
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 mb-2">
             <div
-                class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center"
+                class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20"
             >
                 <svg
-                    class="w-4 h-4 text-white"
+                    class="w-5 h-5 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -686,10 +680,8 @@
                 </svg>
             </div>
             <div>
-                <h3 class="text-white text-sm font-semibold">
-                    Expression Durations
-                </h3>
-                <p class="text-zinc-500 text-xs">
+                <h3 class="text-white font-semibold">Expression Durations</h3>
+                <p class="text-amber-300/60 text-xs">
                     How long special expressions play
                 </p>
             </div>

@@ -127,8 +127,8 @@ MochiEyes<Adafruit_SH1106G>* pMochiEyes = &mochiEyes;  // Pointer for commands.h
 void drawTrainingOverlay(const char* status, int progress);
 
 // ==================== Modules ====================
-#include "commands.h"
 #include "ble_manager.h"
+#include "commands.h"
 
 // ==================== State Variables ====================
 String inputBuffer = "";
@@ -210,6 +210,10 @@ void setup() {
   
   // Initialize BLE (low power alternative to WiFi)
   initBLE(BLE_DEVICE_NAME);
+  
+  // Restore BLE power mode
+  bool bleLP = preferences.getBool("ble_lp", false);
+  setBLELowPowerMode(bleLP);
   
   // Initialize IMU with FastIMU
   Wire.setClock(400000);  // 400kHz I2C for faster IMU reads

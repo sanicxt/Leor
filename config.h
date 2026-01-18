@@ -30,6 +30,12 @@ const char* BLE_DEVICE_NAME = "Leor";
 #define BLE_MTU_REQUEST 185             // Request larger MTU (ESP32 max is typically 517, but 185 is safer)
 #define BLE_ADV_WATCHDOG_MS 60000       // Restart advertising if no connection after 60s
 
+// BLE Power Saving Settings
+#define BLE_TX_POWER_LOW   ESP_PWR_LVL_N3   // -3dBm (low power, ~10m range)
+#define BLE_TX_POWER_HIGH  ESP_PWR_LVL_P9   // +9dBm (high power, ~30m range)
+#define BLE_ADV_INTERVAL_FAST  100          // Fast advertising interval (ms) - for quick connection
+#define BLE_ADV_INTERVAL_SLOW  1000         // Slow advertising interval (ms) - power saving mode
+
 // Note: BLE uses significantly less power than WiFi
 // Control via Bluetooth using a mobile app or web Bluetooth API
 

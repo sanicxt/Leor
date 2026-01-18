@@ -18,6 +18,8 @@
         "wink",
         "laugh",
         "cry",
+        "uwu",
+        "xd",
     ];
 
     // Edge Impulse model gestures (5 classes @ 23Hz)
