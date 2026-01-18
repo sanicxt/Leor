@@ -39,11 +39,11 @@ inline bool loadWeightsFromBase64(const String& data) { return false; }
 inline void setGestureLabel(int index, const char* name, const char* action) { /* no-op */ }
 inline void clearAllGestures() { /* no-op */ }
 inline String listGestures() { 
-    // Return Edge Impulse model classes
+    // Return Edge Impulse model classes WITH action mappings
     String json = "[";
     for (int i = 0; i < EI_CLASSIFIER_LABEL_COUNT; i++) {
         if (i > 0) json += ",";
-        json += "{\"n\":\"" + String(ei_classifier_inferencing_categories[i]) + "\",\"a\":\"\"}";
+        json += "{\"n\":\"" + String(ei_classifier_inferencing_categories[i]) + "\",\"a\":\"" + getGestureAction(i) + "\"}";
     }
     json += "]";
     return json;
@@ -148,10 +148,10 @@ String handleCommand(String cmd) {
   }
   else if (cmd == "love") {
     resetEffects();
-    pMochiEyes->anim_love();
-    pMochiEyes->setMood(HAPPY);
+    pMochiEyes->setMood(DEFAULT);  // Don't use HAPPY - it resets love animation
     pMochiEyes->setPosition(DEFAULT);
-    pMochiEyes->setMouthType(3);
+    pMochiEyes->setMouthType(3);  // Open mouth (surprised/delighted)
+    pMochiEyes->anim_love();  // Call LAST so resetEmotions() doesn't cancel it
     Serial.println(F("Expression: Love"));
   }
   else if (cmd == "surprised") {

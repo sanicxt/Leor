@@ -1,6 +1,9 @@
 // Svelte 5 state management using $state rune in .svelte.ts file
 import { BLE_CONFIG } from './ble-config';
 
+// Gesture mapping type
+export type GestureMapping = { name: string; action: string };
+
 // Reactive state object
 export const bleState = $state({
     connected: false,
@@ -19,7 +22,8 @@ export const bleState = $state({
     gestureMatching: false,
     gestureReactionTime: 1500,
     gestureConfidence: 70,
-    gestureCooldown: 2000
+    gestureCooldown: 2000,
+    gestureMappings: [] as GestureMapping[]  // synced from ESP32
 });
 
 // BLE device and characteristics
@@ -53,6 +57,7 @@ export function getGestureMatching() { return bleState.gestureMatching; }
 export function getGestureReactionTime() { return bleState.gestureReactionTime; }
 export function getGestureConfidence() { return bleState.gestureConfidence; }
 export function getGestureCooldown() { return bleState.gestureCooldown; }
+export function getGestureMappings() { return bleState.gestureMappings; }
 
 // Setters
 export function setShuffleEnabled(val: boolean) { bleState.shuffleEnabled = val; }
@@ -143,6 +148,21 @@ export async function connect(): Promise<boolean> {
                 }
             }
 
+            // Parse gesture info response: [{"n":"neutral","a":""},{"n":"patpat","a":"happy"},...]
+            if (chunk.startsWith('[{"n":')) {
+                try {
+                    const mappings = JSON.parse(chunk);
+                    bleState.gestureMappings = mappings.map((m: { n: string, a: string }) => ({
+                        name: m.n,
+                        action: m.a
+                    }));
+                    console.log('[BLE] Gesture mappings synced:', bleState.gestureMappings);
+                    return;
+                } catch (err) {
+                    console.error('Failed to parse gesture mappings:', err);
+                }
+            }
+
             // Fallback to legacy line-by-line parsing for non-JSON or broken messages
             const value = chunk;
             bleState.lastStatus = value;
@@ -214,10 +234,16 @@ export async function connect(): Promise<boolean> {
                 console.log('Requesting Appearance Settings...');
                 await sendCommand('s:');
 
-                // Final sync: Gesture Settings
+                // Request Gesture Settings
                 setTimeout(async () => {
                     console.log('Requesting Gesture Settings...');
                     await sendCommand('gs:');
+
+                    // Request Gesture Mappings (gi = gesture info)
+                    setTimeout(async () => {
+                        console.log('Requesting Gesture Mappings...');
+                        await sendCommand('gi');
+                    }, 300);
                 }, 300);
             }, 300);
         }, 300);

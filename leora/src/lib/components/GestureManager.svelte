@@ -1,10 +1,5 @@
 <script lang="ts">
-    import {
-        sendCommand,
-        bleState,
-        getGestureMatching,
-        setGestureMatching,
-    } from "$lib/ble.svelte";
+    import { sendCommand, bleState, setGestureMatching } from "$lib/ble.svelte";
 
     // Available expressions that can be mapped to gestures
     const expressions = [
@@ -87,8 +82,31 @@
         }, 3000);
     });
 
+    // Sync gesture actions from BLE when mappings are received
+    // Read directly from bleState proxy for $effect to track dependencies
+    $effect(() => {
+        const mappings = bleState.gestureMappings;
+        if (mappings.length === 0) return;
+
+        // Check if any updates are needed
+        const needsUpdate = mappings.some((mapping) => {
+            const gesture = gestures.find((g) => g.name === mapping.name);
+            return gesture && mapping.action !== gesture.action;
+        });
+
+        if (needsUpdate) {
+            // Create new array reference for reactivity
+            gestures = gestures.map((g) => {
+                const mapping = mappings.find((m) => m.name === g.name);
+                return mapping && mapping.action !== g.action
+                    ? { ...g, action: mapping.action }
+                    : g;
+            });
+        }
+    });
+
     async function toggleMatch() {
-        const newVal = !getGestureMatching();
+        const newVal = !bleState.gestureMatching;
         setGestureMatching(newVal);
         await sendCommand(`gm=${newVal ? "1" : "0"}`);
     }
@@ -97,10 +115,21 @@
         gestureName: string,
         newAction: string,
     ) {
-        const gesture = gestures.find((g) => g.name === gestureName);
-        if (gesture) {
-            gesture.action = newAction;
-            const index = gestures.findIndex((g) => g.name === gestureName);
+        const index = gestures.findIndex((g) => g.name === gestureName);
+        if (index !== -1) {
+            // Update local gestures array with new reference for reactivity
+            gestures = gestures.map((g, i) =>
+                i === index ? { ...g, action: newAction } : g,
+            );
+
+            // Update bleState to keep sync effect in sync
+            const bleMappingIndex = bleState.gestureMappings.findIndex(
+                (m) => m.name === gestureName,
+            );
+            if (bleMappingIndex !== -1) {
+                bleState.gestureMappings[bleMappingIndex].action = newAction;
+            }
+
             await sendCommand(`ga=${index}:${newAction}`);
         }
         editingGesture = null;
@@ -161,7 +190,7 @@
         </div>
 
         <div class="flex items-center gap-3">
-            {#if getGestureMatching()}
+            {#if bleState.gestureMatching}
                 <span
                     class="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full"
                 >
@@ -175,7 +204,7 @@
                 </span>
             {/if}
             <button
-                class="w-14 h-8 rounded-full transition-all duration-300 relative {getGestureMatching()
+                class="w-14 h-8 rounded-full transition-all duration-300 relative {bleState.gestureMatching
                     ? 'bg-gradient-to-r from-emerald-500 to-green-500 shadow-lg shadow-emerald-500/30'
                     : 'bg-zinc-700/80'} disabled:opacity-50"
                 onclick={toggleMatch}
@@ -183,11 +212,11 @@
                 aria-label="Toggle gesture matching"
             >
                 <span
-                    class="absolute left-1 top-1 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-md flex items-center justify-center {getGestureMatching()
+                    class="absolute left-1 top-1 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-md flex items-center justify-center {bleState.gestureMatching
                         ? 'translate-x-6'
                         : 'translate-x-0'}"
                 >
-                    {#if getGestureMatching()}
+                    {#if bleState.gestureMatching}
                         <svg
                             class="w-3.5 h-3.5 text-emerald-500"
                             fill="none"

@@ -54,6 +54,8 @@ Leor is an animated robot eyes project built on ESP32-C3 with OLED display, IMU-
 
 All components connect via I2C bus:
 
+![Wiring Diagram](assets/wiring.png)
+
 ```
 ESP32-C3 Super Mini
        |
