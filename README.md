@@ -141,7 +141,7 @@ cd Leor
 2. Install required libraries via Library Manager:
    - Adafruit GFX Library (by Adafruit)
    - Adafruit SH110X (by Adafruit)
-   - FastIMU (by Ashutosh Bhatt)
+   - FastIMU (by LiquidCGS)
 
 3. Download and Install the Edge Impulse library:
    - Visit the [Edge Impulse Public Project](https://studio.edgeimpulse.com/public/879322/live).
