@@ -21,7 +21,6 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SH110X.h>
 #include "FastIMU.h"
 #include <NimBLEDevice.h>
 #include <Preferences.h>
@@ -29,8 +28,20 @@
 // ==================== Configuration ====================
 #include "config.h"
 
+// ==================== Display Type Selection ====================
+#ifdef DISPLAY_SSD1306
+  #include <Adafruit_SSD1306.h>
+  Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+  #define DISPLAY_TYPE "SSD1306"
+#elif defined(DISPLAY_SH1106)
+  #include <Adafruit_SH110X.h>
+  Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+  #define DISPLAY_TYPE "SH1106"
+#else
+  #error "No display type defined! Please define DISPLAY_SH1106 or DISPLAY_SSD1306 in config.h"
+#endif
+
 // ==================== Hardware Objects ====================
-Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Preferences preferences;
 
 // ==================== FastIMU ====================
@@ -55,11 +66,17 @@ static unsigned long last_interval_ms = 0;
 
 // Draw calibration screen on OLED
 void drawCalibrationScreen(int progress, const char* status) {
+    #ifdef DISPLAY_SSD1306
+      #define WHITE_COLOR SSD1306_WHITE
+    #else
+      #define WHITE_COLOR SH110X_WHITE
+    #endif
+    
     display.clearDisplay();
     
     // Title
     display.setTextSize(1);
-    display.setTextColor(SH110X_WHITE);
+    display.setTextColor(WHITE_COLOR);
     display.setCursor(20, 5);
     display.print(F("IMU CALIBRATION"));
     
@@ -68,11 +85,11 @@ void drawCalibrationScreen(int progress, const char* status) {
     display.print(status);
     
     // Progress bar background
-    display.drawRect(10, 42, 108, 12, SH110X_WHITE);
+    display.drawRect(10, 42, 108, 12, WHITE_COLOR);
     
     // Progress bar fill
     int fillWidth = map(progress, 0, 100, 0, 104);
-    display.fillRect(12, 44, fillWidth, 8, SH110X_WHITE);
+    display.fillRect(12, 44, fillWidth, 8, WHITE_COLOR);
     
     // Percentage
     display.setCursor(50, 56);
@@ -119,8 +136,13 @@ void calibrateIMU() {
 
 // ==================== MochiEyes ====================
 #include "MochiEyes.h"
-MochiEyes<Adafruit_SH1106G> mochiEyes(display);
-MochiEyes<Adafruit_SH1106G>* pMochiEyes = &mochiEyes;  // Pointer for commands.h
+#ifdef DISPLAY_SSD1306
+  MochiEyes<Adafruit_SSD1306> mochiEyes(display);
+  MochiEyes<Adafruit_SSD1306>* pMochiEyes = &mochiEyes;
+#else
+  MochiEyes<Adafruit_SH1106G> mochiEyes(display);
+  MochiEyes<Adafruit_SH1106G>* pMochiEyes = &mochiEyes;
+#endif
 
 // ==================== Gesture Training Overlay ====================
 // Called by gesture_trainer.h to draw training status on OLED
@@ -174,8 +196,19 @@ void setup() {
   Wire.begin();
   
   // Initialize display
-  display.begin(I2C_ADDRESS, true);
+  #ifdef DISPLAY_SSD1306
+    if(!display.begin(SSD1306_SWITCHCAPVCC, I2C_ADDRESS)) {
+      Serial.println(F("SSD1306 init failed!"));
+      while(1);
+    }
+  #else
+    display.begin(I2C_ADDRESS, true);
+  #endif
   mochiEyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, FRAME_RATE);
+  
+  Serial.print(F("✓ Display initialized ("));
+  Serial.print(DISPLAY_TYPE);
+  Serial.println(F(") & Settings loaded"));
   
   // Load settings from Preferences
   int ew = preferences.getInt("ew", 36);
@@ -323,8 +356,14 @@ void maybeShuffleExpression() {
 
 // Draw streaming overlay on OLED - shows when streaming gyro to browser
 void drawStreamingOverlay() {
+  #ifdef DISPLAY_SSD1306
+    #define WHITE_COLOR SSD1306_WHITE
+  #else
+    #define WHITE_COLOR SH110X_WHITE
+  #endif
+  
   display.clearDisplay();
-  display.setTextColor(SH110X_WHITE);
+  display.setTextColor(WHITE_COLOR);
   
   // Header
   display.setTextSize(2);
@@ -332,14 +371,14 @@ void drawStreamingOverlay() {
   display.print(F("STREAMING"));
   
   // Line
-  display.drawLine(0, 20, SCREEN_WIDTH, 20, SH110X_WHITE);
+  display.drawLine(0, 20, SCREEN_WIDTH, 20, WHITE_COLOR);
   
   // Blinking indicator
   display.setTextSize(1);
   if ((millis() / 300) % 2 == 0) {
-    display.fillCircle(64, 40, 8, SH110X_WHITE);
+    display.fillCircle(64, 40, 8, WHITE_COLOR);
   } else {
-    display.drawCircle(64, 40, 8, SH110X_WHITE);
+    display.drawCircle(64, 40, 8, WHITE_COLOR);
   }
   
   display.setCursor(30, 54);

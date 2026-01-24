@@ -17,7 +17,12 @@
 #endif
 
 // Forward declaration - will be set in main sketch
-extern MochiEyes<Adafruit_SH1106G>* pMochiEyes;
+// Support both SSD1306 and SH1106 displays
+#ifdef DISPLAY_SSD1306
+  extern MochiEyes<Adafruit_SSD1306>* pMochiEyes;
+#else
+  extern MochiEyes<Adafruit_SH1106G>* pMochiEyes;
+#endif
 extern Preferences preferences;
 
 // MPU6050 debug logging set in main sketch

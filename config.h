@@ -40,6 +40,10 @@ const char* BLE_DEVICE_NAME = "Leor";
 // Control via Bluetooth using a mobile app or web Bluetooth API
 
 // ==================== Display Settings ====================
+// Display Type: uncomment ONE of these
+//#define DISPLAY_SH1106   // SH1106 display (default)
+#define DISPLAY_SSD1306  // SSD1306 display (alternative)
+
 #define I2C_ADDRESS 0x3c
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
