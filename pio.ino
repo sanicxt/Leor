@@ -29,17 +29,22 @@
 #include "config.h"
 
 // ==================== Display Type Selection ====================
-#ifdef DISPLAY_SSD1306
-  #include <Adafruit_SSD1306.h>
-  Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-  #define DISPLAY_TYPE "SSD1306"
-#elif defined(DISPLAY_SH1106)
-  #include <Adafruit_SH110X.h>
-  Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-  #define DISPLAY_TYPE "SH1106"
-#else
-  #error "No display type defined! Please define DISPLAY_SH1106 or DISPLAY_SSD1306 in config.h"
-#endif
+// Display type is loaded from preferences at boot (requires restart to change)
+// Both libraries are included to support runtime selection via preferences
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_SH110X.h>
+
+// Display objects - one will be initialized based on preferences
+Adafruit_SSD1306* display_ssd1306 = nullptr;
+Adafruit_SH1106G* display_sh1106 = nullptr;
+
+// Unified display interface
+Adafruit_GFX* display = nullptr;
+const char* DISPLAY_TYPE = "Unknown";
+
+// Runtime display type flag
+enum DisplayType { DISP_SSD1306, DISP_SH1106 };
+DisplayType activeDisplayType = DISP_SH1106;
 
 // ==================== Hardware Objects ====================
 Preferences preferences;
@@ -66,37 +71,39 @@ static unsigned long last_interval_ms = 0;
 
 // Draw calibration screen on OLED
 void drawCalibrationScreen(int progress, const char* status) {
-    #ifdef DISPLAY_SSD1306
-      #define WHITE_COLOR SSD1306_WHITE
-    #else
-      #define WHITE_COLOR SH110X_WHITE
-    #endif
+    uint16_t WHITE_COLOR = (activeDisplayType == DISP_SSD1306) ? SSD1306_WHITE : SH110X_WHITE;
     
-    display.clearDisplay();
-    
-    // Title
-    display.setTextSize(1);
-    display.setTextColor(WHITE_COLOR);
-    display.setCursor(20, 5);
-    display.print(F("IMU CALIBRATION"));
-    
-    // Status message
-    display.setCursor(10, 25);
-    display.print(status);
-    
-    // Progress bar background
-    display.drawRect(10, 42, 108, 12, WHITE_COLOR);
-    
-    // Progress bar fill
-    int fillWidth = map(progress, 0, 100, 0, 104);
-    display.fillRect(12, 44, fillWidth, 8, WHITE_COLOR);
-    
-    // Percentage
-    display.setCursor(50, 56);
-    display.print(progress);
-    display.print(F("%"));
-    
-    display.display();
+    if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
+        display_ssd1306->clearDisplay();
+        display_ssd1306->setTextSize(1);
+        display_ssd1306->setTextColor(WHITE_COLOR);
+        display_ssd1306->setCursor(20, 5);
+        display_ssd1306->print(F("IMU CALIBRATION"));
+        display_ssd1306->setCursor(10, 25);
+        display_ssd1306->print(status);
+        display_ssd1306->drawRect(10, 42, 108, 12, WHITE_COLOR);
+        int fillWidth = map(progress, 0, 100, 0, 104);
+        display_ssd1306->fillRect(12, 44, fillWidth, 8, WHITE_COLOR);
+        display_ssd1306->setCursor(50, 56);
+        display_ssd1306->print(progress);
+        display_ssd1306->print(F("%"));
+        display_ssd1306->display();
+    } else if (display_sh1106) {
+        display_sh1106->clearDisplay();
+        display_sh1106->setTextSize(1);
+        display_sh1106->setTextColor(WHITE_COLOR);
+        display_sh1106->setCursor(20, 5);
+        display_sh1106->print(F("IMU CALIBRATION"));
+        display_sh1106->setCursor(10, 25);
+        display_sh1106->print(status);
+        display_sh1106->drawRect(10, 42, 108, 12, WHITE_COLOR);
+        int fillWidth = map(progress, 0, 100, 0, 104);
+        display_sh1106->fillRect(12, 44, fillWidth, 8, WHITE_COLOR);
+        display_sh1106->setCursor(50, 56);
+        display_sh1106->print(progress);
+        display_sh1106->print(F("%"));
+        display_sh1106->display();
+    }
 }
 
 // Calibrate IMU with OLED display
@@ -136,13 +143,12 @@ void calibrateIMU() {
 
 // ==================== MochiEyes ====================
 #include "MochiEyes.h"
-#ifdef DISPLAY_SSD1306
-  MochiEyes<Adafruit_SSD1306> mochiEyes(display);
-  MochiEyes<Adafruit_SSD1306>* pMochiEyes = &mochiEyes;
-#else
-  MochiEyes<Adafruit_SH1106G> mochiEyes(display);
-  MochiEyes<Adafruit_SH1106G>* pMochiEyes = &mochiEyes;
-#endif
+// Separate MochiEyes instances for each display type
+MochiEyes<Adafruit_SSD1306>* pMochiEyes_ssd1306 = nullptr;
+MochiEyes<Adafruit_SH1106G>* pMochiEyes_sh1106 = nullptr;
+
+// Helper macro to get the active MochiEyes instance
+#define GET_MOCHI() (activeDisplayType == DISP_SSD1306 ? (void*)pMochiEyes_ssd1306 : (void*)pMochiEyes_sh1106)
 
 // ==================== Gesture Training Overlay ====================
 // Called by gesture_trainer.h to draw training status on OLED
@@ -192,23 +198,62 @@ void setup() {
   Serial.println(F("leor v2.4 (Action Fix)"));
   Serial.println(F("=============================\n"));
   
+  // Check display preferences and create appropriate object
+  String savedDispType = preferences.getString("disp_type", "sh1106");
+  uint8_t savedDispAddr = preferences.getUInt("disp_addr", I2C_ADDRESS);
+  
+  // Determine which display to use and create object
+  if (savedDispType == "ssd1306") {
+    activeDisplayType = DISP_SSD1306;
+    DISPLAY_TYPE = "SSD1306";
+    display_ssd1306 = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+    display = display_ssd1306;
+  } else {
+    activeDisplayType = DISP_SH1106;
+    DISPLAY_TYPE = "SH1106";
+    display_sh1106 = new Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+    display = display_sh1106;
+  }
+  
+  Serial.print(F("Display Type: "));
+  Serial.print(DISPLAY_TYPE);
+  Serial.print(F(" @ 0x"));
+  Serial.println(savedDispAddr, HEX);
+  
   // Initialize I2C bus first (for display + MPU6050)
   Wire.begin();
   
-  // Initialize display
-  #ifdef DISPLAY_SSD1306
-    if(!display.begin(SSD1306_SWITCHCAPVCC, I2C_ADDRESS)) {
-      Serial.println(F("SSD1306 init failed!"));
-      while(1);
-    }
-  #else
-    display.begin(I2C_ADDRESS, true);
-  #endif
-  mochiEyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, FRAME_RATE);
+  // Initialize the selected display
+  bool displayInitSuccess = false;
+  if (activeDisplayType == DISP_SSD1306) {
+    displayInitSuccess = display_ssd1306->begin(SSD1306_SWITCHCAPVCC, savedDispAddr);
+  } else {
+    displayInitSuccess = display_sh1106->begin(savedDispAddr, true);
+  }
+  
+  if (!displayInitSuccess) {
+    Serial.print(F("⚠️  Display init failed at 0x"));
+    Serial.println(savedDispAddr, HEX);
+    Serial.println(F("Try 0x3C or 0x3D via display:addr command"));
+    while(1) { delay(1000); }
+  }
+  
+  // Initialize MochiEyes with the active display
+  if (activeDisplayType == DISP_SSD1306) {
+    static MochiEyes<Adafruit_SSD1306> mochiEyes(*display_ssd1306);
+    pMochiEyes_ssd1306 = &mochiEyes;
+    pMochiEyes_ssd1306->begin(SCREEN_WIDTH, SCREEN_HEIGHT, FRAME_RATE);
+  } else {
+    static MochiEyes<Adafruit_SH1106G> mochiEyes(*display_sh1106);
+    pMochiEyes_sh1106 = &mochiEyes;
+    pMochiEyes_sh1106->begin(SCREEN_WIDTH, SCREEN_HEIGHT, FRAME_RATE);
+  }
   
   Serial.print(F("✓ Display initialized ("));
   Serial.print(DISPLAY_TYPE);
-  Serial.println(F(") & Settings loaded"));
+  Serial.print(F(" @ 0x"));
+  Serial.print(savedDispAddr, HEX);
+  Serial.println(F(")"));
   
   // Load settings from Preferences
   int ew = preferences.getInt("ew", 36);
@@ -223,16 +268,14 @@ void setup() {
   // pRoboEyes uses float for interval? No, setAutoblinker takes 'byte interval'.
   int bi = preferences.getInt("bi", 3);
   
-  mochiEyes.setWidth(ew, ew);
-  mochiEyes.setHeight(eh, eh);
-  mochiEyes.setSpacebetween(es);
-  mochiEyes.setBorderradius(er, er);
-  mochiEyes.setMouthSize(mw, 6);
-  mochiEyes.setLaughDuration(lt);
-  mochiEyes.setLoveDuration(vt);
-  mochiEyes.setAutoblinker(true, (float)bi, (float)BLINK_VARIATION);
-  
-  Serial.println(F("✓ Display initialized & Settings loaded"));
+  MOCHI_CALL_VOID(setWidth, ew, ew);
+  MOCHI_CALL_VOID(setHeight, eh, eh);
+  MOCHI_CALL_VOID(setSpacebetween, es);
+  MOCHI_CALL_VOID(setBorderradius, er, er);
+  MOCHI_CALL_VOID(setMouthSize, mw, 6);
+  MOCHI_CALL_VOID(setLaughDuration, lt);
+  MOCHI_CALL_VOID(setLoveDuration, vt);
+  MOCHI_CALL_VOID(setAutoblinker, true, (float)bi, (float)BLINK_VARIATION);
   
   // Load shuffle settings
   shuffleEnabled = preferences.getBool("shuf_en", true);
@@ -267,8 +310,8 @@ void setup() {
   initEIGesture();
   
   // Ready!
-  mochiEyes.setMood(0);  // DEFAULT
-  mochiEyes.setPosition(0);  // CENTER
+  MOCHI_CALL_VOID(setMood, 0);  // DEFAULT
+  MOCHI_CALL_VOID(setPosition, 0);  // CENTER
   
   Serial.println(F("\n============================="));
   Serial.println(F("    leor Ready!"));
@@ -286,7 +329,11 @@ void loop() {
   
   // Update display - skip mochiEyes when training
   if (!training) {
-    mochiEyes.update();
+    if (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306) {
+      pMochiEyes_ssd1306->update();
+    } else if (pMochiEyes_sh1106) {
+      pMochiEyes_sh1106->update();
+    }
   }
   
   // Draw streaming overlay if in streaming mode
@@ -356,35 +403,41 @@ void maybeShuffleExpression() {
 
 // Draw streaming overlay on OLED - shows when streaming gyro to browser
 void drawStreamingOverlay() {
-  #ifdef DISPLAY_SSD1306
-    #define WHITE_COLOR SSD1306_WHITE
-  #else
-    #define WHITE_COLOR SH110X_WHITE
-  #endif
+  uint16_t WHITE_COLOR = (activeDisplayType == DISP_SSD1306) ? SSD1306_WHITE : SH110X_WHITE;
   
-  display.clearDisplay();
-  display.setTextColor(WHITE_COLOR);
-  
-  // Header
-  display.setTextSize(2);
-  display.setCursor(10, 2);
-  display.print(F("STREAMING"));
-  
-  // Line
-  display.drawLine(0, 20, SCREEN_WIDTH, 20, WHITE_COLOR);
-  
-  // Blinking indicator
-  display.setTextSize(1);
-  if ((millis() / 300) % 2 == 0) {
-    display.fillCircle(64, 40, 8, WHITE_COLOR);
-  } else {
-    display.drawCircle(64, 40, 8, WHITE_COLOR);
+  if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
+    display_ssd1306->clearDisplay();
+    display_ssd1306->setTextColor(WHITE_COLOR);
+    display_ssd1306->setTextSize(2);
+    display_ssd1306->setCursor(10, 2);
+    display_ssd1306->print(F("STREAMING"));
+    display_ssd1306->drawLine(0, 20, SCREEN_WIDTH, 20, WHITE_COLOR);
+    display_ssd1306->setTextSize(1);
+    if ((millis() / 300) % 2 == 0) {
+      display_ssd1306->fillCircle(64, 40, 8, WHITE_COLOR);
+    } else {
+      display_ssd1306->drawCircle(64, 40, 8, WHITE_COLOR);
+    }
+    display_ssd1306->setCursor(30, 54);
+    display_ssd1306->print(F("Recording..."));
+    display_ssd1306->display();
+  } else if (display_sh1106) {
+    display_sh1106->clearDisplay();
+    display_sh1106->setTextColor(WHITE_COLOR);
+    display_sh1106->setTextSize(2);
+    display_sh1106->setCursor(10, 2);
+    display_sh1106->print(F("STREAMING"));
+    display_sh1106->drawLine(0, 20, SCREEN_WIDTH, 20, WHITE_COLOR);
+    display_sh1106->setTextSize(1);
+    if ((millis() / 300) % 2 == 0) {
+      display_sh1106->fillCircle(64, 40, 8, WHITE_COLOR);
+    } else {
+      display_sh1106->drawCircle(64, 40, 8, WHITE_COLOR);
+    }
+    display_sh1106->setCursor(30, 54);
+    display_sh1106->print(F("Recording..."));
+    display_sh1106->display();
   }
-  
-  display.setCursor(30, 54);
-  display.print(F("Recording..."));
-  
-  display.display();
 }
 
 // Execute action from matched gesture
@@ -408,9 +461,15 @@ void handleMPU6050() {
   if (isReacting && (now - reactionStartTime >= GESTURE_REACTION_MS)) {
     isReacting = false;
     resetEffects();
-    mochiEyes.setMood(DEFAULT);
-    mochiEyes.setPosition(DEFAULT);
-    mochiEyes.setMouthType(1);
+    if (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306) {
+      pMochiEyes_ssd1306->setMood(DEFAULT);
+      pMochiEyes_ssd1306->setPosition(DEFAULT);
+      pMochiEyes_ssd1306->setMouthType(1);
+    } else if (pMochiEyes_sh1106) {
+      pMochiEyes_sh1106->setMood(DEFAULT);
+      pMochiEyes_sh1106->setPosition(DEFAULT);
+      pMochiEyes_sh1106->setMouthType(1);
+    }
     Serial.println(F("[GESTURE] Reaction ended, ready to detect"));
   }
   

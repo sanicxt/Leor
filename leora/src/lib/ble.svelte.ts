@@ -19,6 +19,10 @@ export const bleState = $state({
         mw: 20, lt: 1000, vt: 2000, bi: 3,
         gs: 6, os: 12, ss: 10  // gaze speed, openness speed, squish speed
     },
+    display: {
+        type: 'sh1106',  // sh1106 or ssd1306
+        addr: '0x3c'     // I2C address
+    },
     gestureMatching: false,
     gestureReactionTime: 1500,
     gestureConfidence: 70,
@@ -131,6 +135,10 @@ export async function connect(): Promise<boolean> {
                                         bleState.settings.bi = data.settings[key];
                                     }
                                 });
+                            }
+                            if (data.display) {
+                                if (data.display.type) bleState.display.type = data.display.type;
+                                if (data.display.addr) bleState.display.addr = data.display.addr;
                             }
                             if (data.state) {
                                 if ('shuf' in data.state) bleState.shuffleEnabled = (data.state.shuf === 1);

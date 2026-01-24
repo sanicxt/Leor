@@ -1,6 +1,7 @@
 <script lang="ts">
     import ShufflePanel from "$lib/components/ShufflePanel.svelte";
     import AppearanceSettings from "$lib/components/AppearanceSettings.svelte";
+    import DisplaySettings from "$lib/components/DisplaySettings.svelte";
     import GestureManager from "$lib/components/GestureManager.svelte";
     import GestureSettings from "$lib/components/GestureSettings.svelte";
     import PowerSettings from "$lib/components/PowerSettings.svelte";
@@ -48,6 +49,10 @@
 
         <section>
             <AppearanceSettings />
+        </section>
+
+        <section>
+            <DisplaySettings />
         </section>
 
         <section>

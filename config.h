@@ -22,7 +22,7 @@
 
 // ==================== BLE Settings ====================
 // BLE Device Name (shown when scanning for Bluetooth devices)
-const char* BLE_DEVICE_NAME = "Leor";
+const char* BLE_DEVICE_NAME = "Leor2";
 
 // BLE Robustness Settings
 #define BLE_NOTIFY_MIN_INTERVAL_MS 20   // Minimum ms between notifications (prevent flooding)
@@ -40,9 +40,8 @@ const char* BLE_DEVICE_NAME = "Leor";
 // Control via Bluetooth using a mobile app or web Bluetooth API
 
 // ==================== Display Settings ====================
-// Display Type: uncomment ONE of these
-//#define DISPLAY_SH1106   // SH1106 display (default)
-#define DISPLAY_SSD1306  // SSD1306 display (alternative)
+// Display type is selected at runtime via preferences (disp_type: sh1106 or ssd1306)
+// Change via command: display:type=sh1106 or display:type=ssd1306 (requires restart)
 
 #define I2C_ADDRESS 0x3c
 #define SCREEN_WIDTH 128

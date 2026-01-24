@@ -22,6 +22,7 @@
     import LookPad from "$lib/components/LookPad.svelte";
     import ShufflePanel from "$lib/components/ShufflePanel.svelte";
     import AppearanceSettings from "$lib/components/AppearanceSettings.svelte";
+    import DisplaySettings from "$lib/components/DisplaySettings.svelte";
     import GestureManager from "$lib/components/GestureManager.svelte";
     import GestureSettings from "$lib/components/GestureSettings.svelte";
     import PowerSettings from "$lib/components/PowerSettings.svelte";
@@ -419,6 +420,9 @@
 
                     <!-- Full width: Appearance -->
                     <AppearanceSettings />
+
+                    <!-- Display Settings -->
+                    <DisplaySettings />
 
                     <!-- Power Management -->
                     <PowerSettings />

@@ -180,130 +180,130 @@ String handleCommand(String cmd) {
   // ==================== EXPRESSIONS ====================
   if (cmd == "happy") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, HAPPY);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID_NOARGS(anim_laugh);
-    MOCHI_CALL_VOID(setMouthType, 1);
+    pMochiEyes->setMood(HAPPY);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->anim_laugh();
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Expression: Happy"));
   }
   else if (cmd == "sad") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, TIRED);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 2);
+    pMochiEyes->setMood(TIRED);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(2);
     Serial.println(F("Expression: Sad"));
   }
   else if (cmd == "angry") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, ANGRY);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 5);
+    pMochiEyes->setMood(ANGRY);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(5);
     Serial.println(F("Expression: Angry"));
   }
   else if (cmd == "love") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);  // Don't use HAPPY - it resets love animation
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 3);  // Open mouth (surprised/delighted)
-    MOCHI_CALL_VOID_NOARGS(anim_love);  // Call LAST so resetEmotions() doesn't cancel it
+    pMochiEyes->setMood(DEFAULT);  // Don't use HAPPY - it resets love animation
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(3);  // Open mouth (surprised/delighted)
+    pMochiEyes->anim_love();  // Call LAST so resetEmotions() doesn't cancel it
     Serial.println(F("Expression: Love"));
   }
   else if (cmd == "surprised") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
-    MOCHI_CALL_VOID(setCuriosity, ON);
-    MOCHI_CALL_VOID(setPosition, POS_N);
-    MOCHI_CALL_VOID_NOARGS(blink);
-    MOCHI_CALL_VOID(setMouthType, 3);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setCuriosity(ON);
+    pMochiEyes->setPosition(POS_N);
+    pMochiEyes->blink();
+    pMochiEyes->setMouthType(3);
     Serial.println(F("Expression: Surprised"));
   }
   else if (cmd == "confused") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
-    MOCHI_CALL_VOID_NOARGS(anim_confused);
-    MOCHI_CALL_VOID(setMouthType, 4);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->anim_confused();
+    pMochiEyes->setMouthType(4);
     Serial.println(F("Expression: Confused"));
   }
   else if (cmd == "sleepy") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, TIRED);
-    MOCHI_CALL_VOID(setPosition, POS_SW);
-    MOCHI_CALL_VOID(setMouthType, 5);
+    pMochiEyes->setMood(TIRED);
+    pMochiEyes->setPosition(POS_SW);
+    pMochiEyes->setMouthType(5);
     Serial.println(F("Expression: Sleepy"));
   }
   else if (cmd == "curious") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
-    MOCHI_CALL_VOID(setCuriosity, ON);
-    MOCHI_CALL_VOID(setPosition, POS_E);
-    MOCHI_CALL_VOID(setMouthType, 4);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setCuriosity(ON);
+    pMochiEyes->setPosition(POS_E);
+    pMochiEyes->setMouthType(4);
     Serial.println(F("Expression: Curious"));
   }
   else if (cmd == "nervous") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
-    MOCHI_CALL_VOID(setSweat, ON);
-    MOCHI_CALL_VOID(setCuriosity, ON);
-    MOCHI_CALL_VOID(setPosition, POS_N);  // Use POS_N instead of NW - left eye gets bigger with curious mode
-    MOCHI_CALL_VOID(setMouthType, 2);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setSweat(ON);
+    pMochiEyes->setCuriosity(ON);
+    pMochiEyes->setPosition(POS_N);  // Use POS_N instead of NW - left eye gets bigger with curious mode
+    pMochiEyes->setMouthType(2);
     Serial.println(F("Expression: Nervous"));
   }
   else if (cmd == "knocked" || cmd == "dizzy") {
     resetEffects();
-    MOCHI_CALL_VOID(setKnocked, ON);
+    pMochiEyes->setKnocked(ON);
     Serial.println(F("Expression: Knocked"));
   }
   else if (cmd == "neutral" || cmd == "normal" || cmd == "reset") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 1);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Expression: Neutral"));
   }
   else if (cmd == "idle") {
     resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
-    MOCHI_CALL_VOID(setIdleMode, ON, 1, 2);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 1);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setIdleMode(ON, 1, 2);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Mode: Idle"));
   }
   else if (cmd == "raised") {
     resetEffects();
-    MOCHI_CALL_VOID(setEyebrows, true);
-    MOCHI_CALL_VOID(setMood, DEFAULT);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 4);
+    pMochiEyes->setEyebrows(true);
+    pMochiEyes->setMood(DEFAULT);
+    pMochiEyes->setPosition(DEFAULT);
+    pMochiEyes->setMouthType(4);
     Serial.println(F("Expression: Raised eyebrows"));
   }
 
   // ==================== MOUTH ====================
   else if (cmd == "smile") {
-    MOCHI_CALL_VOID(setMouthType, 1);
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Mouth: Smile"));
   }
   else if (cmd == "frown") {
-    MOCHI_CALL_VOID(setMouthType, 2);
+    pMochiEyes->setMouthType(2);
     Serial.println(F("Mouth: Frown"));
   }
   else if (cmd == "open") {
-    MOCHI_CALL_VOID(setMouthType, 3);
+    pMochiEyes->setMouthType(3);
     Serial.println(F("Mouth: Open"));
   }
   else if (cmd == "ooo") {
-    MOCHI_CALL_VOID(setMouthType, 4);
+    pMochiEyes->setMouthType(4);
     Serial.println(F("Mouth: Ooo"));
   }
   else if (cmd == "flat") {
-    MOCHI_CALL_VOID(setMouthType, 5);
+    pMochiEyes->setMouthType(5);
     Serial.println(F("Mouth: Flat"));
   }
   else if (cmd == "uwum") {
-    MOCHI_CALL_VOID(setMouthType, 6);
+    pMochiEyes->setMouthType(6);
     Serial.println(F("Mouth: UwU"));
   }
   else if (cmd == "xdm") {
-    MOCHI_CALL_VOID(setMouthType, 7);
+    pMochiEyes->setMouthType(7);
     Serial.println(F("Mouth: XD"));
   }
   else if (cmd.startsWith("talk")) {
@@ -314,7 +314,7 @@ String handleCommand(String cmd) {
       if (duration < 100) duration = 100;
       if (duration > 10000) duration = 10000;
     }
-    MOCHI_CALL_VOID(startMouthAnim, 1, duration);
+    pMochiEyes->startMouthAnim(1, duration);
     Serial.print(F("Mouth: Talking for ")); Serial.print(duration); Serial.println(F("ms"));
   }
   else if (cmd.startsWith("chew")) {
@@ -325,7 +325,7 @@ String handleCommand(String cmd) {
       if (duration < 100) duration = 100;
       if (duration > 10000) duration = 10000;
     }
-    MOCHI_CALL_VOID(startMouthAnim, 2, duration);
+    pMochiEyes->startMouthAnim(2, duration);
     Serial.print(F("Mouth: Chewing for ")); Serial.print(duration); Serial.println(F("ms"));
   }
   else if (cmd.startsWith("wobble")) {
@@ -336,78 +336,78 @@ String handleCommand(String cmd) {
       if (duration < 100) duration = 100;
       if (duration > 10000) duration = 10000;
     }
-    MOCHI_CALL_VOID(startMouthAnim, 3, duration);
+    pMochiEyes->startMouthAnim(3, duration);
     Serial.print(F("Mouth: Wobbling for ")); Serial.print(duration); Serial.println(F("ms"));
   }
 
   // ==================== ACTIONS ====================
   else if (cmd == "blink") {
-    MOCHI_CALL_VOID_NOARGS(blink);
+    pMochiEyes->blink();
     Serial.println(F("Action: Blink"));
   }
   else if (cmd == "wink") {
-    MOCHI_CALL_VOID(wink, true);
-    MOCHI_CALL_VOID(setMouthType, 1);
+    pMochiEyes->wink(true);
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Action: Wink"));
   }
   else if (cmd == "winkr") {
-    MOCHI_CALL_VOID(wink, false);
-    MOCHI_CALL_VOID(setMouthType, 1);
+    pMochiEyes->wink(false);
+    pMochiEyes->setMouthType(1);
     Serial.println(F("Action: Wink Right"));
   }
   else if (cmd == "laugh") {
-    MOCHI_CALL_VOID_NOARGS(anim_laugh);
+    pMochiEyes->anim_laugh();
     Serial.println(F("Action: Laugh"));
   }
   else if (cmd == "cry") {
-    MOCHI_CALL_VOID_NOARGS(anim_cry);
+    pMochiEyes->anim_cry();
     Serial.println(F("Action: Cry"));
   }
   else if (cmd == "uwu") {
-    MOCHI_CALL_VOID(triggerUwU, 3.0f); // Default 3 seconds
+    pMochiEyes->triggerUwU(3.0f); // Default 3 seconds
     Serial.println(F("Expression: UwU"));
   }
   else if (cmd == "xd") {
-    MOCHI_CALL_VOID(triggerXD, 3.0f);
+    pMochiEyes->triggerXD(3.0f);
     Serial.println(F("Expression: XD"));
   }
   // knocked moved to expressions
 
   // ==================== POSITIONS ====================
   else if (cmd == "center") {
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
+    pMochiEyes->setPosition(DEFAULT);
     Serial.println(F("Position: Center"));
   }
   else if (cmd == "n" || cmd == "up") {
-    MOCHI_CALL_VOID(setPosition, POS_N);
+    pMochiEyes->setPosition(POS_N);
     Serial.println(F("Position: North"));
   }
   else if (cmd == "ne") {
-    MOCHI_CALL_VOID(setPosition, POS_NE);
+    pMochiEyes->setPosition(POS_NE);
     Serial.println(F("Position: North-East"));
   }
   else if (cmd == "e" || cmd == "right") {
-    MOCHI_CALL_VOID(setPosition, POS_E);
+    pMochiEyes->setPosition(POS_E);
     Serial.println(F("Position: East"));
   }
   else if (cmd == "se") {
-    MOCHI_CALL_VOID(setPosition, POS_SE);
+    pMochiEyes->setPosition(POS_SE);
     Serial.println(F("Position: South-East"));
   }
   else if (cmd == "s" || cmd == "down") {
-    MOCHI_CALL_VOID(setPosition, POS_S);
+    pMochiEyes->setPosition(POS_S);
     Serial.println(F("Position: South"));
   }
   else if (cmd == "sw") {
-    MOCHI_CALL_VOID(setPosition, POS_SW);
+    pMochiEyes->setPosition(POS_SW);
     Serial.println(F("Position: South-West"));
   }
   else if (cmd == "w" || cmd == "left") {
-    MOCHI_CALL_VOID(setPosition, POS_W);
+    pMochiEyes->setPosition(POS_W);
     Serial.println(F("Position: West"));
   }
   else if (cmd == "nw") {
-    MOCHI_CALL_VOID(setPosition, POS_NW);
+    pMochiEyes->setPosition(POS_NW);
     Serial.println(F("Position: North-West"));
   }
 
@@ -415,21 +415,21 @@ String handleCommand(String cmd) {
   else if (cmd == "sweat") {
     static bool sweatOn = false;
     sweatOn = !sweatOn;
-    MOCHI_CALL_VOID(setSweat, sweatOn);
+    pMochiEyes->setSweat(sweatOn);
     Serial.print(F("Sweat: "));
     Serial.println(sweatOn ? F("ON") : F("OFF"));
   }
   else if (cmd == "cyclops") {
     static bool cyclopsOn = false;
     cyclopsOn = !cyclopsOn;
-    MOCHI_CALL_VOID(setCyclops, cyclopsOn);
+    pMochiEyes->setCyclops(cyclopsOn);
     Serial.print(F("Cyclops: "));
     Serial.println(cyclopsOn ? F("ON") : F("OFF"));
   }
   else if (cmd == "mouth") {
     static bool mouthOn = true;
     mouthOn = !mouthOn;
-    MOCHI_CALL_VOID(setMouthEnabled, mouthOn);
+    pMochiEyes->setMouthEnabled(mouthOn);
     Serial.print(F("Mouth: "));
     Serial.println(mouthOn ? F("ON") : F("OFF"));
   }
@@ -463,9 +463,6 @@ String handleCommand(String cmd) {
       json += "\"gs\":" + String(preferences.getInt("gs", 6)) + ",";
       json += "\"os\":" + String(preferences.getInt("os", 12)) + ",";
       json += "\"ss\":" + String(preferences.getInt("ss", 10));
-      json += "},\"display\":{";
-      json += "\"type\":\"" + preferences.getString("disp_type", "sh1106") + "\",";
-      json += "\"addr\":\"0x" + String(preferences.getUInt("disp_addr", I2C_ADDRESS), HEX) + "\"";
       json += "},\"state\":{";
       json += "\"shuf\":" + String(shuffleEnabled ? "1" : "0") + ",";
       json += "\"mpu\":" + String(mpuVerbose ? "1" : "0");
@@ -484,37 +481,37 @@ String handleCommand(String cmd) {
         int value = params.substring(eqPos + 1, commaPos).toInt();
         
         if (key == "ew") {
-          MOCHI_CALL_VOID(setWidth, value, value);
+          pMochiEyes->setWidth(value, value);
           preferences.putInt("ew", value);
         } else if (key == "eh") {
-          MOCHI_CALL_VOID(setHeight, value, value);
+          pMochiEyes->setHeight(value, value);
           preferences.putInt("eh", value);
         } else if (key == "es") {
-          MOCHI_CALL_VOID(setSpacebetween, value);
+          pMochiEyes->setSpacebetween(value);
           preferences.putInt("es", value);
         } else if (key == "er") {
-          MOCHI_CALL_VOID(setBorderradius, value, value);
+          pMochiEyes->setBorderradius(value, value);
           preferences.putInt("er", value);
         } else if (key == "mw") {
-          MOCHI_CALL_VOID(setMouthSize, value, 6);
+          pMochiEyes->setMouthSize(value, 6);
           preferences.putInt("mw", value);
         } else if (key == "lt") {
-          MOCHI_CALL_VOID(setLaughDuration, value);
+          pMochiEyes->setLaughDuration(value);
           preferences.putInt("lt", value);
         } else if (key == "vt") {
-          MOCHI_CALL_VOID(setLoveDuration, value);
+          pMochiEyes->setLoveDuration(value);
           preferences.putInt("vt", value);
         } else if (key == "bi") {
-          MOCHI_CALL_VOID(setAutoblinker, true, value, 3);
+          pMochiEyes->setAutoblinker(true, value, 3);
           preferences.putInt("bi", value);
         } else if (key == "gs") {
-          MOCHI_CALL_VOID(setGazeSpeed, (float)value);
+          pMochiEyes->setGazeSpeed((float)value);
           preferences.putInt("gs", value);
         } else if (key == "os") {
-          MOCHI_CALL_VOID(setOpennessSpeed, (float)value);
+          pMochiEyes->setOpennessSpeed((float)value);
           preferences.putInt("os", value);
         } else if (key == "ss") {
-          MOCHI_CALL_VOID(setSquishSpeed, (float)value);
+          pMochiEyes->setSquishSpeed((float)value);
           preferences.putInt("ss", value);
         }
       }
@@ -740,7 +737,6 @@ String handleCommand(String cmd) {
     
     if (params.startsWith("type=")) {
       String type = params.substring(5);
-      type.trim(); // Remove any whitespace
       type.toLowerCase();
       
       // Save display type preference
@@ -750,7 +746,6 @@ String handleCommand(String cmd) {
         String current = String(DISPLAY_TYPE);
         current.toLowerCase();
         
-        // Always return success if valid, noting if restart is needed
         if (type != current) {
           return "display:type=" + type + " saved. Restart required: send 'restart' command";
         } else {
@@ -773,47 +768,27 @@ String handleCommand(String cmd) {
       return "display:addr invalid. Use hex format: 0x3C or 0x3D";
     }
     else if (params == "test") {
-      // Test display with animation - use display-specific objects for proper method calls
-      if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
-        display_ssd1306->clearDisplay();
-        display_ssd1306->setTextSize(2);
-        display_ssd1306->setTextColor(SSD1306_WHITE);
-        display_ssd1306->setCursor(20, 20);
-        display_ssd1306->println("DISPLAY");
-        display_ssd1306->setCursor(35, 40);
-        display_ssd1306->println("TEST");
-        display_ssd1306->display();
-        delay(1000);
-        
-        // Animate a bouncing box
-        for (int i = 0; i < 30; i++) {
-          display_ssd1306->clearDisplay();
-          int x = (i * 4) % (SCREEN_WIDTH - 20);
-          int y = 20 + (int)(15 * sin(i * 0.3));
-          display_ssd1306->fillRect(x, y, 20, 20, SSD1306_WHITE);
-          display_ssd1306->display();
-          delay(50);
-        }
-      } else if (display_sh1106) {
-        display_sh1106->clearDisplay();
-        display_sh1106->setTextSize(2);
-        display_sh1106->setTextColor(SH110X_WHITE);
-        display_sh1106->setCursor(20, 20);
-        display_sh1106->println("DISPLAY");
-        display_sh1106->setCursor(35, 40);
-        display_sh1106->println("TEST");
-        display_sh1106->display();
-        delay(1000);
-        
-        // Animate a bouncing box
-        for (int i = 0; i < 30; i++) {
-          display_sh1106->clearDisplay();
-          int x = (i * 4) % (SCREEN_WIDTH - 20);
-          int y = 20 + (int)(15 * sin(i * 0.3));
-          display_sh1106->fillRect(x, y, 20, 20, SH110X_WHITE);
-          display_sh1106->display();
-          delay(50);
-        }
+      // Test display with animation
+      uint16_t WHITE_COLOR = (activeDisplayType == DISP_SSD1306) ? SSD1306_WHITE : SH110X_WHITE;
+      
+      displayClear();
+      display->setTextSize(2);
+      display->setTextColor(WHITE_COLOR);
+      display->setCursor(20, 20);
+      display->println("DISPLAY");
+      display->setCursor(35, 40);
+      display->println("TEST");
+      displayShow();
+      delay(1000);
+      
+      // Animate a bouncing box
+      for (int i = 0; i < 30; i++) {
+        displayClear();
+        int x = (i * 4) % (SCREEN_WIDTH - 20);
+        int y = 20 + (int)(15 * sin(i * 0.3));
+        display->fillRect(x, y, 20, 20, WHITE_COLOR);
+        displayShow();
+        delay(50);
       }
       
       return "display:test complete";
