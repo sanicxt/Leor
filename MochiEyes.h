@@ -1669,6 +1669,11 @@ public:
         timers.breathingSpeed = clampf(speed, 0.1f, 1.0f);  // 0.1-1.0 Hz
     }
     
+    // Breathing getters
+    bool getBreathingEnabled() const { return timers.breathingEnabled; }
+    float getBreathingIntensity() const { return timers.breathingIntensity; }
+    float getBreathingSpeed() const { return timers.breathingSpeed; }
+    
     // Animation speed setters
     void setGazeSpeed(float speed) { targets.gazeSpeed = speed; }
     void setOpennessSpeed(float speed) { targets.opennessSpeed = speed; }

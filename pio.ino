@@ -284,6 +284,12 @@ void setup() {
   shuffleNeutralMinMs = preferences.getUInt("shuf_nmin", 2000);
   shuffleNeutralMaxMs = preferences.getUInt("shuf_nmax", 5000);
   
+  // Load breathing settings
+  bool breathEnabled = preferences.getBool("br_en", true);
+  float breathIntensity = preferences.getFloat("br_int", 0.08f);
+  float breathSpeed = preferences.getFloat("br_spd", 0.3f);
+  MOCHI_CALL_VOID(setBreathing, breathEnabled, breathIntensity, breathSpeed);
+  
   // Initialize BLE (low power alternative to WiFi)
   initBLE(BLE_DEVICE_NAME);
   

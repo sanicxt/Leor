@@ -66,6 +66,11 @@ inline void displayShow() {
     } \
   } while(0)
 
+#define MOCHI_GET(method) \
+  (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306 \
+    ? pMochiEyes_ssd1306->method() \
+    : (pMochiEyes_sh1106 ? pMochiEyes_sh1106->method() : 0))
+
 // MPU6050 debug logging set in main sketch
 extern bool mpuVerbose;
 
@@ -138,9 +143,9 @@ void printHelp() {
   Serial.println(F("\nSYSTEM:"));
   Serial.println(F("  restart/reboot - restart ESP32"));
   Serial.println(F("\nTOGGLES:"));
-  Serial.println(F("  sweat, cyclops, breathing"));
-  Serial.println(F("  breathing:intensity=<0.01-0.2> - adjust breath depth"));
-  Serial.println(F("  breathing:speed=<0.1-1.0> - adjust breath rate"));
+  Serial.println(F("  sweat, cyclops, br (breathing)"));
+  Serial.println(F("  bri=<0.01-0.2> - breathing intensity"));
+  Serial.println(F("  brs=<0.1-1.0> - breathing speed"));
   Serial.println(F("  mpulog - toggle MPU6050 debug output"));
   Serial.println(F("================================\n"));
 }
@@ -431,22 +436,41 @@ String handleCommand(String cmd) {
   }
   
   // ==================== BREATHING CONTROL ====================
-  else if (cmd == "breathing") {
-    static bool breathingOn = false;
-    breathingOn = !breathingOn;
-    MOCHI_CALL_VOID(setBreathing, breathingOn, 0.08f, 0.3f);  // 8% squish, 3.3s cycle
+  else if (cmd == "br:") {
+    // Report breathing status for web UI sync
+    String status = "br:";
+    status += (MOCHI_GET(getBreathingEnabled) ? "on" : "off");
+    status += " i=" + String(MOCHI_GET(getBreathingIntensity), 2);
+    status += " s=" + String(MOCHI_GET(getBreathingSpeed), 2);
+    Serial.println(status);
+    return status;
+  }
+  else if (cmd.startsWith("br=")) {
+    int val = cmd.substring(3).toInt();
+    bool breathingOn = (val == 1);
+    MOCHI_CALL_VOID(setBreathing, breathingOn);
+    preferences.putBool("br_en", breathingOn);
     Serial.print(F("Breathing: "));
     Serial.println(breathingOn ? F("ON") : F("OFF"));
   }
-  else if (cmd.startsWith("breathing:intensity=")) {
-    float intensity = cmd.substring(20).toFloat();
+  else if (cmd == "br") {
+    bool breathingOn = !MOCHI_GET(getBreathingEnabled);
+    MOCHI_CALL_VOID(setBreathing, breathingOn);
+    preferences.putBool("br_en", breathingOn);
+    Serial.print(F("Breathing: "));
+    Serial.println(breathingOn ? F("ON") : F("OFF"));
+  }
+  else if (cmd.startsWith("bri=")) {
+    float intensity = cmd.substring(4).toFloat();
     MOCHI_CALL_VOID(setBreathingIntensity, intensity);
+    preferences.putFloat("br_int", intensity);
     Serial.print(F("Breathing intensity: "));
     Serial.println(intensity);
   }
-  else if (cmd.startsWith("breathing:speed=")) {
-    float speed = cmd.substring(16).toFloat();
+  else if (cmd.startsWith("brs=")) {
+    float speed = cmd.substring(4).toFloat();
     MOCHI_CALL_VOID(setBreathingSpeed, speed);
+    preferences.putFloat("br_spd", speed);
     Serial.print(F("Breathing speed: "));
     Serial.println(speed);
   }

@@ -14,6 +14,9 @@ export const bleState = $state({
     shuffleExprMax: 5,
     shuffleNeutralMin: 2,
     shuffleNeutralMax: 5,
+    breathingEnabled: true,
+    breathingIntensity: 0.08,
+    breathingSpeed: 0.3,
     settings: {
         ew: 36, eh: 36, es: 10, er: 8,
         mw: 20, lt: 1000, vt: 2000, bi: 3,
@@ -44,6 +47,9 @@ export function getShuffleExprMin() { return bleState.shuffleExprMin; }
 export function getShuffleExprMax() { return bleState.shuffleExprMax; }
 export function getShuffleNeutralMin() { return bleState.shuffleNeutralMin; }
 export function getShuffleNeutralMax() { return bleState.shuffleNeutralMax; }
+export function getBreathingEnabled() { return bleState.breathingEnabled; }
+export function getBreathingIntensity() { return bleState.breathingIntensity; }
+export function getBreathingSpeed() { return bleState.breathingSpeed; }
 
 // Appearance getters
 export function getSettingsEw() { return bleState.settings.ew; }
@@ -70,6 +76,9 @@ export function setShuffleExprMin(val: number) { bleState.shuffleExprMin = val; 
 export function setShuffleExprMax(val: number) { bleState.shuffleExprMax = val; }
 export function setShuffleNeutralMin(val: number) { bleState.shuffleNeutralMin = val; }
 export function setShuffleNeutralMax(val: number) { bleState.shuffleNeutralMax = val; }
+export function setBreathingEnabled(val: boolean) { bleState.breathingEnabled = val; }
+export function setBreathingIntensity(val: number) { bleState.breathingIntensity = val; }
+export function setBreathingSpeed(val: number) { bleState.breathingSpeed = val; }
 
 // Appearance setters
 export function setSettingsEw(val: number) { bleState.settings.ew = val; }
@@ -224,6 +233,15 @@ export async function connect(): Promise<boolean> {
                 bleState.shuffleNeutralMin = parseInt(neuMatch[1]);
                 bleState.shuffleNeutralMax = parseInt(neuMatch[2]);
             }
+
+            // Parse breathing status (br:on/off i=0.08 s=0.3)
+            const breathMatch = value.match(/br:(on|off)\s+i=([\d.]+)\s+s=([\d.]+)/);
+            if (breathMatch) {
+                bleState.breathingEnabled = (breathMatch[1] === 'on');
+                bleState.breathingIntensity = parseFloat(breathMatch[2]);
+                bleState.breathingSpeed = parseFloat(breathMatch[3]);
+                console.log('[BLE] Breathing:', breathMatch[1], 'intensity:', breathMatch[2], 'speed:', breathMatch[3]);
+            }
         });
 
         // Subscribe to gesture notifications
@@ -264,6 +282,12 @@ export async function connect(): Promise<boolean> {
                         setTimeout(async () => {
                             console.log('Requesting BLE Power Status...');
                             await sendCommand('ble:');
+
+                            // Request Breathing Status
+                            setTimeout(async () => {
+                                console.log('Requesting Breathing Status...');
+                                await sendCommand('br:');
+                            }, 300);
                         }, 300);
                     }, 300);
                 }, 300);

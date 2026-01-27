@@ -1,5 +1,6 @@
 <script lang="ts">
     import ShufflePanel from "$lib/components/ShufflePanel.svelte";
+    import BreathingControl from "$lib/components/BreathingControl.svelte";
     import AppearanceSettings from "$lib/components/AppearanceSettings.svelte";
     import DisplaySettings from "$lib/components/DisplaySettings.svelte";
     import GestureManager from "$lib/components/GestureManager.svelte";
@@ -19,6 +20,7 @@
     <header
         class="border-b border-white/5 px-6 py-4 flex items-center gap-4 sticky top-0 bg-black/20 backdrop-blur-xl z-50"
     >
+        <!-- svelte-ignore a11y_consider_explicit_label -->
         <a
             href="{base}/"
             class="p-2 -ml-2 rounded-full hover:bg-white/5 text-zinc-400 hover:text-white transition-colors"
@@ -45,6 +47,10 @@
     <main class="p-4 sm:p-6 max-w-2xl mx-auto space-y-6 pb-32 relative z-10">
         <section>
             <ShufflePanel />
+        </section>
+
+        <section>
+            <BreathingControl />
         </section>
 
         <section>

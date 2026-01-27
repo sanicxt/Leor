@@ -26,6 +26,7 @@
     import GestureManager from "$lib/components/GestureManager.svelte";
     import GestureSettings from "$lib/components/GestureSettings.svelte";
     import PowerSettings from "$lib/components/PowerSettings.svelte";
+    import BreathingControl from "$lib/components/BreathingControl.svelte";
 
     import {
         getConnected,
@@ -423,6 +424,8 @@
 
                     <!-- Display Settings -->
                     <DisplaySettings />
+
+                    <BreathingControl />
 
                     <!-- Power Management -->
                     <PowerSettings />
