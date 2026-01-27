@@ -478,27 +478,40 @@
                 oninput={(e) => setSettingsMw(parseInt(e.currentTarget.value))}
                 onchange={applySettings}
                 disabled={!bleState.connected}
-                class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-pink-500 disabled:opacity-50"
+                class="w-full h-2 bg-zinc-700/50 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed
+                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+                       [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-br
+                       [&::-webkit-slider-thumb]:from-pink-400 [&::-webkit-slider-thumb]:to-rose-500
+                       [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-pink-500/50
+                       [&::-webkit-slider-thumb]:cursor-pointer"
             />
         </div>
 
         <!-- Mouth Animation Triggers -->
         <div class="space-y-3">
-            <div class="flex items-center justify-between">
-                <span class="text-zinc-400 text-xs">Animation Duration</span>
-                <span class="text-pink-400 font-mono text-xs font-bold"
-                    >{mouthAnimDuration}ms</span
-                >
+            <div class="space-y-2 p-3 rounded-xl bg-white/5">
+                <div class="flex items-center justify-between">
+                    <span class="text-zinc-400 text-xs">Animation Duration</span
+                    >
+                    <span class="text-pink-400 font-mono text-xs font-bold"
+                        >{mouthAnimDuration}ms</span
+                    >
+                </div>
+                <input
+                    type="range"
+                    min="500"
+                    max="5000"
+                    step="100"
+                    bind:value={mouthAnimDuration}
+                    disabled={!bleState.connected}
+                    class="w-full h-2 bg-zinc-700/50 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed
+                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-br
+                           [&::-webkit-slider-thumb]:from-pink-400 [&::-webkit-slider-thumb]:to-rose-500
+                           [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-pink-500/50
+                           [&::-webkit-slider-thumb]:cursor-pointer"
+                />
             </div>
-            <input
-                type="range"
-                min="500"
-                max="5000"
-                step="100"
-                bind:value={mouthAnimDuration}
-                disabled={!bleState.connected}
-                class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-pink-500 disabled:opacity-50"
-            />
             <div class="grid grid-cols-3 gap-2 pt-2">
                 <button
                     onclick={triggerTalk}

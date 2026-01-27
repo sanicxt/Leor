@@ -112,7 +112,9 @@ void resetEffects() {
   MOCHI_CALL_VOID(setVFlicker, OFF);
   MOCHI_CALL_VOID(setSweat, OFF);
   MOCHI_CALL_VOID(setIdleMode, OFF);
-  MOCHI_CALL_VOID(setBreathing, OFF);  // Turn off breathing too
+  // Restore breathing state from preferences instead of forcing OFF
+  bool breathEnabled = preferences.getBool("br_en", true);
+  MOCHI_CALL_VOID(setBreathing, breathEnabled);
   MOCHI_CALL_VOID(setEyebrows, false);
   MOCHI_CALL_VOID(setKnocked, OFF);
   

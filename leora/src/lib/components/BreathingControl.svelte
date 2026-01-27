@@ -135,7 +135,7 @@
     </div>
 
     <!-- Intensity Slider -->
-    <div class="space-y-2">
+    <div class="p-3 rounded-xl bg-white/5 space-y-2">
         <div class="flex justify-between items-center">
             <label
                 for="breath-intensity"
@@ -144,7 +144,7 @@
                 Intensity
             </label>
             <span
-                class="text-cyan-400 text-xs font-mono bg-cyan-500/10 px-2 py-0.5 rounded"
+                class="text-cyan-400 text-xs font-mono px-2 py-0.5 rounded"
             >
                 {(breathingIntensity * 100).toFixed(0)}%
             </span>
@@ -168,18 +168,19 @@
                    [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-cyan-500/50
                    [&::-webkit-slider-thumb]:cursor-pointer"
         />
-        <p class="text-cyan-300/40 text-[10px]">1% - 20% squish variation</p>
+        <div class="flex justify-between text-[10px] text-cyan-300/40">
+            <span>Subtle</span>
+            <span>Strong</span>
+        </div>
     </div>
 
     <!-- Speed Slider -->
-    <div class="space-y-2">
+    <div class="p-3 rounded-xl bg-white/5 space-y-2">
         <div class="flex justify-between items-center">
             <label for="breath-speed" class="text-cyan-300 text-xs font-medium">
                 Speed
             </label>
-            <span
-                class="text-cyan-400 text-xs font-mono bg-cyan-500/10 px-2 py-0.5 rounded"
-            >
+            <span class="text-cyan-400 text-xs font-mono">
                 {(1 / breathingSpeed).toFixed(1)}s
             </span>
         </div>
@@ -200,8 +201,9 @@
                    [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-cyan-500/50
                    [&::-webkit-slider-thumb]:cursor-pointer"
         />
-        <p class="text-cyan-300/40 text-[10px]">
-            10s (slow) - 1s (fast) per breath cycle
-        </p>
+        <div class="flex justify-between text-[10px] text-cyan-300/40">
+            <span>Slow (10s)</span>
+            <span>Fast (1s)</span>
+        </div>
     </div>
 </div>
