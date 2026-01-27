@@ -107,6 +107,7 @@ void resetEffects() {
   MOCHI_CALL_VOID(setVFlicker, OFF);
   MOCHI_CALL_VOID(setSweat, OFF);
   MOCHI_CALL_VOID(setIdleMode, OFF);
+  MOCHI_CALL_VOID(setBreathing, OFF);  // Turn off breathing too
   MOCHI_CALL_VOID(setEyebrows, false);
   MOCHI_CALL_VOID(setKnocked, OFF);
   
@@ -137,7 +138,9 @@ void printHelp() {
   Serial.println(F("\nSYSTEM:"));
   Serial.println(F("  restart/reboot - restart ESP32"));
   Serial.println(F("\nTOGGLES:"));
-  Serial.println(F("  sweat, cyclops"));
+  Serial.println(F("  sweat, cyclops, breathing"));
+  Serial.println(F("  breathing:intensity=<0.01-0.2> - adjust breath depth"));
+  Serial.println(F("  breathing:speed=<0.1-1.0> - adjust breath rate"));
   Serial.println(F("  mpulog - toggle MPU6050 debug output"));
   Serial.println(F("================================\n"));
 }
@@ -212,7 +215,7 @@ String handleCommand(String cmd) {
     resetEffects();
     MOCHI_CALL_VOID(setMood, DEFAULT);
     MOCHI_CALL_VOID(setCuriosity, ON);
-    MOCHI_CALL_VOID(setPosition, POS_N);
+    // No setPosition - curious motion creates the surprised look
     MOCHI_CALL_VOID_NOARGS(blink);
     MOCHI_CALL_VOID(setMouthType, 3);
     Serial.println(F("Expression: Surprised"));
@@ -235,7 +238,7 @@ String handleCommand(String cmd) {
     resetEffects();
     MOCHI_CALL_VOID(setMood, DEFAULT);
     MOCHI_CALL_VOID(setCuriosity, ON);
-    MOCHI_CALL_VOID(setPosition, POS_E);
+    // No setPosition - curious mode creates left-right motion
     MOCHI_CALL_VOID(setMouthType, 4);
     Serial.println(F("Expression: Curious"));
   }
@@ -244,7 +247,7 @@ String handleCommand(String cmd) {
     MOCHI_CALL_VOID(setMood, DEFAULT);
     MOCHI_CALL_VOID(setSweat, ON);
     MOCHI_CALL_VOID(setCuriosity, ON);
-    MOCHI_CALL_VOID(setPosition, POS_N);  // Use POS_N instead of NW - left eye gets bigger with curious mode
+    // No setPosition - nervous uses curious left-right motion
     MOCHI_CALL_VOID(setMouthType, 2);
     Serial.println(F("Expression: Nervous"));
   }
@@ -425,6 +428,27 @@ String handleCommand(String cmd) {
     MOCHI_CALL_VOID(setCyclops, cyclopsOn);
     Serial.print(F("Cyclops: "));
     Serial.println(cyclopsOn ? F("ON") : F("OFF"));
+  }
+  
+  // ==================== BREATHING CONTROL ====================
+  else if (cmd == "breathing") {
+    static bool breathingOn = false;
+    breathingOn = !breathingOn;
+    MOCHI_CALL_VOID(setBreathing, breathingOn, 0.08f, 0.3f);  // 8% squish, 3.3s cycle
+    Serial.print(F("Breathing: "));
+    Serial.println(breathingOn ? F("ON") : F("OFF"));
+  }
+  else if (cmd.startsWith("breathing:intensity=")) {
+    float intensity = cmd.substring(20).toFloat();
+    MOCHI_CALL_VOID(setBreathingIntensity, intensity);
+    Serial.print(F("Breathing intensity: "));
+    Serial.println(intensity);
+  }
+  else if (cmd.startsWith("breathing:speed=")) {
+    float speed = cmd.substring(16).toFloat();
+    MOCHI_CALL_VOID(setBreathingSpeed, speed);
+    Serial.print(F("Breathing speed: "));
+    Serial.println(speed);
   }
   else if (cmd == "mouth") {
     static bool mouthOn = true;

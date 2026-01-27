@@ -288,6 +288,15 @@ struct AnimationTimers {
     float idleVariation;
     bool idleMode;
     
+    // Breathing effect
+    float breathingPhase;    // Current breathing cycle phase
+    float breathingSpeed;    // Cycles per second
+    float breathingIntensity; // 0-1 how much squish oscillation
+    bool breathingEnabled;
+    
+    // Blink randomization
+    int nextBlinkType;  // 0=normal, 1=slow, 2=fast, 3=half
+    
     void reset() {
         confusedRemaining = 0.0f;
         loveRemaining = 0.0f;
@@ -296,7 +305,6 @@ struct AnimationTimers {
         uwuRemaining = 0.0f;
         xdRemaining = 0.0f;
         
-        idleMode = true;
         mouthAnimType = 0;
         
         blinkCooldown = 2.0f;
@@ -307,7 +315,14 @@ struct AnimationTimers {
         idleCooldown = 0.0f;
         idleInterval = 2.0f;
         idleVariation = 3.0f;
-        idleMode = false;
+        idleMode = false;  // Off by default - neutral stance
+        
+        breathingPhase = 0.0f;
+        breathingSpeed = 0.3f;  // 0.3 Hz = ~3.3 second breath cycle
+        breathingIntensity = 0.08f;  // 8% squish change - visible at 60fps
+        breathingEnabled = true;  // ON by default for living eyes
+        
+        nextBlinkType = 0;
     }
 };
 
@@ -483,17 +498,77 @@ private:
             params.spiralAngle += dt * 8.0f;
         }
         
-        // Auto-blink (disabled when knocked)
+        // Auto-blink (disabled when knocked) - with randomized blink types
         if (timers.autoBlink && params.knockedIntensity < 0.5f) {
             timers.blinkCooldown -= dt;
             if (timers.blinkCooldown <= 0) {
-                blink();
+                // Choose random blink type for next blink
+                int blinkRoll = random(100);
+                if (blinkRoll < 60) {
+                    timers.nextBlinkType = 0; // Normal blink (60%)
+                } else if (blinkRoll < 75) {
+                    timers.nextBlinkType = 1; // Slow blink (15%)
+                } else if (blinkRoll < 85) {
+                    timers.nextBlinkType = 2; // Fast blink (10%)
+                } else if (blinkRoll < 95) {
+                    timers.nextBlinkType = 3; // Half blink (10%)
+                } else {
+                    timers.nextBlinkType = 4; // Asymmetric blink (5%)
+                }
+                
+                // Execute the chosen blink type
+                switch (timers.nextBlinkType) {
+                    case 0: // Normal blink
+                        blink();
+                        break;
+                    case 1: // Slow, tired blink
+                        targets.openness = 0.0f;
+                        targets.opennessSpeed = 6.0f; // Slower than normal
+                        params.openness = 0.0f;
+                        targets.openness = 1.0f;
+                        break;
+                    case 2: // Fast, alert blink
+                        targets.openness = 0.0f;
+                        targets.opennessSpeed = 18.0f; // Faster than normal
+                        params.openness = 0.0f;
+                        targets.openness = 1.0f;
+                        break;
+                    case 3: // Half blink - doesn't close completely
+                        targets.openness = 0.3f;
+                        targets.opennessSpeed = 14.0f;
+                        params.openness = 0.3f;
+                        targets.openness = 1.0f;
+                        break;
+                    case 4: // Asymmetric blink - one eye leads slightly
+                        if (random(2) == 0) {
+                            // Left eye blinks first
+                            params.leftOpenness = 0.0f;
+                            targets.leftOpenness = 1.0f;
+                            params.rightOpenness = 0.3f; // Right starts later
+                            targets.rightOpenness = 1.0f;
+                        } else {
+                            // Right eye blinks first
+                            params.rightOpenness = 0.0f;
+                            targets.rightOpenness = 1.0f;
+                            params.leftOpenness = 0.3f; // Left starts later
+                            targets.leftOpenness = 1.0f;
+                        }
+                        targets.openness = 0.0f;
+                        params.openness = 0.0f;
+                        targets.openness = 1.0f;
+                        break;
+                }
+                
+                // Randomize next blink interval more
+                float intervalVariation = ((float)random(200) - 50.0f) / 100.0f; // -0.5 to +1.5
                 timers.blinkCooldown = timers.blinkInterval + 
-                    ((float)random(100) / 100.0f) * timers.blinkVariation;
+                    (intervalVariation * timers.blinkVariation);
+                // Ensure minimum interval
+                if (timers.blinkCooldown < 1.0f) timers.blinkCooldown = 1.0f;
             }
         }
         
-        // Idle mode - random gaze
+        // Idle mode - random gaze movements only (no squish conflicts)
         if (timers.idleMode) {
             timers.idleCooldown -= dt;
             if (timers.idleCooldown <= 0) {
@@ -502,6 +577,15 @@ private:
                 timers.idleCooldown = timers.idleInterval + 
                     ((float)random(100) / 100.0f) * timers.idleVariation;
             }
+        }
+        
+        // Breathing effect - gentle squish oscillation
+        if (timers.breathingEnabled) {
+            timers.breathingPhase += dt * timers.breathingSpeed * 6.28318f;  // 2*PI for full cycle
+            // Use sine wave for smooth inhale/exhale
+            float breathCycle = sinf(timers.breathingPhase);
+            // Map to squish: 1.0 = neutral, >1.0 = taller (inhale), <1.0 = wider (exhale)
+            targets.squish = 1.0f + (breathCycle * timers.breathingIntensity);
         }
         
         // Curious mode - use intensity for smooth eye size change
@@ -542,7 +626,7 @@ private:
         float stretchY = params.squish;
         float stretchX = 1.0f / params.squish;  // Inverse for volume preservation
         
-        // Base dimensions with squash/stretch
+        // Base dimensions with squash/stretch only
         int16_t eyeW = (int16_t)(layout.baseWidth * stretchX);
         int16_t eyeH = (int16_t)(layout.baseHeight * stretchY);
         
@@ -1391,6 +1475,9 @@ public:
     }
     
     void resetEmotions() {
+        // Clear all overlays first
+        clearAllOverlays();
+        
         // Reset emotion targets
         targets.joy = 0.0f;
         targets.anger = 0.0f;
@@ -1454,8 +1541,9 @@ public:
         targets.openness = 1.0f;
     }
     
-    // Helper to clear all overlay expression timers/intensities (for mutual exclusivity)
-    void clearAllOverlays() {
+    // Helper to clear timed overlay expressions (love, cry, laugh, uwu, xd, confused)
+    // Does NOT clear curious/sweat so they can coexist
+    void clearTimedOverlays() {
         timers.loveRemaining = 0.0f;
         timers.cryRemaining = 0.0f;
         timers.laughRemaining = 0.0f;
@@ -1472,6 +1560,23 @@ public:
         params.tearProgress = 0.0f;
         params.hFlicker = 0.0f;
         params.vFlicker = 0.0f;
+    }
+    
+    // Helper to stop curious gaze override (called when manually setting position)
+    void clearCuriousGaze() {
+        targets.curiousIntensity = 0.0f;
+        params.curiousPhase = 0.0f;
+    }
+    
+    // Helper to clear ALL overlay expression timers/intensities (for complete reset)
+    void clearAllOverlays() {
+        clearTimedOverlays();
+        targets.curiousIntensity = 0.0f;
+        targets.sweatIntensity = 0.0f;
+        params.curiousPhase = 0.0f;
+        // Reset gaze to center so timed effects don't inherit position from expressions
+        targets.gazeX = 0.0f;
+        targets.gazeY = 0.0f;
     }
     
     void triggerLove(float durationSec = 2.0f) {
@@ -1518,6 +1623,9 @@ public:
     }
     
     void setSweat(bool on) {
+        if (on) {
+            clearTimedOverlays();  // Clear timed effects but allow curious to coexist
+        }
         targets.sweatIntensity = on ? 1.0f : 0.0f;
     }
     
@@ -1542,6 +1650,23 @@ public:
         if (active) {
             timers.idleCooldown = 0.5f;  // Start soon
         }
+    }
+    
+    void setBreathing(bool active, float intensity = 0.08f, float speed = 0.3f) {
+        timers.breathingEnabled = active;
+        timers.breathingIntensity = intensity;  // 0.08 = 8% squish change
+        timers.breathingSpeed = speed;  // 0.3 Hz = 3.3 second cycle
+        if (!active) {
+            targets.squish = 1.0f;  // Reset to neutral
+        }
+    }
+    
+    void setBreathingIntensity(float intensity) {
+        timers.breathingIntensity = clampf(intensity, 0.0f, 0.2f);  // Max 20% squish
+    }
+    
+    void setBreathingSpeed(float speed) {
+        timers.breathingSpeed = clampf(speed, 0.1f, 1.0f);  // 0.1-1.0 Hz
     }
     
     // Animation speed setters
@@ -1614,6 +1739,7 @@ public:
     }
     
     void setPosition(uint8_t pos) {
+        clearCuriousGaze();  // Stop curious from overriding the position
         switch (pos) {
             case 1: setGaze(0, -1); break;     // N
             case 2: setGaze(1, -1); break;     // NE
@@ -1655,10 +1781,11 @@ public:
     }
     
     void setCuriosity(bool on) {
-        targets.curiousIntensity = on ? 1.0f : 0.0f;
         if (on) {
+            clearTimedOverlays();  // Clear timed effects but allow sweat to coexist
             params.curiousPhase = 0.0f;
         }
+        targets.curiousIntensity = on ? 1.0f : 0.0f;
     }
     
     void setHFlicker(bool on, uint8_t amplitude = 2) {
