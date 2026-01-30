@@ -374,11 +374,11 @@ String handleCommand(String cmd) {
     Serial.println(F("Action: Cry"));
   }
   else if (cmd == "uwu") {
-    MOCHI_CALL_VOID(triggerUwU, 3.0f); // Default 3 seconds
+    MOCHI_CALL_VOID_NOARGS(triggerUwU);
     Serial.println(F("Expression: UwU"));
   }
   else if (cmd == "xd") {
-    MOCHI_CALL_VOID(triggerXD, 3.0f);
+    MOCHI_CALL_VOID_NOARGS(triggerXD);
     Serial.println(F("Expression: XD"));
   }
   // knocked moved to expressions

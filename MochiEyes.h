@@ -145,8 +145,12 @@ struct EyeParams {
     float curiousIntensity; // 0 = normal, 1 = curious mode (smooth)
     float uwuIntensity;     // 0 = normal, 1 = full UwU face (smooth)
     float xdIntensity;      // 0 = normal, 1 = full >U< face (smooth)
+    float confusedIntensity; // 0 = normal, 1 = confused (shaking)
+    float laughIntensity;   // 0 = normal, 1 = laughing
     bool cyclops;
     float curiousPhase;     // Animation phase for left-right movement
+    float confusedPhase;    // Animation phase for shake
+    float laughPhase;       // Animation phase for laugh
     
     // Flicker effects (frame-local, not smoothed)
     float hFlicker;
@@ -176,8 +180,12 @@ struct EyeParams {
         curiousIntensity = 0.0f;
         uwuIntensity = 0.0f;
         xdIntensity = 0.0f;
+        confusedIntensity = 0.0f;
+        laughIntensity = 0.0f;
         cyclops = false;
         curiousPhase = 0.0f;
+        confusedPhase = 0.0f;
+        laughPhase = 0.0f;
         hFlicker = 0.0f;
         vFlicker = 0.0f;
     }
@@ -446,51 +454,36 @@ private:
         
         // === EYE ANIMATIONS (separate from mouth) ===
         
-        // Love animation
-        if (timers.loveRemaining > 0) {
-            timers.loveRemaining -= dt;
-            targets.love = 1.0f;
-            targets.heartScale = 1.0f;
-            params.heartPulse += dt * 10.0f;
-        } else if (params.love > 0.01f) {
-            targets.love = 0.0f;
-            targets.heartScale = 0.0f;
+        // Love animation - PERSISTENT (no timer countdown, stays until cleared)
+        if (targets.love > 0.5f) {
+            params.heartPulse += dt * 10.0f;  // Keep hearts pulsing
         }
         
-        // Cry animation
-        if (timers.cryRemaining > 0) {
-            timers.cryRemaining -= dt;
+        // Cry animation - PERSISTENT (based on fatigue target, not timer)
+        if (targets.fatigue > 0.3f) {
             params.tearProgress += dt * 40.0f;
             if (params.tearProgress > layout.screenH) {
                 params.tearProgress = 0.0f;
             }
-            targets.fatigue = 0.5f;
-        } else if (params.tearProgress > 0 || params.fatigue > 0.01f) {
-            // Reset tears and fatigue when cry ends
+        } else if (params.tearProgress > 0) {
             params.tearProgress = 0.0f;
-            targets.fatigue = 0.0f;
         }
         
-        // Confused animation - eyes shake
-        if (timers.confusedRemaining > 0) {
-            timers.confusedRemaining -= dt;
-            params.hFlicker = sinf(timers.confusedRemaining * 50.0f) * 8.0f;
+        // Confused animation - PERSISTENT (based on confusedIntensity)
+        if (params.confusedIntensity > 0.1f) {
+            params.confusedPhase += dt * 50.0f;
+            params.hFlicker = sinf(params.confusedPhase) * 8.0f * params.confusedIntensity;
         } else {
             params.hFlicker = 0.0f;
         }
         
-        // Laugh animation
-        if (timers.laughRemaining > 0) {
-            timers.laughRemaining -= dt;
-            params.vFlicker = sinf(timers.laughRemaining * 20.0f) * 2.0f;
-            targets.mouthOpenness = (sinf(timers.laughRemaining * 12.0f) + 1.0f) * 0.5f;
-            targets.joy = 1.0f;
+        // Laugh animation - PERSISTENT (based on laughIntensity)
+        if (params.laughIntensity > 0.1f) {
+            params.laughPhase += dt;
+            params.vFlicker = sinf(params.laughPhase * 20.0f) * 2.0f * params.laughIntensity;
+            targets.mouthOpenness = (sinf(params.laughPhase * 12.0f) + 1.0f) * 0.5f * params.laughIntensity;
         } else {
             params.vFlicker = 0.0f;
-            if (timers.laughRemaining < 0 && timers.laughRemaining > -0.1f) {
-                targets.mouthOpenness = 0.0f;
-                targets.joy = 0.0f;
-            }
         }
         
         // Knocked (spiral eyes)
@@ -596,21 +589,7 @@ private:
             targets.gazeY = 0.0f;
         }
         
-        // UwU timer - eyes only, no joy override
-        if (timers.uwuRemaining > 0) {
-            timers.uwuRemaining -= dt;
-            targets.uwuIntensity = 1.0f;
-        } else if (params.uwuIntensity > 0.01f) {
-            targets.uwuIntensity = 0.0f;
-        }
-        
-        // XD (>U<) timer - eyes only, no joy override
-        if (timers.xdRemaining > 0) {
-            timers.xdRemaining -= dt;
-            targets.xdIntensity = 1.0f;
-        } else if (params.xdIntensity > 0.01f) {
-            targets.xdIntensity = 0.0f;
-        }
+        // UwU and XD are now PERSISTENT (no timer, they stay until clearAllOverlays)
     }
     
     // ========================================================================
@@ -1574,41 +1553,56 @@ public:
         targets.curiousIntensity = 0.0f;
         targets.sweatIntensity = 0.0f;
         params.curiousPhase = 0.0f;
-        // Reset gaze to center so timed effects don't inherit position from expressions
+        params.confusedIntensity = 0.0f;
+        params.confusedPhase = 0.0f;
+        params.laughIntensity = 0.0f;
+        params.laughPhase = 0.0f;
+        params.tearProgress = 0.0f;
+        targets.fatigue = 0.0f;
+        // Reset gaze to center so effects don't inherit position from expressions
         targets.gazeX = 0.0f;
         targets.gazeY = 0.0f;
     }
     
     void triggerLove(float durationSec = 2.0f) {
         clearAllOverlays();  // Cancel other expressions
-        timers.loveRemaining = durationSec;
+        targets.love = 1.0f;
+        targets.heartScale = 1.0f;
         params.heartPulse = 0.0f;
+        // No timer - expression is now persistent until another is triggered
     }
     
-    void triggerCry(float durationSec = 3.0f) {
+    void triggerCry(float durationSec = 0) {
         clearAllOverlays();
-        timers.cryRemaining = durationSec;
+        targets.fatigue = 0.5f;  // Droopy sad eyes
         params.tearProgress = 0.0f;
+        // Now persistent - no timer
     }
     
-    void triggerConfused(float durationSec = 0.5f) {
+    void triggerConfused(float durationSec = 0) {
         clearAllOverlays();
-        timers.confusedRemaining = durationSec;
+        params.confusedIntensity = 1.0f;
+        params.confusedPhase = 0.0f;
+        // Now persistent - no timer
     }
     
-    void triggerUwU(float duration) {
+    void triggerUwU(float duration = 0) {
         clearAllOverlays();
-        timers.uwuRemaining = duration;
+        targets.uwuIntensity = 1.0f;
+        // No timer - expression is now persistent until another is triggered
     }
     
-    void triggerXD(float duration) {
+    void triggerXD(float duration = 0) {
         clearAllOverlays();
-        timers.xdRemaining = duration;
+        targets.xdIntensity = 1.0f;
+        // No timer - expression is now persistent
     }
     
-    void triggerLaugh(float durationSec = 1.0f) {
+    void triggerLaugh(float durationSec = 0) {
         clearAllOverlays();
-        timers.laughRemaining = durationSec;
+        params.laughIntensity = 1.0f;
+        params.laughPhase = 0.0f;
+        // Now persistent - no timer
     }
     
     void setKnocked(bool on) {
