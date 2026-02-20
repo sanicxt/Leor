@@ -20,7 +20,7 @@ export const bleState = $state({
     settings: {
         ew: 36, eh: 36, es: 10, er: 8,
         mw: 20, lt: 1000, vt: 2000, bi: 3,
-        gs: 6, os: 12, ss: 10  // gaze speed, openness speed, squish speed
+        gs: 6, os: 12, ss: 10, td: 3000  // gaze speed, openness speed, squish speed, touch hold delay (ms)
     },
     display: {
         type: 'sh1106',  // sh1106 or ssd1306
@@ -63,6 +63,7 @@ export function getSettingsBi() { return bleState.settings.bi; }
 export function getSettingsGs() { return bleState.settings.gs; }
 export function getSettingsOs() { return bleState.settings.os; }
 export function getSettingsSs() { return bleState.settings.ss; }
+export function getSettingsTd() { return bleState.settings.td; }
 
 export function getGestureMatching() { return bleState.gestureMatching; }
 export function getGestureReactionTime() { return bleState.gestureReactionTime; }
@@ -92,6 +93,7 @@ export function setSettingsBi(val: number) { bleState.settings.bi = val; }
 export function setSettingsGs(val: number) { bleState.settings.gs = val; }
 export function setSettingsOs(val: number) { bleState.settings.os = val; }
 export function setSettingsSs(val: number) { bleState.settings.ss = val; }
+export function setSettingsTd(val: number) { bleState.settings.td = val; }
 
 export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
 export function setGestureReactionTime(val: number) { bleState.gestureReactionTime = val; }
@@ -186,13 +188,13 @@ export async function connect(): Promise<boolean> {
             bleState.lastStatus = value;
 
             // Parse appearance and gesture settings
-            const params = ['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss', 'rt', 'cf', 'cd', 'gm'];
+            const params = ['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss', 'td', 'rt', 'cf', 'cd', 'gm'];
             if (value.includes('=') || value.includes('gs:')) {
                 params.forEach(param => {
                     const match = value.match(new RegExp(`${param}=(\\d+(\\.\\d+)?)`));
                     if (match) {
                         const val = parseFloat(match[1]);
-                        if (['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss'].includes(param)) {
+                        if (['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss', 'td'].includes(param)) {
                             (bleState.settings as any)[param] = val;
                         } else if (param === 'rt') {
                             bleState.gestureReactionTime = val;

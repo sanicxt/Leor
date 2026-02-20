@@ -1,10 +1,22 @@
 <script lang="ts">
-    import { sendCommand, bleState } from "$lib/ble.svelte";
+    import {
+        sendCommand,
+        bleState,
+        getSettingsTd,
+        setSettingsTd,
+    } from "$lib/ble.svelte";
+
+    let touchHoldDelay = $derived(getSettingsTd());
 
     async function toggleLowPowerMode() {
         const newVal = !bleState.bleLowPowerMode;
         bleState.bleLowPowerMode = newVal;
         await sendCommand(`ble:lp=${newVal ? "1" : "0"}`);
+    }
+
+    async function updateTouchHoldDelay(value: number) {
+        setSettingsTd(value);
+        await sendCommand(`s:td=${value}`);
     }
 </script>
 
@@ -35,6 +47,59 @@
                 <h2 class="text-lg font-semibold text-white">Power Settings</h2>
                 <p class="text-xs text-zinc-400">BLE power management</p>
             </div>
+        </div>
+    </div>
+
+    <!-- Touch Hold Delay -->
+    <div class="mt-4 p-4 bg-white/5 rounded-xl border border-white/5 space-y-3">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 rounded-lg bg-sky-500/20 flex items-center justify-center"
+                >
+                    <svg
+                        class="w-5 h-5 text-sky-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M9 11V6a3 3 0 016 0v5m-6 0h6m-6 0v5a3 3 0 006 0v-5"
+                        />
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-white font-medium text-sm">
+                        Touch Hold to Sleep
+                    </div>
+                    <div class="text-zinc-500 text-xs">
+                        Long touch duration before deep sleep
+                    </div>
+                </div>
+            </div>
+            <span class="text-sky-300 text-xs font-mono"
+                >{(touchHoldDelay / 1000).toFixed(1)}s</span
+            >
+        </div>
+
+        <input
+            type="range"
+            min="1000"
+            max="15000"
+            step="500"
+            value={touchHoldDelay}
+            onchange={(e) =>
+                updateTouchHoldDelay(parseInt(e.currentTarget.value))}
+            disabled={!bleState.connected}
+            class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-sky-500 disabled:opacity-50"
+        />
+
+        <div class="flex justify-between text-[10px] text-zinc-500 px-1">
+            <span>1s</span>
+            <span>15s</span>
         </div>
     </div>
 

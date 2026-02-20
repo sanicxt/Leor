@@ -24,6 +24,8 @@
 #include "FastIMU.h"
 #include <NimBLEDevice.h>
 #include <Preferences.h>
+#include <esp_sleep.h>
+#include "driver/rtc_io.h"
 
 // ==================== Configuration ====================
 #include "config.h"
@@ -184,6 +186,142 @@ unsigned long shuffleNextChangeMs = 0;
 // MPU6050 verbose logging
 bool mpuVerbose = false;
 
+// Touch wake / deep sleep (digital input)
+unsigned long touchHoldMs = TOUCH_HOLD_DEFAULT_MS;
+bool touchSleepArmed = false;
+
+// Touch detection state (simple hold timer)
+static unsigned long touchPressStartMs = 0;
+static bool touchLastState = false;
+static unsigned long touchDetectEnableAtMs = 0;
+
+inline bool isTouchWakePressed() {
+  int pinState = digitalRead(TOUCH_WAKE_PIN);
+  return (TOUCH_WAKE_ACTIVE_LEVEL == 0) ? (pinState == LOW) : (pinState == HIGH);
+}
+
+void enterDeepSleepFromTouch() {
+  Serial.println(F("[POWER] Long touch detected -> entering deep sleep"));
+  sendBLEStatus("sleeping");
+
+  // --- 1. Show bye-bye then blank the OLED ---
+  {
+    uint8_t dispAddr = (uint8_t)preferences.getUInt("disp_addr", I2C_ADDRESS);
+    if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
+      display_ssd1306->clearDisplay();
+      display_ssd1306->setTextColor(1);
+      display_ssd1306->setTextSize(2);
+      display_ssd1306->setCursor(28, 24);
+      display_ssd1306->print(F("Bye bye!"));
+      display_ssd1306->display();
+    } else if (display_sh1106) {
+      display_sh1106->clearDisplay();
+      display_sh1106->setTextColor(1);
+      display_sh1106->setTextSize(2);
+      display_sh1106->setCursor(28, 24);
+      display_sh1106->print(F("Bye bye!"));
+      display_sh1106->display();
+    }
+    delay(300);
+    // Send display-off command (0xAE) over I2C.
+    Wire.beginTransmission(dispAddr);
+    Wire.write(0x00);
+    Wire.write(0xAE);
+    Wire.endTransmission();
+  }
+
+  // --- 2. Put MPU-6050 into sleep mode (~10 µA vs ~3.8 mA active) ---
+  // Write SLEEP bit (bit 6) in register PWR_MGMT_1 (0x6B).
+  Wire.beginTransmission(IMU_ADDRESS);
+  Wire.write(0x6B); // PWR_MGMT_1
+  Wire.write(0x40); // SLEEP = 1
+  Wire.endTransmission();
+
+  // --- 3. Release the I2C bus so SDA/SCL float ---
+  Wire.end();
+
+  // --- 4. Stop BLE advertising ---
+  // deinit() crashes if the stack is active; deep sleep cuts the radio anyway.
+  NimBLEDevice::getAdvertising()->stop();
+
+  delay(30);
+
+  // --- 5. Configure GPIO wake source ---
+  // Wake on PRESS (same level as active):
+  //   Active-LOW button  → wake on LOW  (press pulls pin low)
+  //   Active-HIGH button → wake on HIGH (press drives pin high)
+  // This way releasing the button does NOT immediately wake the chip.
+  // The user must press the button again to turn on.
+  esp_sleep_enable_ext1_wakeup_io(
+    (1ULL << TOUCH_WAKE_PIN),
+    (TOUCH_WAKE_ACTIVE_LEVEL == 0) ? ESP_EXT1_WAKEUP_ANY_LOW : ESP_EXT1_WAKEUP_ANY_HIGH
+  );
+
+  // Hold pin at the NON-active level during sleep so EXT1 doesn't fire immediately.
+  //   Active-LOW  (wake on LOW)  → hold HIGH with pullup
+  //   Active-HIGH (wake on HIGH) → hold LOW  with pulldown
+  if (TOUCH_WAKE_ACTIVE_LEVEL == 0) {
+    rtc_gpio_pullup_en((gpio_num_t)TOUCH_WAKE_PIN);
+    rtc_gpio_pulldown_dis((gpio_num_t)TOUCH_WAKE_PIN);
+  } else {
+    rtc_gpio_pulldown_en((gpio_num_t)TOUCH_WAKE_PIN);
+    rtc_gpio_pullup_dis((gpio_num_t)TOUCH_WAKE_PIN);
+  }
+
+  // Wait for the button to be released BEFORE sleeping.
+  // If we sleep while the pin is still at the active level, EXT1 fires instantly.
+  Serial.println(F("[POWER] Waiting for button release before sleep..."));
+  Serial.flush();
+  unsigned long releaseWaitStart = millis();
+  while (isTouchWakePressed()) {
+    if (millis() - releaseWaitStart > 5000) {
+      // Abort if user holds for >5s more
+      Serial.println(F("[POWER] Sleep aborted: button held too long"));
+      touchPressStartMs = 0;
+      return;
+    }
+    delay(10);
+  }
+  // Small settling delay after release
+  delay(50);
+
+  Serial.println(F("[POWER] Button released. Sleeping now. Press to wake."));
+  Serial.flush();
+
+  esp_deep_sleep_start();
+}
+
+void handleTouchWakeButton() {
+  if (millis() < touchDetectEnableAtMs) {
+    return;
+  }
+
+  bool currentState = isTouchWakePressed();
+  unsigned long now = millis();
+
+  // LOW -> HIGH edge: touched
+  if (!touchLastState && currentState) {
+    touchPressStartMs = now;
+    Serial.println(F("[POWER] Tap pressed"));
+  }
+
+  // HIGH -> LOW edge: released
+  if (touchLastState && !currentState) {
+    if (touchPressStartMs != 0) {
+      touchPressStartMs = 0;
+      Serial.println(F("[POWER] Hold cancelled"));
+    }
+  }
+
+  // While still touched, check hold threshold
+  if (currentState && touchPressStartMs != 0 && (now - touchPressStartMs) >= touchHoldMs) {
+    touchPressStartMs = 0;
+    enterDeepSleepFromTouch();
+  }
+
+  touchLastState = currentState;
+}
+
 // ==================== Setup ====================
 void setup() {
   Serial.begin(115200);
@@ -194,8 +332,43 @@ void setup() {
   // Initialize Preferences
   preferences.begin("leor", false);
 
+  // Touch wake pin setup
+  if (TOUCH_WAKE_USE_PULLUP) {
+    pinMode(TOUCH_WAKE_PIN, INPUT_PULLUP);
+  } else {
+    pinMode(TOUCH_WAKE_PIN, INPUT);
+  }
+  // Let the pull-up settle, then seed debouncer state from the real pin level.
+  delay(10);
+  touchPressStartMs = 0;
+  touchLastState = isTouchWakePressed();
+  touchDetectEnableAtMs = millis() + 1000;
+  touchHoldMs = preferences.getUInt("touch_ms", TOUCH_HOLD_DEFAULT_MS);
+  if (touchHoldMs < 1000) touchHoldMs = 1000;
+  if (touchHoldMs > 15000) touchHoldMs = 15000;
+  esp_sleep_wakeup_cause_t wakeCause = esp_sleep_get_wakeup_cause();
+  bool isTouchWake = (wakeCause == ESP_SLEEP_WAKEUP_EXT1 ||
+                      wakeCause == ESP_SLEEP_WAKEUP_GPIO  ||
+                      wakeCause == ESP_SLEEP_WAKEUP_EXT0);
+
+  if (isTouchWake) {
+    // Chip woke because button was PRESSED (press triggered the wakeup edge).
+    // Wait 1 second then boot.
+    Serial.println(F("[POWER] Wakeup from deep sleep. Booting in 1s..."));
+    delay(1000);
+    Serial.println(F("[POWER] Starting up."));
+
+    // After wake, ignore touch for 1 second before detecting again.
+    touchPressStartMs = 0;
+    touchLastState = isTouchWakePressed();
+    touchDetectEnableAtMs = millis() + 1000;
+  }
+
+  // Sleep is always armed; no accidental re-sleep guard needed here.
+  touchSleepArmed = true;
+
   Serial.println(F("\n============================="));
-  Serial.println(F("leor v2.4 (Action Fix)"));
+  Serial.println(F("leor v3.0"));
   Serial.println(F("=============================\n"));
   
   // Check display preferences and create appropriate object
@@ -327,6 +500,9 @@ void setup() {
 
 // ==================== Main Loop ====================
 void loop() {
+  // Touch check FIRST — before any blocking work — for maximum responsiveness.
+  handleTouchWakeButton();
+
   // Handle BLE connection state
   handleBLEConnection();
   

@@ -81,6 +81,7 @@ extern uint32_t shuffleExprMaxMs;
 extern uint32_t shuffleNeutralMinMs;
 extern uint32_t shuffleNeutralMaxMs;
 extern bool shuffleNeedsInit;
+extern unsigned long touchHoldMs;
 
 // ==================== Stub functions for deprecated gesture_trainer.h features ====================
 // Edge Impulse model is pre-trained, so weight transfer functions are not needed
@@ -144,6 +145,7 @@ void printHelp() {
   Serial.println(F("  display:info - show display info"));
   Serial.println(F("\nSYSTEM:"));
   Serial.println(F("  restart/reboot - restart ESP32"));
+  Serial.println(F("  tw: - touch wake/deep sleep status"));
   Serial.println(F("\nTOGGLES:"));
   Serial.println(F("  sweat, cyclops, br (breathing)"));
   Serial.println(F("  bri=<0.01-0.2> - breathing intensity"));
@@ -512,7 +514,8 @@ String handleCommand(String cmd) {
       json += "\"bi\":" + String(preferences.getInt("bi", 3)) + ",";
       json += "\"gs\":" + String(preferences.getInt("gs", 6)) + ",";
       json += "\"os\":" + String(preferences.getInt("os", 12)) + ",";
-      json += "\"ss\":" + String(preferences.getInt("ss", 10));
+      json += "\"ss\":" + String(preferences.getInt("ss", 10)) + ",";
+      json += "\"td\":" + String(preferences.getUInt("touch_ms", 3000));
       json += "},\"display\":{";
       json += "\"type\":\"" + preferences.getString("disp_type", "sh1106") + "\",";
       json += "\"addr\":\"0x" + String(preferences.getUInt("disp_addr", I2C_ADDRESS), HEX) + "\"";
@@ -566,6 +569,11 @@ String handleCommand(String cmd) {
         } else if (key == "ss") {
           MOCHI_CALL_VOID(setSquishSpeed, (float)value);
           preferences.putInt("ss", value);
+        } else if (key == "td") {
+          if (value < 1000) value = 1000;
+          if (value > 15000) value = 15000;
+          touchHoldMs = (unsigned long)value;
+          preferences.putUInt("touch_ms", touchHoldMs);
         }
       }
       idx = commaPos + 1;
@@ -673,6 +681,15 @@ String handleCommand(String cmd) {
     setBLELowPowerMode(val == 1);
     preferences.putBool("ble_lp", val == 1);
     return "ble:lp=" + String(val == 1 ? "1" : "0");
+  }
+
+  // ==================== TOUCH POWER COMMANDS ====================
+  // tw: = get touch wake/deep sleep status
+  else if (cmd == "tw:") {
+    String resp = "tw:pin=" + String(TOUCH_WAKE_PIN);
+    resp += " active=" + String(TOUCH_WAKE_ACTIVE_LEVEL == 0 ? "low" : "high");
+    resp += " hold=" + String(touchHoldMs) + "ms";
+    return resp;
   }
 
   // ==================== EXPRESSION SHUFFLE (short: sh:, long: shuffle:) ====================

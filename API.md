@@ -76,6 +76,7 @@ For quick help on a connected device, send the `help` command (prints to serial)
   - `gs` gaze speed
   - `os` openness speed
   - `ss` squish speed
+  - `td` touch long-hold delay in ms (300-3000) for deep sleep
 
 Examples:
 - `s:ew=36,eh=36`
@@ -97,6 +98,10 @@ Examples:
 ## BLE power
 - ble: — Get BLE power/low-power status. Example response: `ble:lp=1`.
 - ble:lp=1 / ble:lp=0 — Set BLE low power mode. Returns current setting.
+
+## Touch power
+- tw: — Get touch wake/deep sleep status (`pin`, active level, and hold delay).
+- Set hold delay via settings command: `s:td=3000` (range 300–3000ms).
 
 ## Expression shuffle (sh: or shuffle:)
 - sh: / shuffle: with comma-separated tokens:

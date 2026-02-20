@@ -59,4 +59,12 @@ const char* BLE_DEVICE_NAME = "Leor2";
 #define BLINK_INTERVAL 3          // Base interval in seconds
 #define BLINK_VARIATION 3         // Random variation in seconds
 
+// ==================== Touch Wake / Deep Sleep ====================
+// Use a digital touch/button signal pin to enter deep sleep and wake up.
+// Default wiring assumes touch module outputs HIGH when touched.
+#define TOUCH_WAKE_PIN 0
+#define TOUCH_WAKE_ACTIVE_LEVEL 1      // 0 = LOW is pressed, 1 = HIGH is pressed
+#define TOUCH_WAKE_USE_PULLUP false
+#define TOUCH_HOLD_DEFAULT_MS 3000     // Long-touch hold duration (max 3s via WebUI)
+
 #endif // CONFIG_H

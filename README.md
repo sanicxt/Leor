@@ -103,6 +103,7 @@ graph TD
 | **GND** | Ground | GND |
 | **GPIO 8** | I2C SDA | SDA |
 | **GPIO 9** | I2C SCL | SCL |
+| **GPIO 2** | Touch wake input | Digital touch/button output |
 
 ---
 
