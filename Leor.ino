@@ -267,6 +267,9 @@ void enterDeepSleepFromTouch() {
     rtc_gpio_pulldown_en((gpio_num_t)TOUCH_WAKE_PIN);
     rtc_gpio_pullup_dis((gpio_num_t)TOUCH_WAKE_PIN);
   }
+  // Lock the GPIO pull state so it survives sleep entry.
+  // On ESP32-C3 (no RTC_PERIPH domain), without hold the pull resets and pin floats -> instant wake.
+  rtc_gpio_hold_en((gpio_num_t)TOUCH_WAKE_PIN);
 
   // Wait for the button to be released BEFORE sleeping.
   // If we sleep while the pin is still at the active level, EXT1 fires instantly.
@@ -331,6 +334,9 @@ void setup() {
   
   // Initialize Preferences
   preferences.begin("leor", false);
+
+  // Release GPIO hold from previous deep sleep (hold persists through reset).
+  rtc_gpio_hold_dis((gpio_num_t)TOUCH_WAKE_PIN);
 
   // Touch wake pin setup
   if (TOUCH_WAKE_USE_PULLUP) {
