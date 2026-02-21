@@ -67,4 +67,10 @@ const char* BLE_DEVICE_NAME = "Leor2";
 #define TOUCH_WAKE_USE_PULLUP false
 #define TOUCH_HOLD_DEFAULT_MS 3000     // Long-touch hold duration (max 3s via WebUI)
 
+// ==================== Power Control (PNP Transistor) ====================
+// PNP transistor base connected to this pin.
+// LOW  → transistor ON  → peripheral power rail energized (normal operation)
+// HIGH → transistor OFF → peripheral power rail cut (deep sleep)
+#define PWR_CTRL_PIN 1
+
 #endif // CONFIG_H

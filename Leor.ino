@@ -240,6 +240,11 @@ void enterDeepSleepFromTouch() {
   // --- 3. Release the I2C bus so SDA/SCL float ---
   Wire.end();
 
+  // --- 3b. Cut peripheral power: drive PNP base HIGH → transistor OFF ---
+  // Lock the level with hold so it survives sleep entry on ESP32-C3.
+  rtc_gpio_set_level((gpio_num_t)PWR_CTRL_PIN, 1);
+  rtc_gpio_hold_en((gpio_num_t)PWR_CTRL_PIN);
+
   // --- 4. Stop BLE advertising ---
   // deinit() crashes if the stack is active; deep sleep cuts the radio anyway.
   NimBLEDevice::getAdvertising()->stop();
@@ -334,6 +339,15 @@ void setup() {
   
   // Initialize Preferences
   preferences.begin("leor", false);
+
+  // Power on peripherals via PNP transistor (GPIO1 LOW = base low = transistor conducts).
+  // Must happen before Wire.begin() so OLED/IMU have a stable supply.
+  // Release any hold that may have been set during the previous deep sleep.
+  rtc_gpio_hold_dis((gpio_num_t)PWR_CTRL_PIN);
+  rtc_gpio_init((gpio_num_t)PWR_CTRL_PIN);
+  rtc_gpio_set_direction((gpio_num_t)PWR_CTRL_PIN, RTC_GPIO_MODE_OUTPUT_ONLY);
+  rtc_gpio_set_level((gpio_num_t)PWR_CTRL_PIN, 0); // LOW → PNP ON → peripherals powered
+  delay(20); // Allow supply rail to stabilize
 
   // Release GPIO hold from previous deep sleep (hold persists through reset).
   rtc_gpio_hold_dis((gpio_num_t)TOUCH_WAKE_PIN);
