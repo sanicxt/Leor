@@ -8,6 +8,7 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+#include <ArduinoJson.h>
 #include "MochiEyes.h"
 #include "ei_gesture.h"
 
@@ -92,12 +93,15 @@ inline void setGestureLabel(int index, const char* name, const char* action) { /
 inline void clearAllGestures() { /* no-op */ }
 inline String listGestures() { 
     // Return Edge Impulse model classes WITH action mappings
-    String json = "[";
+    JsonDocument doc;
+    JsonArray arr = doc.to<JsonArray>();
     for (int i = 0; i < EI_CLASSIFIER_LABEL_COUNT; i++) {
-        if (i > 0) json += ",";
-        json += "{\"n\":\"" + String(ei_classifier_inferencing_categories[i]) + "\",\"a\":\"" + getGestureAction(i) + "\"}";
+        JsonObject obj = arr.add<JsonObject>();
+        obj["n"] = ei_classifier_inferencing_categories[i];
+        obj["a"] = getGestureAction(i);
     }
-    json += "]";
+    String json;
+    serializeJson(doc, json);
     return json;
 }
 inline bool isTraining() { return false; }  // EI model is pre-trained
@@ -503,26 +507,70 @@ String handleCommand(String cmd) {
     
     // If empty params, return current settings as JSON for robust sync
     if (params.length() == 0) {
-      String json = "{\"type\":\"sync\",\"settings\":{";
-      json += "\"ew\":" + String(preferences.getInt("ew", 36)) + ",";
-      json += "\"eh\":" + String(preferences.getInt("eh", 36)) + ",";
-      json += "\"es\":" + String(preferences.getInt("es", 10)) + ",";
-      json += "\"er\":" + String(preferences.getInt("er", 8)) + ",";
-      json += "\"mw\":" + String(preferences.getInt("mw", 20)) + ",";
-      json += "\"lt\":" + String(preferences.getInt("lt", 1000)) + ",";
-      json += "\"vt\":" + String(preferences.getInt("vt", 2000)) + ",";
-      json += "\"bi\":" + String(preferences.getInt("bi", 3)) + ",";
-      json += "\"gs\":" + String(preferences.getInt("gs", 6)) + ",";
-      json += "\"os\":" + String(preferences.getInt("os", 12)) + ",";
-      json += "\"ss\":" + String(preferences.getInt("ss", 10)) + ",";
-      json += "\"td\":" + String(preferences.getUInt("touch_ms", 3000));
-      json += "},\"display\":{";
-      json += "\"type\":\"" + preferences.getString("disp_type", "sh1106") + "\",";
-      json += "\"addr\":\"0x" + String(preferences.getUInt("disp_addr", I2C_ADDRESS), HEX) + "\"";
-      json += "},\"state\":{";
-      json += "\"shuf\":" + String(shuffleEnabled ? "1" : "0") + ",";
-      json += "\"mpu\":" + String(mpuVerbose ? "1" : "0");
-      json += "}}";
+      JsonDocument doc;
+      doc["type"] = "sync";
+
+      // Appearance settings
+      JsonObject settings = doc["settings"].to<JsonObject>();
+      settings["ew"] = preferences.getInt("ew", 36);
+      settings["eh"] = preferences.getInt("eh", 36);
+      settings["es"] = preferences.getInt("es", 10);
+      settings["er"] = preferences.getInt("er", 8);
+      settings["mw"] = preferences.getInt("mw", 20);
+      settings["lt"] = preferences.getInt("lt", 1000);
+      settings["vt"] = preferences.getInt("vt", 2000);
+      settings["bi"] = preferences.getInt("bi", 3);
+      settings["gs"] = preferences.getInt("gs", 6);
+      settings["os"] = preferences.getInt("os", 12);
+      settings["ss"] = preferences.getInt("ss", 10);
+      settings["td"] = preferences.getUInt("touch_ms", 3000);
+      settings["wp"] = preferences.getUInt("wake_pin", TOUCH_WAKE_PIN);
+      settings["pp"] = preferences.getUInt("pwr_pin",  PWR_CTRL_PIN);
+
+      // Display
+      JsonObject disp = doc["display"].to<JsonObject>();
+      disp["type"] = preferences.getString("disp_type", "sh1106");
+      char addrBuf[7];
+      snprintf(addrBuf, sizeof(addrBuf), "0x%02X", preferences.getUInt("disp_addr", I2C_ADDRESS));
+      disp["addr"] = addrBuf;
+
+      // State flags
+      JsonObject state = doc["state"].to<JsonObject>();
+      state["shuf"] = shuffleEnabled ? 1 : 0;
+      state["mpu"]  = mpuVerbose ? 1 : 0;
+
+      // Shuffle timings (seconds)
+      JsonObject shuffle = doc["shuffle"].to<JsonObject>();
+      shuffle["emin"] = (int)(shuffleExprMinMs / 1000);
+      shuffle["emax"] = (int)(shuffleExprMaxMs / 1000);
+      shuffle["nmin"] = (int)(shuffleNeutralMinMs / 1000);
+      shuffle["nmax"] = (int)(shuffleNeutralMaxMs / 1000);
+
+      // Breathing
+      JsonObject breathing = doc["breathing"].to<JsonObject>();
+      breathing["on"] = MOCHI_GET(getBreathingEnabled) ? 1 : 0;
+      breathing["i"]  = serialized(String(MOCHI_GET(getBreathingIntensity), 2));
+      breathing["s"]  = serialized(String(MOCHI_GET(getBreathingSpeed), 2));
+
+      // BLE power
+      JsonObject ble = doc["ble"].to<JsonObject>();
+      ble["lp"] = getBLELowPowerMode() ? 1 : 0;
+
+      // Gesture recognition
+      JsonObject gesture = doc["gesture"].to<JsonObject>();
+      gesture["gm"] = ei_matching_enabled ? 1 : 0;
+      gesture["rt"] = (int)GESTURE_REACTION_MS;
+      gesture["cf"] = (int)(ei_confidence_threshold * 100);
+      gesture["cd"] = (int)ei_cooldown_ms;
+      JsonArray gmap = gesture["map"].to<JsonArray>();
+      for (int i = 0; i < EI_CLASSIFIER_LABEL_COUNT; i++) {
+        JsonObject g = gmap.add<JsonObject>();
+        g["n"] = ei_classifier_inferencing_categories[i];
+        g["a"] = getGestureAction(i);
+      }
+
+      String json;
+      serializeJson(doc, json);
       return json;
     }
     
@@ -574,6 +622,16 @@ String handleCommand(String cmd) {
           if (value > 15000) value = 15000;
           touchHoldMs = (unsigned long)value;
           preferences.putUInt("touch_ms", touchHoldMs);
+        } else if (key == "wp") {
+          // Wake pin - must be an RTC-capable GPIO (0-5 on ESP32-C3). Requires restart.
+          if (value >= 0 && value <= 5) {
+            preferences.putUInt("wake_pin", (uint32_t)value);
+          }
+        } else if (key == "pp") {
+          // Power control pin - must be an RTC-capable GPIO (0-5 on ESP32-C3). Requires restart.
+          if (value >= 0 && value <= 5) {
+            preferences.putUInt("pwr_pin", (uint32_t)value);
+          }
         }
       }
       idx = commaPos + 1;

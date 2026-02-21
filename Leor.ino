@@ -108,6 +108,76 @@ void drawCalibrationScreen(int progress, const char* status) {
     }
 }
 
+// OTA progress screen  (called from BLE task via callback — keep it fast)
+// pct: 0-99 = receiving with progress bar; 100 = success; negative = error/no bar
+void drawOtaScreen(int pct, const char* line1, const char* line2) {
+    uint16_t W = (activeDisplayType == DISP_SSD1306) ? SSD1306_WHITE : SH110X_WHITE;
+
+    #define OTA_DRAW(d) \
+    do { \
+        (d)->clearDisplay(); \
+        /* ═══ Title bar ═══ */ \
+        const char* title = line1 ? line1 : "OTA UPDATE"; \
+        int16_t tw = (int16_t)strlen(title) * 6; \
+        (d)->setTextSize(1); \
+        (d)->setTextColor(W); \
+        (d)->setCursor((128 - tw) / 2, 2); \
+        (d)->print(title); \
+        (d)->drawFastHLine(0, 12, 128, W); \
+        \
+        /* ═══ Status text ═══ */ \
+        if (line2) { \
+            int16_t sw = (int16_t)strlen(line2) * 6; \
+            (d)->setCursor((128 - sw) / 2, 16); \
+            (d)->print(line2); \
+        } \
+        \
+        /* ═══ Progress bar (thick, rounded) ═══ */ \
+        if (pct >= 0) { \
+            int16_t barX = 4, barY = 28, barW = 120, barH = 14; \
+            (d)->drawRoundRect(barX, barY, barW, barH, 3, W); \
+            int fill = (int)((long)(pct) * (barW - 4) / 100); \
+            if (fill > 0) { \
+                (d)->fillRoundRect(barX + 2, barY + 2, fill, barH - 4, 2, W); \
+            } \
+            /* Percentage centered on the bar */ \
+            char _pb[5]; snprintf(_pb, sizeof(_pb), "%d%%", pct); \
+            int16_t px = (128 - (int16_t)strlen(_pb) * 6) / 2; \
+            (d)->setCursor(px, barY + 3); \
+            /* Invert text color where bar is filled for readability */ \
+            (d)->setTextColor(pct > 40 ? 0 : W); \
+            (d)->print(_pb); \
+            (d)->setTextColor(W); \
+        } \
+        \
+        /* ═══ Bottom info line ═══ */ \
+        if (pct >= 0 && pct < 100) { \
+            /* Animated dots to show activity */ \
+            int dots = (millis() / 400) % 4; \
+            char dotStr[5] = "   "; \
+            for (int _d = 0; _d < dots; _d++) dotStr[_d] = '.'; \
+            (d)->setCursor(4, 48); \
+            (d)->print(F("Flashing")); \
+            (d)->print(dotStr); \
+        } else if (pct == 100) { \
+            /* Success checkmark */ \
+            (d)->setCursor(40, 50); \
+            (d)->setTextSize(1); \
+            (d)->print(F("Rebooting...")); \
+        } \
+        \
+        (d)->display(); \
+    } while (0)
+
+    if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
+        OTA_DRAW(display_ssd1306);
+    } else if (display_sh1106) {
+        OTA_DRAW(display_sh1106);
+    }
+
+    #undef OTA_DRAW
+}
+
 // Calibrate IMU with OLED display
 void calibrateIMU() {
     Serial.println(F("  Calibrating IMU (keep still)..."));
@@ -190,13 +260,18 @@ bool mpuVerbose = false;
 unsigned long touchHoldMs = TOUCH_HOLD_DEFAULT_MS;
 bool touchSleepArmed = false;
 
+// Runtime-configurable GPIO pins (loaded from preferences at boot, default from config.h)
+// Only ESP32-C3 RTC-capable GPIOs (0-5) can be used for deep-sleep wake / hold.
+uint8_t runtimeTouchPin = TOUCH_WAKE_PIN;
+uint8_t runtimePwrPin   = PWR_CTRL_PIN;
+
 // Touch detection state (simple hold timer)
 static unsigned long touchPressStartMs = 0;
 static bool touchLastState = false;
 static unsigned long touchDetectEnableAtMs = 0;
 
 inline bool isTouchWakePressed() {
-  int pinState = digitalRead(TOUCH_WAKE_PIN);
+  int pinState = digitalRead(runtimeTouchPin);
   return (TOUCH_WAKE_ACTIVE_LEVEL == 0) ? (pinState == LOW) : (pinState == HIGH);
 }
 
@@ -242,8 +317,8 @@ void enterDeepSleepFromTouch() {
 
   // --- 3b. Cut peripheral power: drive PNP base HIGH → transistor OFF ---
   // Lock the level with hold so it survives sleep entry on ESP32-C3.
-  rtc_gpio_set_level((gpio_num_t)PWR_CTRL_PIN, 1);
-  rtc_gpio_hold_en((gpio_num_t)PWR_CTRL_PIN);
+  rtc_gpio_set_level((gpio_num_t)runtimePwrPin, 1);
+  rtc_gpio_hold_en((gpio_num_t)runtimePwrPin);
 
   // --- 4. Stop BLE advertising ---
   // deinit() crashes if the stack is active; deep sleep cuts the radio anyway.
@@ -258,7 +333,7 @@ void enterDeepSleepFromTouch() {
   // This way releasing the button does NOT immediately wake the chip.
   // The user must press the button again to turn on.
   esp_sleep_enable_ext1_wakeup_io(
-    (1ULL << TOUCH_WAKE_PIN),
+    (1ULL << runtimeTouchPin),
     (TOUCH_WAKE_ACTIVE_LEVEL == 0) ? ESP_EXT1_WAKEUP_ANY_LOW : ESP_EXT1_WAKEUP_ANY_HIGH
   );
 
@@ -266,15 +341,15 @@ void enterDeepSleepFromTouch() {
   //   Active-LOW  (wake on LOW)  → hold HIGH with pullup
   //   Active-HIGH (wake on HIGH) → hold LOW  with pulldown
   if (TOUCH_WAKE_ACTIVE_LEVEL == 0) {
-    rtc_gpio_pullup_en((gpio_num_t)TOUCH_WAKE_PIN);
-    rtc_gpio_pulldown_dis((gpio_num_t)TOUCH_WAKE_PIN);
+    rtc_gpio_pullup_en((gpio_num_t)runtimeTouchPin);
+    rtc_gpio_pulldown_dis((gpio_num_t)runtimeTouchPin);
   } else {
-    rtc_gpio_pulldown_en((gpio_num_t)TOUCH_WAKE_PIN);
-    rtc_gpio_pullup_dis((gpio_num_t)TOUCH_WAKE_PIN);
+    rtc_gpio_pulldown_en((gpio_num_t)runtimeTouchPin);
+    rtc_gpio_pullup_dis((gpio_num_t)runtimeTouchPin);
   }
   // Lock the GPIO pull state so it survives sleep entry.
   // On ESP32-C3 (no RTC_PERIPH domain), without hold the pull resets and pin floats -> instant wake.
-  rtc_gpio_hold_en((gpio_num_t)TOUCH_WAKE_PIN);
+  rtc_gpio_hold_en((gpio_num_t)runtimeTouchPin);
 
   // Wait for the button to be released BEFORE sleeping.
   // If we sleep while the pin is still at the active level, EXT1 fires instantly.
@@ -340,23 +415,31 @@ void setup() {
   // Initialize Preferences
   preferences.begin("leor", false);
 
-  // Power on peripherals via PNP transistor (GPIO1 LOW = base low = transistor conducts).
+  // Load runtime-configurable pin numbers (saved by WebUI; fallback to compile-time defaults).
+  runtimeTouchPin = (uint8_t)preferences.getUInt("wake_pin", TOUCH_WAKE_PIN);
+  runtimePwrPin   = (uint8_t)preferences.getUInt("pwr_pin",  PWR_CTRL_PIN);
+
+  // Verify OTA boot: if this is the first boot after a BLE OTA update, mark it valid.
+  // If not called, the bootloader will roll back to the previous firmware on next reboot.
+  otaVerifyBootAndMark();
+
+  // Power on peripherals via PNP transistor (runtimePwrPin LOW = base low = transistor conducts).
   // Must happen before Wire.begin() so OLED/IMU have a stable supply.
   // Release any hold that may have been set during the previous deep sleep.
-  rtc_gpio_hold_dis((gpio_num_t)PWR_CTRL_PIN);
-  rtc_gpio_init((gpio_num_t)PWR_CTRL_PIN);
-  rtc_gpio_set_direction((gpio_num_t)PWR_CTRL_PIN, RTC_GPIO_MODE_OUTPUT_ONLY);
-  rtc_gpio_set_level((gpio_num_t)PWR_CTRL_PIN, 0); // LOW → PNP ON → peripherals powered
+  rtc_gpio_hold_dis((gpio_num_t)runtimePwrPin);
+  rtc_gpio_init((gpio_num_t)runtimePwrPin);
+  rtc_gpio_set_direction((gpio_num_t)runtimePwrPin, RTC_GPIO_MODE_OUTPUT_ONLY);
+  rtc_gpio_set_level((gpio_num_t)runtimePwrPin, 0); // LOW → PNP ON → peripherals powered
   delay(20); // Allow supply rail to stabilize
 
   // Release GPIO hold from previous deep sleep (hold persists through reset).
-  rtc_gpio_hold_dis((gpio_num_t)TOUCH_WAKE_PIN);
+  rtc_gpio_hold_dis((gpio_num_t)runtimeTouchPin);
 
   // Touch wake pin setup
   if (TOUCH_WAKE_USE_PULLUP) {
-    pinMode(TOUCH_WAKE_PIN, INPUT_PULLUP);
+    pinMode(runtimeTouchPin, INPUT_PULLUP);
   } else {
-    pinMode(TOUCH_WAKE_PIN, INPUT);
+    pinMode(runtimeTouchPin, INPUT);
   }
   // Let the pull-up settle, then seed debouncer state from the real pin level.
   delay(10);
@@ -447,6 +530,9 @@ void setup() {
   Serial.print(F(" @ 0x"));
   Serial.print(savedDispAddr, HEX);
   Serial.println(F(")"));
+
+  // Register OTA display callback so ota_manager.h can update the OLED
+  setOtaDisplayCallback(drawOtaScreen);
   
   // Load settings from Preferences
   int ew = preferences.getInt("ew", 36);
@@ -520,8 +606,17 @@ void setup() {
 
 // ==================== Main Loop ====================
 void loop() {
-  // Touch check FIRST — before any blocking work — for maximum responsiveness.
-  handleTouchWakeButton();
+  // Touch check FIRST — but SKIP during OTA to prevent accidental deep sleep.
+  if (!isOtaInProgress()) {
+    handleTouchWakeButton();
+  }
+
+  // During OTA the BLE task owns I2C/display — skip all rendering to avoid conflicts.
+  if (isOtaInProgress()) {
+    otaCheckReboot();  // handles deferred reboot after successful OTA
+    delay(10);
+    return;
+  }
 
   // Handle BLE connection state
   handleBLEConnection();

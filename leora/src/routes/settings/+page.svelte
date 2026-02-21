@@ -6,6 +6,7 @@
     import GestureManager from "$lib/components/GestureManager.svelte";
     import GestureSettings from "$lib/components/GestureSettings.svelte";
     import PowerSettings from "$lib/components/PowerSettings.svelte";
+    import OtaPanel from "$lib/components/OtaPanel.svelte";
     import { base } from "$app/paths";
     import MasterBackground from "$lib/components/MasterBackground.svelte";
 </script>
@@ -71,6 +72,10 @@
 
         <section>
             <PowerSettings />
+        </section>
+
+        <section>
+            <OtaPanel />
         </section>
 
         <!-- About Section -->

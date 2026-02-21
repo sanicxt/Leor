@@ -27,6 +27,8 @@
   import GestureSettings from "$lib/components/GestureSettings.svelte";
   import PowerSettings from "$lib/components/PowerSettings.svelte";
   import BreathingControl from "$lib/components/BreathingControl.svelte";
+  import OtaPanel from "$lib/components/OtaPanel.svelte";
+  import { base } from "$app/paths";
 
   import {
     getConnected,
@@ -426,6 +428,10 @@
         <div in:fly={{ y: 20, duration: 300 }} class="max-w-4xl mx-auto">
           <GestureManager />
         </div>
+      {:else if activeTab === "ota"}
+        <div in:fly={{ y: 20, duration: 300 }} class="max-w-2xl mx-auto">
+          <OtaPanel />
+        </div>
       {/if}
 
       <!-- Bottom Spacer for Tabs -->
@@ -444,6 +450,7 @@
           { id: "home", title: "Home" },
           { id: "settings", title: "Settings" },
           { id: "gestures", title: "Gestures" },
+          { id: "ota", title: "Update" },
         ]}
       />
     </div>

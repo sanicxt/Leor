@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include "config.h"
+#include "ota_manager.h"
 
 // Implemented in commands.h
 String handleCommand(String cmd);
@@ -263,7 +264,8 @@ void initBLE(const char* deviceName) {
   Serial.println(F("Initializing NimBLE..."));
   
   NimBLEDevice::init(deviceName);
-  
+  NimBLEDevice::setMTU(512); // negotiate up to 512-byte ATT MTU for faster OTA
+
   pServer = NimBLEDevice::createServer();
   if (!pServer) {
     Serial.println(F("✗ Failed to create BLE server!"));
@@ -306,9 +308,13 @@ void initBLE(const char* deviceName) {
 
   pService->start();
 
+  // Register OTA firmware update service on its own service UUID.
+  initOTAService(pServer);
+
   NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
   pAdvertising->setName(deviceName);
   pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->addServiceUUID(OTA_SERVICE_UUID);
   pAdvertising->enableScanResponse(true);
   
   pAdvertising->start();

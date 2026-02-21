@@ -4,9 +4,18 @@
         bleState,
         getSettingsTd,
         setSettingsTd,
+        getSettingsWp,
+        setSettingsWp,
+        getSettingsPp,
+        setSettingsPp,
     } from "$lib/ble.svelte";
 
     let touchHoldDelay = $derived(getSettingsTd());
+    let wakePin = $derived(getSettingsWp());
+    let pwrPin = $derived(getSettingsPp());
+
+    // ESP32-C3 RTC-capable GPIO pins (0-5)
+    const rtcPins = [0, 1, 2, 3, 4, 5];
 
     async function toggleLowPowerMode() {
         const newVal = !bleState.bleLowPowerMode;
@@ -17,6 +26,27 @@
     async function updateTouchHoldDelay(value: number) {
         setSettingsTd(value);
         await sendCommand(`s:td=${value}`);
+    }
+
+    async function updateWakePin(value: number) {
+        setSettingsWp(value);
+        await sendCommand(`s:wp=${value}`);
+    }
+
+    async function updatePwrPin(value: number) {
+        setSettingsPp(value);
+        await sendCommand(`s:pp=${value}`);
+    }
+
+    let rebooting = $state(false);
+
+    async function rebootDevice() {
+        rebooting = true;
+        await sendCommand("restart");
+        // Device disconnects on reboot; show spinner briefly
+        setTimeout(() => {
+            rebooting = false;
+        }, 3000);
     }
 </script>
 
@@ -101,6 +131,138 @@
             <span>1s</span>
             <span>15s</span>
         </div>
+    </div>
+
+    <!-- Pin Configuration -->
+    <div class="mt-3 p-4 bg-white/5 rounded-xl border border-white/5 space-y-4">
+        <div class="flex items-center gap-3 mb-1">
+            <div
+                class="w-10 h-10 rounded-lg bg-sky-500/20 flex items-center justify-center"
+            >
+                <svg
+                    class="w-5 h-5 text-sky-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"
+                    />
+                </svg>
+            </div>
+            <div>
+                <div class="text-white font-medium text-sm">
+                    GPIO Pin Assignment
+                </div>
+                <div class="text-zinc-500 text-xs">
+                    RTC-capable only (0–5) · Restart required
+                </div>
+            </div>
+        </div>
+
+        <!-- Wake Pin -->
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="text-zinc-300 text-sm">Touch / Wake pin</div>
+                <div class="text-zinc-500 text-xs">
+                    Active-HIGH touch module input
+                </div>
+            </div>
+            <div class="flex gap-1">
+                {#each rtcPins as pin}
+                    <button
+                        class="w-8 h-8 rounded-lg text-xs font-mono font-bold transition-all
+                            {wakePin === pin
+                            ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/30'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}
+                            disabled:opacity-50"
+                        onclick={() => updateWakePin(pin)}
+                        disabled={!bleState.connected || pin === pwrPin}
+                        >{pin}</button
+                    >
+                {/each}
+            </div>
+        </div>
+
+        <!-- Power Control Pin -->
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="text-zinc-300 text-sm">Power control pin</div>
+                <div class="text-zinc-500 text-xs">
+                    PNP base · LOW=on, HIGH=off
+                </div>
+            </div>
+            <div class="flex gap-1">
+                {#each rtcPins as pin}
+                    <button
+                        class="w-8 h-8 rounded-lg text-xs font-mono font-bold transition-all
+                            {pwrPin === pin
+                            ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/30'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}
+                            disabled:opacity-50"
+                        onclick={() => updatePwrPin(pin)}
+                        disabled={!bleState.connected || pin === wakePin}
+                        >{pin}</button
+                    >
+                {/each}
+            </div>
+        </div>
+
+        <p class="text-[10px] text-amber-500/80 flex items-center gap-1">
+            <svg
+                class="w-3 h-3 shrink-0"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+                ><path
+                    fill-rule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clip-rule="evenodd"
+                /></svg
+            >
+            Changes take effect after device restart. Wake and power pins cannot
+            be the same.
+        </p>
+
+        <!-- Reboot Button -->
+        <button
+            onclick={rebootDevice}
+            disabled={!bleState.connected || rebooting}
+            class="w-full py-2.5 rounded-xl font-semibold text-sm transition-all
+                   {bleState.connected && !rebooting
+                ? 'bg-gradient-to-r from-amber-500/80 to-orange-500/80 text-white hover:opacity-90 shadow-lg shadow-amber-500/15'
+                : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}
+                   disabled:opacity-50"
+        >
+            {#if rebooting}
+                <span class="flex items-center justify-center gap-2">
+                    <svg
+                        class="w-4 h-4 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                    >
+                        <circle
+                            class="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            stroke-width="4"
+                        />
+                        <path
+                            class="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8v8z"
+                        />
+                    </svg>
+                    Rebooting...
+                </span>
+            {:else}
+                Reboot Device
+            {/if}
+        </button>
     </div>
 
     <!-- Low Power Toggle -->
