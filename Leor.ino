@@ -25,6 +25,7 @@
 #include <NimBLEDevice.h>
 #include <Preferences.h>
 #include <esp_sleep.h>
+#include "driver/gpio.h"
 #include "driver/rtc_io.h"
 
 // ==================== Configuration ====================
@@ -317,8 +318,8 @@ void enterDeepSleepFromTouch() {
 
   // --- 3b. Cut peripheral power: drive PNP base HIGH → transistor OFF ---
   // Lock the level with hold so it survives sleep entry on ESP32-C3.
-  rtc_gpio_set_level((gpio_num_t)runtimePwrPin, 1);
-  rtc_gpio_hold_en((gpio_num_t)runtimePwrPin);
+  gpio_set_level((gpio_num_t)runtimePwrPin, 1);
+  gpio_hold_en((gpio_num_t)runtimePwrPin);
 
   // --- 4. Stop BLE advertising ---
   // deinit() crashes if the stack is active; deep sleep cuts the radio anyway.
@@ -332,24 +333,24 @@ void enterDeepSleepFromTouch() {
   //   Active-HIGH button → wake on HIGH (press drives pin high)
   // This way releasing the button does NOT immediately wake the chip.
   // The user must press the button again to turn on.
-  esp_sleep_enable_ext1_wakeup_io(
+  esp_deep_sleep_enable_gpio_wakeup(
     (1ULL << runtimeTouchPin),
-    (TOUCH_WAKE_ACTIVE_LEVEL == 0) ? ESP_EXT1_WAKEUP_ANY_LOW : ESP_EXT1_WAKEUP_ANY_HIGH
+    (TOUCH_WAKE_ACTIVE_LEVEL == 0) ? ESP_GPIO_WAKEUP_GPIO_LOW : ESP_GPIO_WAKEUP_GPIO_HIGH
   );
 
   // Hold pin at the NON-active level during sleep so EXT1 doesn't fire immediately.
   //   Active-LOW  (wake on LOW)  → hold HIGH with pullup
   //   Active-HIGH (wake on HIGH) → hold LOW  with pulldown
   if (TOUCH_WAKE_ACTIVE_LEVEL == 0) {
-    rtc_gpio_pullup_en((gpio_num_t)runtimeTouchPin);
-    rtc_gpio_pulldown_dis((gpio_num_t)runtimeTouchPin);
+    gpio_pullup_en((gpio_num_t)runtimeTouchPin);
+    gpio_pulldown_dis((gpio_num_t)runtimeTouchPin);
   } else {
-    rtc_gpio_pulldown_en((gpio_num_t)runtimeTouchPin);
-    rtc_gpio_pullup_dis((gpio_num_t)runtimeTouchPin);
+    gpio_pulldown_en((gpio_num_t)runtimeTouchPin);
+    gpio_pullup_dis((gpio_num_t)runtimeTouchPin);
   }
   // Lock the GPIO pull state so it survives sleep entry.
   // On ESP32-C3 (no RTC_PERIPH domain), without hold the pull resets and pin floats -> instant wake.
-  rtc_gpio_hold_en((gpio_num_t)runtimeTouchPin);
+  gpio_hold_en((gpio_num_t)runtimeTouchPin);
 
   // Wait for the button to be released BEFORE sleeping.
   // If we sleep while the pin is still at the active level, EXT1 fires instantly.
@@ -426,14 +427,14 @@ void setup() {
   // Power on peripherals via PNP transistor (runtimePwrPin LOW = base low = transistor conducts).
   // Must happen before Wire.begin() so OLED/IMU have a stable supply.
   // Release any hold that may have been set during the previous deep sleep.
-  rtc_gpio_hold_dis((gpio_num_t)runtimePwrPin);
-  rtc_gpio_init((gpio_num_t)runtimePwrPin);
-  rtc_gpio_set_direction((gpio_num_t)runtimePwrPin, RTC_GPIO_MODE_OUTPUT_ONLY);
-  rtc_gpio_set_level((gpio_num_t)runtimePwrPin, 0); // LOW → PNP ON → peripherals powered
+  gpio_hold_dis((gpio_num_t)runtimePwrPin);
+  gpio_reset_pin((gpio_num_t)runtimePwrPin);
+  gpio_set_direction((gpio_num_t)runtimePwrPin, GPIO_MODE_OUTPUT);
+  gpio_set_level((gpio_num_t)runtimePwrPin, 0); // LOW → PNP ON → peripherals powered
   delay(20); // Allow supply rail to stabilize
 
   // Release GPIO hold from previous deep sleep (hold persists through reset).
-  rtc_gpio_hold_dis((gpio_num_t)runtimeTouchPin);
+  gpio_hold_dis((gpio_num_t)runtimeTouchPin);
 
   // Touch wake pin setup
   if (TOUCH_WAKE_USE_PULLUP) {
