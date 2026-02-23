@@ -9,29 +9,22 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <ArduinoJson.h>
-#include "MochiEyes.h"
+#include "display_manager.h"
+#include "imu_manager.h"
+#include "shuffle_manager.h"
+#include "power_manager.h"
 #include "ei_gesture.h"
+#include "ble_manager.h"
 
 // Re-define DEFAULT after Edge Impulse include (ges_inferencing.h has #undef DEFAULT)
 #ifndef DEFAULT
 #define DEFAULT 0
 #endif
 
-// Forward declaration - will be set in main sketch
-// Unified display interface supporting both SSD1306 and SH1106
-extern Adafruit_GFX* display;
-extern Adafruit_SSD1306* display_ssd1306;
-extern Adafruit_SH1106G* display_sh1106;
-
-extern DisplayType activeDisplayType;
-extern const char* DISPLAY_TYPE;
+// Preferences declared in Leor.ino
 extern Preferences preferences;
 
-// MochiEyes instances
-extern MochiEyes<Adafruit_SSD1306>* pMochiEyes_ssd1306;
-extern MochiEyes<Adafruit_SH1106G>* pMochiEyes_sh1106;
-
-// Helper functions for display-specific methods
+// Display helpers
 inline void displayClear() {
   if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
     display_ssd1306->clearDisplay();
@@ -48,16 +41,8 @@ inline void displayShow() {
   }
 }
 
-// Helper macros for MochiEyes method calls
-#define MOCHI_CALL_VOID(method, ...) \
-  do { \
-    if (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306) { \
-      pMochiEyes_ssd1306->method(__VA_ARGS__); \
-    } else if (pMochiEyes_sh1106) { \
-      pMochiEyes_sh1106->method(__VA_ARGS__); \
-    } \
-  } while(0)
-
+// NOARGS variant (not in display_manager.h)
+#ifndef MOCHI_CALL_VOID_NOARGS
 #define MOCHI_CALL_VOID_NOARGS(method) \
   do { \
     if (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306) { \
@@ -66,23 +51,7 @@ inline void displayShow() {
       pMochiEyes_sh1106->method(); \
     } \
   } while(0)
-
-#define MOCHI_GET(method) \
-  (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306 \
-    ? pMochiEyes_ssd1306->method() \
-    : (pMochiEyes_sh1106 ? pMochiEyes_sh1106->method() : 0))
-
-// MPU6050 debug logging set in main sketch
-extern bool mpuVerbose;
-
-// Random expression shuffle state set in main sketch
-extern bool shuffleEnabled;
-extern uint32_t shuffleExprMinMs;
-extern uint32_t shuffleExprMaxMs;
-extern uint32_t shuffleNeutralMinMs;
-extern uint32_t shuffleNeutralMaxMs;
-extern bool shuffleNeedsInit;
-extern unsigned long touchHoldMs;
+#endif
 
 // ==================== Stub functions for deprecated gesture_trainer.h features ====================
 // Edge Impulse model is pre-trained, so weight transfer functions are not needed

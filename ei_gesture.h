@@ -10,6 +10,10 @@
 #define EI_GESTURE_H
 
 #include <Arduino.h>
+#include <Preferences.h>
+
+// Preferences declared in Leor.ino
+extern Preferences preferences;
 
 // Edge Impulse Arduino library (renamed from ges to leor)
 #include <leor_inferencing.h>
