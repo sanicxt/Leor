@@ -116,6 +116,10 @@ void setup() {
     MOCHI_CALL_VOID(setMood, 0);
     MOCHI_CALL_VOID(setPosition, 0);
 
+    // Re-arm touch detection now that all init is done
+    // (replaces the 30s guard set in initPower so touch works immediately)
+    armTouchDetect(500);
+
     Serial.println(F("\n============================="));
     Serial.println(F("    leor Ready!"));
     Serial.println(F("============================="));

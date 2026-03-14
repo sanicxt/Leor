@@ -22,7 +22,7 @@
 
 // ==================== BLE Settings ====================
 // BLE Device Name (shown when scanning for Bluetooth devices)
-const char* BLE_DEVICE_NAME = "Leor2";
+const char* BLE_DEVICE_NAME = "Leor";
 
 // BLE Robustness Settings
 #define BLE_NOTIFY_MIN_INTERVAL_MS 20   // Minimum ms between notifications (prevent flooding)
@@ -42,6 +42,9 @@ const char* BLE_DEVICE_NAME = "Leor2";
 // ==================== Display Settings ====================
 // Display type is selected at runtime via preferences (disp_type: sh1106 or ssd1306)
 // Change via command: display:type=sh1106 or display:type=ssd1306 (requires restart)
+
+#define I2C_SDA_PIN    10  // SDA on GPIO 8
+#define I2C_SCL_PIN   7   // SCL on GPIO 10
 
 #define I2C_ADDRESS 0x3c
 #define SCREEN_WIDTH 128
@@ -72,5 +75,11 @@ const char* BLE_DEVICE_NAME = "Leor2";
 // LOW  → transistor ON  → peripheral power rail energized (normal operation)
 // HIGH → transistor OFF → peripheral power rail cut (deep sleep)
 #define PWR_CTRL_PIN 1
+
+// ==================== Built-in LED ====================
+// GPIO8 on ESP32-C3 SuperMini is a plain active-LOW LED (LOW=on, HIGH=off).
+// gpio_sleep_sel_en() + gpio_sleep_set_pull_mode(PULLUP) automatically pulls it
+// HIGH (LED off) when the chip enters deep sleep. Set to -1 to disable.
+#define BUILTIN_SLEEP_LED_PIN  8
 
 #endif // CONFIG_H

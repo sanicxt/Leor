@@ -97,6 +97,7 @@ void executeGestureAction(const String& action) {
 
 void initIMU() {
     Wire.setClock(400000);
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
     int err = IMU.init(calib, IMU_ADDRESS);
     if (err != 0) {
         Serial.print(F("IMU init error: "));

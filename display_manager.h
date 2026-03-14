@@ -217,7 +217,7 @@ void initDisplay(Preferences& preferences) {
     Serial.print(F(" @ 0x"));
     Serial.println(savedDispAddr, HEX);
 
-    Wire.begin();
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
 
     bool ok = false;
     if (activeDisplayType == DISP_SSD1306) {
