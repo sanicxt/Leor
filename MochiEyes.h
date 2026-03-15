@@ -265,6 +265,29 @@ struct RenderState {
     int16_t mouthX, mouthY, mouthW, mouthH;
     // Current border radius (may vary with squish)
     uint8_t borderRadius;
+    
+    // Dirty rect tracking for partial updates
+    int16_t minX, minY, maxX, maxY;
+    int16_t oldMinX, oldMinY, oldMaxX, oldMaxY;
+    
+    void resetDirty() {
+        minX = 1000; minY = 1000;
+        maxX = -1000; maxY = -1000;
+    }
+    
+    void expandDirty(int16_t x, int16_t y, int16_t w, int16_t h) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + w > maxX) maxX = x + w;
+        if (y + h > maxY) maxY = y + h;
+    }
+    
+    void saveOldDirty() {
+        oldMinX = minX;
+        oldMinY = minY;
+        oldMaxX = maxX;
+        oldMaxY = maxY;
+    }
 };
 
 // ============================================================================
@@ -272,13 +295,7 @@ struct RenderState {
 // ============================================================================
 
 struct AnimationTimers {
-    // Timed animations
-    float loveRemaining;
-    float cryRemaining;
-    float confusedRemaining;
-    float laughRemaining;
-    float uwuRemaining;
-    float xdRemaining;
+    // Timed animations (only mouth anims use timed completion now)
     
     // Mouth animations
     float mouthAnimRemaining;
@@ -306,13 +323,6 @@ struct AnimationTimers {
     int nextBlinkType;  // 0=normal, 1=slow, 2=fast, 3=half
     
     void reset() {
-        confusedRemaining = 0.0f;
-        loveRemaining = 0.0f;
-        cryRemaining = 0.0f;
-        laughRemaining = 0.0f;
-        uwuRemaining = 0.0f;
-        xdRemaining = 0.0f;
-        
         mouthAnimType = 0;
         
         blinkCooldown = 2.0f;
@@ -436,18 +446,18 @@ private:
             
             switch (timers.mouthAnimType) {
                 case 1: // Talk - rapid open/close with varying amplitude
-                    targets.mouthOpenness = (sinf(t * 25.0f) * 0.5f + 0.5f) * 
-                                           (0.3f + sinf(t * 5.0f) * 0.2f);
+                    targets.mouthOpenness = (sinf(t * 20.0f) * 0.4f + 0.6f) * 
+                                           (0.4f + sinf(t * 3.0f) * 0.3f);
                     break;
-                case 2: // Chew - asymmetric jaw movement
-                    targets.mouthOpenness = fabsf(sinf(t * 8.0f)) * 0.6f;
+                case 2: // Chew - softer, asymmetric jaw movement
+                    targets.mouthOpenness = fabsf(sinf(t * 6.0f)) * 0.5f + 0.1f;
                     break;
-                case 3: // Wobble - mouth position oscillates left/right
-                    // Use mouthOpenness variation to simulate wobble since we can't move mouth X
-                    targets.mouthOpenness = 0.2f + sinf(t * 12.0f) * 0.15f;
+                case 3: // Wobble - erratic variation
+                    targets.mouthOpenness = 0.3f + sinf(t * 15.0f) * 0.2f + cosf(t * 7.0f) * 0.1f;
                     break;
             }
         } else if (timers.mouthAnimType != 0) {
+            // Animation finished: cleanly reset the target
             targets.mouthOpenness = 0.0f;
             timers.mouthAnimType = 0;
         }
@@ -645,7 +655,33 @@ private:
         render.mouthX = (layout.screenW - layout.mouthWidth) / 2 + gazeOffsetX;
         render.mouthY = eyeBottom + 4;
         render.mouthW = layout.mouthWidth;
-        render.mouthH = layout.mouthHeight + (int16_t)(params.mouthOpenness * 6);
+        // Even when mouthOpenness is 0, the mouth (e.g., MOUTH_D) could draw up to ~12px tall
+        // Let's force a larger minimum tracked height for the base mouth box
+        int16_t openAdd = (int16_t)(params.mouthOpenness * 8); // matches drawMouth's 8px scale
+        render.mouthH = layout.mouthHeight + openAdd + 6; // Extra 6px to cover MOUTH_D and MOUTH_W
+        
+        // Track bounds of eyes and mouth
+        // Add padding around elements to handle rendering out-of-bounds drawing (like mouths)
+        int16_t pad = 8;
+        
+        // Include eye boundaries (even cyclops right eye is tracked safely as 0 wid/hi)
+        render.expandDirty(render.leftX - pad, render.leftY - pad, render.leftW + pad*2, render.leftH + pad*2);
+        if (!params.cyclops) {
+            render.expandDirty(render.rightX - pad, render.rightY - pad, render.rightW + pad*2, render.rightH + pad*2);
+        }
+        
+        // Expand for mouth (use larger pad since some mouths like MOUTH_D are tall)
+        render.expandDirty(render.mouthX - pad*2, render.mouthY - pad*2, render.mouthW + pad*4, render.mouthH + pad*4);
+        
+        // Expand for global effects that might cover the whole screen
+        if (params.tearProgress > 0 || params.knockedIntensity > 0.05f || params.sweatIntensity > 0.1f) {
+            render.expandDirty(0, 0, layout.screenW, layout.screenH);
+        } else if (params.love > 0.1f) {
+            // Hearts pulse and can be large, just dirty the eye regions plus upper half
+            render.expandDirty(0, 0, layout.screenW, layout.screenH);
+        } else if (params.uwuIntensity > 0.1f || params.xdIntensity > 0.1f) {
+            render.expandDirty(0, 0, layout.screenW, layout.screenH);
+        }
     }
     
     // ========================================================================
@@ -1379,12 +1415,34 @@ public:
         float dt = (now - lastFrameMs) / 1000.0f;
         lastFrameMs = now;
         
+        // Save previous frame's bounding box
+        render.saveOldDirty();
+        render.resetDirty();
+        
         updateTimers(dt);
         updateParams(dt);
         computeRenderState();
         
-        // Render
-        display->clearDisplay();
+        // Combine old and new dirty rects into the final bounding box to clear & redraw
+        int16_t clearX = min(render.minX, render.oldMinX);
+        int16_t clearY = min(render.minY, render.oldMinY);
+        int16_t clearMaxX = max(render.maxX, render.oldMaxX);
+        int16_t clearMaxY = max(render.maxY, render.oldMaxY);
+        
+        int16_t clearW = clearMaxX - clearX;
+        int16_t clearH = clearMaxY - clearY;
+        
+        // Clamp clear region globally
+        if (clearX < 0) { clearW += clearX; clearX = 0; }
+        if (clearY < 0) { clearH += clearY; clearY = 0; }
+        if (clearW > layout.screenW - clearX) clearW = layout.screenW - clearX;
+        if (clearH > layout.screenH - clearY) clearH = layout.screenH - clearY;
+
+        // Render: Only clear the dirty rect!
+        if (clearW > 0 && clearH > 0) {
+            display->fillRect(clearX, clearY, clearW, clearH, BGCOLOR);
+        }
+        
         drawEyes();
         drawEyelids();
         drawMouth();
@@ -1394,7 +1452,12 @@ public:
         drawXDOverlay();
         drawTears();
         drawKnockedOverlay();
-        display->display();
+        
+        // Push only the dirty pixels!
+        extern void pushPartialUpdate(int16_t x, int16_t y, int16_t w, int16_t h);
+        if (clearW > 0 && clearH > 0) {
+            pushPartialUpdate(clearX, clearY, clearW, clearH);
+        }
     }
     
     // ========================================================================
@@ -1468,12 +1531,9 @@ public:
         targets.openness = 1.0f;
         targets.leftOpenness = 1.0f;
         targets.rightOpenness = 1.0f;
+        targets.mouthOpenness = 0.0f;
         
         // Stop timed animations
-        timers.loveRemaining = 0.0f;
-        timers.cryRemaining = 0.0f;
-        timers.confusedRemaining = 0.0f;
-        timers.laughRemaining = 0.0f;
         timers.mouthAnimRemaining = 0.0f;
         timers.mouthAnimType = 0;
     }
@@ -1523,12 +1583,6 @@ public:
     // Helper to clear timed overlay expressions (love, cry, laugh, uwu, xd, confused)
     // Does NOT clear curious/sweat so they can coexist
     void clearTimedOverlays() {
-        timers.loveRemaining = 0.0f;
-        timers.cryRemaining = 0.0f;
-        timers.laughRemaining = 0.0f;
-        timers.uwuRemaining = 0.0f;
-        timers.xdRemaining = 0.0f;
-        timers.confusedRemaining = 0.0f;
         
         targets.knockedIntensity = 0.0f;
         targets.uwuIntensity = 0.0f;
@@ -1536,7 +1590,11 @@ public:
         targets.love = 0.0f;
         targets.fatigue = 0.0f;
         
+        // Ensure dynamic animation variables like laugh are cleared from targets
+        // The smoothing will automatically dial down params.laughIntensity
+        
         params.tearProgress = 0.0f;
+        params.laughIntensity = 0.0f; // Force clear
         params.hFlicker = 0.0f;
         params.vFlicker = 0.0f;
     }
@@ -1557,11 +1615,12 @@ public:
         params.confusedPhase = 0.0f;
         params.laughIntensity = 0.0f;
         params.laughPhase = 0.0f;
-        params.tearProgress = 0.0f;
         targets.fatigue = 0.0f;
         // Reset gaze to center so effects don't inherit position from expressions
         targets.gazeX = 0.0f;
         targets.gazeY = 0.0f;
+        // Reset mouth openness in case dynamic animations (like laugh/talk) left it open
+        targets.mouthOpenness = 0.0f;
     }
     
     void triggerLove(float durationSec = 2.0f) {
@@ -1771,14 +1830,6 @@ public:
         // Not implemented - mouth always shows
     }
     
-    void setLaughDuration(int ms) {
-        // Legacy - use triggerLaugh(seconds) instead
-    }
-    
-    void setLoveDuration(int ms) {
-        // Legacy - use triggerLove(seconds) instead
-    }
-    
     void setCuriosity(bool on) {
         if (on) {
             clearTimedOverlays();  // Clear timed effects but allow sweat to coexist
@@ -1799,9 +1850,6 @@ public:
         // Not implemented in v2 - could add later
     }
     
-    void setConfusedDuration(int ms) {}
-    void setCryDuration(int ms) {}
-    
     // Animation triggers (legacy names)
     void anim_love() { triggerLove(2.0f); }
     void anim_cry() { triggerCry(3.0f); }
@@ -1810,6 +1858,7 @@ public:
     void anim_knocked() { setKnocked(true); }
     
     void startMouthAnim(int anim, unsigned long duration) {
+        clearAllOverlays();
         // anim: 1=talk, 2=chew, 3=wobble
         timers.mouthAnimRemaining = duration / 1000.0f;
         timers.mouthAnimType = anim;

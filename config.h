@@ -50,11 +50,9 @@ const char* BLE_DEVICE_NAME = "Leor";
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
-#define FRAME_RATE 100  // FPS
-
+#define FRAME_RATE 25   // FPS
 // ==================== MPU6050 Sensor Settings ====================
-#define MPU_SAMPLE_RATE_MS 20     // Read interval in ms
-#define GESTURE_MAG_MIN 2.0f      // Min magnitude (rad/s) to start gesture sampling
+#define MPU_SAMPLE_RATE_MS 100    // Read interval in ms (10Hz)#define GESTURE_MAG_MIN 2.0f      // Min magnitude (rad/s) to start gesture sampling
 #define GESTURE_COOLDOWN_MS 1500  // Cooldown after gesture match before next detection
 // Note: GESTURE_REACTION_MS is now a modifiable variable in pio.ino
 

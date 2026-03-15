@@ -23,6 +23,7 @@
 #include <Adafruit_GFX.h>
 #include <NimBLEDevice.h>
 #include <Preferences.h>
+#include <queue>
 
 // ==================== Modules ====================
 #include "config.h"
@@ -34,10 +35,42 @@
 #include "ble_manager.h"        // NimBLE BLE stack
 #include "commands.h"           // Command parser
 #include "ei_gesture.h"         // Edge Impulse gesture inference
+#include "esp_pm.h"             // ESP32 power management
 
 // ==================== Globals ====================
 Preferences preferences;
 static String inputBuffer = "";
+
+// ==================== BLE Command Queue ====================
+std::queue<String> bleCommandQueue;
+SemaphoreHandle_t bleCommandMutex = NULL;
+
+void enqueueBleCommand(String cmd) {
+    if (bleCommandMutex && xSemaphoreTake(bleCommandMutex, portMAX_DELAY)) {
+        bleCommandQueue.push(cmd);
+        xSemaphoreGive(bleCommandMutex);
+    }
+}
+
+void processBleCommands() {
+    String cmd = "";
+    if (bleCommandMutex && xSemaphoreTake(bleCommandMutex, 0)) {
+        if (!bleCommandQueue.empty()) {
+            cmd = bleCommandQueue.front();
+            bleCommandQueue.pop();
+        }
+        xSemaphoreGive(bleCommandMutex);
+    }
+    
+    if (cmd.length() > 0) {
+        String response = handleCommand(cmd);
+        if (response.length() > 0) {
+            // sendBLEStatus is in ble_manager.h
+            extern void sendBLEStatus(const String&);
+            sendBLEStatus(response);
+        }
+    }
+}
 
 // ==================== Serial Input ====================
 void handleSerialInput() {
@@ -59,6 +92,17 @@ void setup() {
     Serial.begin(115200);
     delay(250);
     randomSeed((uint32_t)micros());
+    
+    // Initialize mutex for BLE command queue
+    bleCommandMutex = xSemaphoreCreateMutex();
+
+    // Enable Automatic Light Sleep
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz = 80,
+        .min_freq_mhz = 10,
+        .light_sleep_enable = true
+    };
+    esp_pm_configure(&pm_config);
 
     preferences.begin("leor", false);
 
@@ -81,8 +125,6 @@ void setup() {
     int es = preferences.getInt("es", 10);
     int er = preferences.getInt("er", 8);
     int mw = preferences.getInt("mw", 20);
-    int lt = preferences.getInt("lt", 1000);
-    int vt = preferences.getInt("vt", 2000);
     int bi = preferences.getInt("bi", 3);
 
     MOCHI_CALL_VOID(setWidth, ew, ew);
@@ -90,8 +132,6 @@ void setup() {
     MOCHI_CALL_VOID(setSpacebetween, es);
     MOCHI_CALL_VOID(setBorderradius, er, er);
     MOCHI_CALL_VOID(setMouthSize, mw, 6);
-    MOCHI_CALL_VOID(setLaughDuration, lt);
-    MOCHI_CALL_VOID(setLoveDuration, vt);
     MOCHI_CALL_VOID(setAutoblinker, true, (float)bi, (float)BLINK_VARIATION);
 
     // 5. Load breathing settings
@@ -168,4 +208,10 @@ void loop() {
 
     // Serial commands
     handleSerialInput();
+    
+    // Process queued BLE commands (prevents race conditions with MochiEyes)
+    processBleCommands();
+
+    // Yield to FreeRTOS to allow automatic light sleep
+    vTaskDelay(pdMS_TO_TICKS(5));
 }

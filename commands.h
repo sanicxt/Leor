@@ -162,104 +162,88 @@ String handleCommand(String cmd) {
   Serial.print(F("> "));
   Serial.println(cmd);
 
+  // Helper macro to encapsulate standard expression state transitions
+  #define SET_EXPRESSION(mood_val, pos_val, mouth_val) \
+    do { \
+      resetEffects(); \
+      if ((mood_val) >= 0) MOCHI_CALL_VOID(setMood, mood_val); \
+      if ((pos_val) >= 0) MOCHI_CALL_VOID(setPosition, pos_val); \
+      if ((mouth_val) >= 0) MOCHI_CALL_VOID(setMouthType, mouth_val); \
+    } while(0)
+
   // ==================== EXPRESSIONS ====================
   if (cmd == "happy") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, HAPPY);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
+    SET_EXPRESSION(HAPPY, DEFAULT, 1);
     MOCHI_CALL_VOID_NOARGS(anim_laugh);
-    MOCHI_CALL_VOID(setMouthType, 1);
     Serial.println(F("Expression: Happy"));
   }
   else if (cmd == "sad") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, TIRED);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 2);
+    SET_EXPRESSION(TIRED, DEFAULT, 2);
     Serial.println(F("Expression: Sad"));
   }
   else if (cmd == "angry") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, ANGRY);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 5);
+    SET_EXPRESSION(ANGRY, DEFAULT, 5);
     Serial.println(F("Expression: Angry"));
   }
   else if (cmd == "love") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);  // Don't use HAPPY - it resets love animation
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 3);  // Open mouth (surprised/delighted)
+    SET_EXPRESSION(DEFAULT, DEFAULT, 3);
     MOCHI_CALL_VOID_NOARGS(anim_love);  // Call LAST so resetEmotions() doesn't cancel it
     Serial.println(F("Expression: Love"));
   }
   else if (cmd == "surprised") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
+    SET_EXPRESSION(DEFAULT, -1, 3);
     MOCHI_CALL_VOID(setCuriosity, ON);
-    // No setPosition - curious motion creates the surprised look
     MOCHI_CALL_VOID_NOARGS(blink);
-    MOCHI_CALL_VOID(setMouthType, 3);
     Serial.println(F("Expression: Surprised"));
   }
   else if (cmd == "confused") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
+    SET_EXPRESSION(DEFAULT, -1, 4);
     MOCHI_CALL_VOID_NOARGS(anim_confused);
-    MOCHI_CALL_VOID(setMouthType, 4);
     Serial.println(F("Expression: Confused"));
   }
   else if (cmd == "sleepy") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, TIRED);
-    MOCHI_CALL_VOID(setPosition, POS_SW);
-    MOCHI_CALL_VOID(setMouthType, 5);
+    SET_EXPRESSION(TIRED, POS_SW, 5);
     Serial.println(F("Expression: Sleepy"));
   }
   else if (cmd == "curious") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
+    SET_EXPRESSION(DEFAULT, -1, 4);
     MOCHI_CALL_VOID(setCuriosity, ON);
-    // No setPosition - curious mode creates left-right motion
-    MOCHI_CALL_VOID(setMouthType, 4);
     Serial.println(F("Expression: Curious"));
   }
   else if (cmd == "nervous") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
+    SET_EXPRESSION(DEFAULT, -1, 2);
     MOCHI_CALL_VOID(setSweat, ON);
     MOCHI_CALL_VOID(setCuriosity, ON);
-    // No setPosition - nervous uses curious left-right motion
-    MOCHI_CALL_VOID(setMouthType, 2);
     Serial.println(F("Expression: Nervous"));
   }
   else if (cmd == "knocked" || cmd == "dizzy") {
-    resetEffects();
+    SET_EXPRESSION(-1, -1, -1);
     MOCHI_CALL_VOID(setKnocked, ON);
     Serial.println(F("Expression: Knocked"));
   }
   else if (cmd == "neutral" || cmd == "normal" || cmd == "reset") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 1);
+    SET_EXPRESSION(DEFAULT, DEFAULT, 1);
     Serial.println(F("Expression: Neutral"));
   }
   else if (cmd == "idle") {
-    resetEffects();
-    MOCHI_CALL_VOID(setMood, DEFAULT);
+    SET_EXPRESSION(DEFAULT, DEFAULT, 1);
     MOCHI_CALL_VOID(setIdleMode, ON, 1, 2);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 1);
     Serial.println(F("Mode: Idle"));
   }
   else if (cmd == "raised") {
-    resetEffects();
+    SET_EXPRESSION(DEFAULT, DEFAULT, 4);
     MOCHI_CALL_VOID(setEyebrows, true);
-    MOCHI_CALL_VOID(setMood, DEFAULT);
-    MOCHI_CALL_VOID(setPosition, DEFAULT);
-    MOCHI_CALL_VOID(setMouthType, 4);
     Serial.println(F("Expression: Raised eyebrows"));
+  }
+  else if (cmd == "uwu") {
+    SET_EXPRESSION(DEFAULT, -1, 6);
+    MOCHI_CALL_VOID_NOARGS(triggerUwU);
+    Serial.println(F("Expression: UwU"));
+  }
+  else if (cmd == "xd") {
+    SET_EXPRESSION(DEFAULT, -1, 7);
+    MOCHI_CALL_VOID_NOARGS(triggerXD);
+    Serial.println(F("Expression: XD"));
   }
 
   // ==================== MOUTH ====================
@@ -347,14 +331,6 @@ String handleCommand(String cmd) {
   else if (cmd == "cry") {
     MOCHI_CALL_VOID_NOARGS(anim_cry);
     Serial.println(F("Action: Cry"));
-  }
-  else if (cmd == "uwu") {
-    MOCHI_CALL_VOID_NOARGS(triggerUwU);
-    Serial.println(F("Expression: UwU"));
-  }
-  else if (cmd == "xd") {
-    MOCHI_CALL_VOID_NOARGS(triggerXD);
-    Serial.println(F("Expression: XD"));
   }
   // knocked moved to expressions
 
@@ -486,8 +462,6 @@ String handleCommand(String cmd) {
       settings["es"] = preferences.getInt("es", 10);
       settings["er"] = preferences.getInt("er", 8);
       settings["mw"] = preferences.getInt("mw", 20);
-      settings["lt"] = preferences.getInt("lt", 1000);
-      settings["vt"] = preferences.getInt("vt", 2000);
       settings["bi"] = preferences.getInt("bi", 3);
       settings["gs"] = preferences.getInt("gs", 6);
       settings["os"] = preferences.getInt("os", 12);
@@ -568,12 +542,6 @@ String handleCommand(String cmd) {
         } else if (key == "mw") {
           MOCHI_CALL_VOID(setMouthSize, value, 6);
           preferences.putInt("mw", value);
-        } else if (key == "lt") {
-          MOCHI_CALL_VOID(setLaughDuration, value);
-          preferences.putInt("lt", value);
-        } else if (key == "vt") {
-          MOCHI_CALL_VOID(setLoveDuration, value);
-          preferences.putInt("vt", value);
         } else if (key == "bi") {
           MOCHI_CALL_VOID(setAutoblinker, true, value, 3);
           preferences.putInt("bi", value);

@@ -11,7 +11,8 @@
 #include "config.h"
 #include "ota_manager.h"
 
-// Implemented in commands.h
+// Implemented in Leor.ino
+void enqueueBleCommand(String cmd);
 String handleCommand(String cmd);
 
 // BLE Service and Characteristic UUIDs
@@ -53,14 +54,12 @@ static String bleTrimOneLine(String s) {
   return s;
 }
 
-static String bleProcessPayload(const String& payload) {
+static void bleProcessPayload(const String& payload) {
   // Allow sending multiple commands at once separated by newlines or semicolons.
-  String lastResponse;
-
   String work = payload;
   work.replace("\r", "");
   work.trim();
-  if (work.length() == 0) return lastResponse;
+  if (work.length() == 0) return;
 
   int start = 0;
   while (start < work.length()) {
@@ -74,14 +73,12 @@ static String bleProcessPayload(const String& payload) {
     String cmd = (end == -1) ? work.substring(start) : work.substring(start, end);
     cmd = bleTrimOneLine(cmd);
     if (cmd.length() > 0) {
-      lastResponse = handleCommand(cmd);
+      enqueueBleCommand(cmd);
     }
 
     if (end == -1) break;
     start = end + 1;
   }
-
-  return lastResponse;
 }
 
 // ==================== Notification Functions ====================
@@ -147,8 +144,8 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
         // Low power: slower connection (saves battery, ~100-200ms)
         pServer->updateConnParams(connInfo.getConnHandle(), 80, 160, 0, 400);
       } else {
-        // Performance: faster connection (lower latency, ~30-60ms)
-        pServer->updateConnParams(connInfo.getConnHandle(), 24, 48, 0, 180);
+        // Performance but still optimized for power (40ms - 60ms)
+        pServer->updateConnParams(connInfo.getConnHandle(), 32, 48, 0, 400);
       }
       
       sendBLEStatus("connected");
@@ -181,11 +178,8 @@ class CommandCallbacks: public NimBLECharacteristicCallbacks {
       Serial.print(F("[BLE] RX: "));
       Serial.println(payload);
 
-      String response = bleProcessPayload(payload);
-      if (response.length() > 0) {
-        // Send the entire response, letting chunking handle MTU limits
-        sendBLEStatus(response);
-      }
+      // Async process - pushes to queue, responses sent handled in loop()
+      bleProcessPayload(payload);
     }
 };
 

@@ -59,6 +59,9 @@ MochiEyes<Adafruit_SH1106G>* pMochiEyes_sh1106  = nullptr;
 
 // ==================== OLED Screen Helpers ====================
 
+// Forward declaration for partial updates
+void pushPartialUpdate(int16_t x, int16_t y, int16_t w, int16_t h);
+
 void drawCalibrationScreen(int progress, const char* status) {
     uint16_t WHITE_COLOR = (activeDisplayType == DISP_SSD1306) ? SSD1306_WHITE : SH110X_WHITE;
 
@@ -77,6 +80,7 @@ void drawCalibrationScreen(int progress, const char* status) {
         display_ssd1306->print(progress);
         display_ssd1306->print(F("%"));
         display_ssd1306->display();
+        pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     } else if (display_sh1106) {
         display_sh1106->clearDisplay();
         display_sh1106->setTextSize(1);
@@ -92,6 +96,7 @@ void drawCalibrationScreen(int progress, const char* status) {
         display_sh1106->print(progress);
         display_sh1106->print(F("%"));
         display_sh1106->display();
+        pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     }
 }
 
@@ -141,6 +146,7 @@ void drawOtaScreen(int pct, const char* line1, const char* line2) {
             (d)->print(F("Rebooting...")); \
         } \
         (d)->display(); \
+        pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT); \
     } while (0)
 
     if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
@@ -172,6 +178,7 @@ void drawStreamingOverlay() {
         display_ssd1306->setCursor(30, 54);
         display_ssd1306->print(F("Recording..."));
         display_ssd1306->display();
+        pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     } else if (display_sh1106) {
         display_sh1106->clearDisplay();
         display_sh1106->setTextColor(WHITE_COLOR);
@@ -193,6 +200,98 @@ void drawStreamingOverlay() {
 
 // Gesture training overlay stub (defined in gesture_trainer.h)
 void drawTrainingOverlay(const char* status, int progress);
+
+// ==================== Partial Update Rendering ====================
+
+// Given a bounding box, push only that dirty rectangle to the OLED over I2C
+void pushPartialUpdate(int16_t x, int16_t y, int16_t w, int16_t h) {
+    if (w <= 0 || h <= 0) return;
+    
+    // Clamp to screen
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (x >= SCREEN_WIDTH || y >= SCREEN_HEIGHT || w <= 0 || h <= 0) return;
+    if (x + w > SCREEN_WIDTH) w = SCREEN_WIDTH - x;
+    if (y + h > SCREEN_HEIGHT) h = SCREEN_HEIGHT - y;
+    
+    // SSD1306 and SH1106 are page-addressed vertically (8 pixels per page)
+    uint8_t startPage = y / 8;
+    uint8_t endPage = (y + h - 1) / 8;
+    uint8_t startCol = x;
+    uint8_t endCol = x + w - 1;
+    uint8_t* buffer = nullptr;
+    if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
+        buffer = display_ssd1306->getBuffer();
+    } else if (activeDisplayType == DISP_SH1106 && display_sh1106) {
+        buffer = display_sh1106->getBuffer();
+    }
+    if (!buffer) return;
+
+    if (activeDisplayType == DISP_SSD1306) {
+        // SSD1306 supports hardware bounding box addressing
+        Wire.beginTransmission(I2C_ADDRESS);
+        Wire.write(0x00); // Command stream
+        Wire.write(0x21); // Column Address
+        Wire.write(startCol);
+        Wire.write(endCol);
+        Wire.write(0x22); // Page Address
+        Wire.write(startPage);
+        Wire.write(endPage);
+        Wire.endTransmission();
+        
+        // Push data in chunks to respect I2C buffers
+        uint16_t totalBytes = (endPage - startPage + 1) * (endCol - startCol + 1);
+        uint16_t bytesSent = 0;
+        
+        // For SSD1306 bounding box addressing, we just stream the data linearly
+        // from top page to bottom page, within the column bounds
+        for (uint8_t p = startPage; p <= endPage; p++) {
+            for (uint8_t c = startCol; c <= endCol; c++) {
+                if (bytesSent % 31 == 0) {
+                    if (bytesSent > 0) Wire.endTransmission();
+                    Wire.beginTransmission(I2C_ADDRESS);
+                    Wire.write(0x40); // Data stream
+                }
+                Wire.write(buffer[p * SCREEN_WIDTH + c]);
+                bytesSent++;
+            }
+        }
+        if (bytesSent > 0) {
+            Wire.endTransmission();
+        }
+    } 
+    else if (activeDisplayType == DISP_SH1106) {
+        // SH1106 does NOT support hardware bounding box addressing natively, 
+        // we must manually set the page and column for every page row
+        for (uint8_t p = startPage; p <= endPage; p++) {
+            Wire.beginTransmission(I2C_ADDRESS);
+            Wire.write(0x00); // Command stream
+            Wire.write(0xB0 + p); // Set page address
+            // SH1106 RAM starts at col 2 usually, check Adafruit lib offset
+            // We'll mimic Adafruit_SH110x logic: column + offset
+            uint8_t colOffset = startCol + 2; // +2 for 1.3" 128x64 SH1106
+            Wire.write(0x00 | (colOffset & 0x0F)); // Lower column nibble
+            Wire.write(0x10 | (colOffset >> 4));   // Upper column nibble
+            Wire.endTransmission();
+            
+            uint16_t rowBytesSent = 0;
+            uint16_t rowTotal = endCol - startCol + 1;
+            
+            for (uint8_t c = startCol; c <= endCol; c++) {
+                if (rowBytesSent % 31 == 0) {
+                    if (rowBytesSent > 0) Wire.endTransmission();
+                    Wire.beginTransmission(I2C_ADDRESS);
+                    Wire.write(0x40); // Data stream
+                }
+                Wire.write(buffer[p * SCREEN_WIDTH + c]);
+                rowBytesSent++;
+            }
+            if (rowBytesSent > 0) {
+                Wire.endTransmission();
+            }
+        }
+    }
+}
 
 // ==================== Display Initialization ====================
 
@@ -217,6 +316,7 @@ void initDisplay(Preferences& preferences) {
     Serial.print(F(" @ 0x"));
     Serial.println(savedDispAddr, HEX);
 
+    Wire.setClock(400000);  // 400kHz fast-mode I2C saves transmission time
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
 
     bool ok = false;
@@ -255,5 +355,6 @@ void initDisplay(Preferences& preferences) {
     Serial.print(savedDispAddr, HEX);
     Serial.println(F(")"));
 }
+
 
 #endif // DISPLAY_MANAGER_H

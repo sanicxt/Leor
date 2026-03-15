@@ -70,6 +70,14 @@ void calibrateIMU() {
     drawCalibrationScreen(100, "Calibration done!");
     delay(500);
 
+    // Clear the screen buffer and push it so MochiEyes starts with a blank slate
+    if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
+        display_ssd1306->clearDisplay();
+    } else if (display_sh1106) {
+        display_sh1106->clearDisplay();
+    }
+    pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
     Serial.println(F("  Done!"));
     Serial.print(F("  Gyro bias: "));
     Serial.print(calib.gyroBias[0], 2); Serial.print(", ");
