@@ -31,10 +31,10 @@ const char* BLE_DEVICE_NAME = "Leor";
 #define BLE_ADV_WATCHDOG_MS 60000       // Restart advertising if no connection after 60s
 
 // BLE Power Saving Settings
-#define BLE_TX_POWER_LOW   ESP_PWR_LVL_N3   // -3dBm (low power, ~10m range)
+#define BLE_TX_POWER_LOW   ESP_PWR_LVL_N12  // -12dBm (ultra low power, ~2-5m range)
 #define BLE_TX_POWER_HIGH  ESP_PWR_LVL_P9   // +9dBm (high power, ~30m range)
 #define BLE_ADV_INTERVAL_FAST  100          // Fast advertising interval (ms) - for quick connection
-#define BLE_ADV_INTERVAL_SLOW  1000         // Slow advertising interval (ms) - power saving mode
+#define BLE_ADV_INTERVAL_SLOW  2000         // Ultra-slow advertising interval (ms) - extreme power saving
 
 // Note: BLE uses significantly less power than WiFi
 // Control via Bluetooth using a mobile app or web Bluetooth API
@@ -52,7 +52,8 @@ const char* BLE_DEVICE_NAME = "Leor";
 #define OLED_RESET -1
 #define FRAME_RATE 25   // FPS
 // ==================== MPU6050 Sensor Settings ====================
-#define MPU_SAMPLE_RATE_MS 100    // Read interval in ms (10Hz)#define GESTURE_MAG_MIN 2.0f      // Min magnitude (rad/s) to start gesture sampling
+#define MPU_SAMPLE_RATE_MS 100    // Read interval in ms (10Hz)
+#define GESTURE_MAG_MIN 2.0f      // Min magnitude (rad/s) to start gesture sampling
 #define GESTURE_COOLDOWN_MS 1500  // Cooldown after gesture match before next detection
 // Note: GESTURE_REACTION_MS is now a modifiable variable in pio.ino
 

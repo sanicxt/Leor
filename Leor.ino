@@ -147,6 +147,7 @@ void setup() {
     initBLE(BLE_DEVICE_NAME);
     bool bleLP = preferences.getBool("ble_lp", false);
     setBLELowPowerMode(bleLP);
+    setDisplayLowPowerMode(bleLP);
 
     // 8. IMU + Gesture
     initIMU();

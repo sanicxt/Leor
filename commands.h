@@ -674,6 +674,7 @@ String handleCommand(String cmd) {
   else if (cmd.startsWith("ble:lp=")) {
     int val = cmd.substring(7).toInt();
     setBLELowPowerMode(val == 1);
+    setDisplayLowPowerMode(val == 1);
     preferences.putBool("ble_lp", val == 1);
     return "ble:lp=" + String(val == 1 ? "1" : "0");
   }

@@ -293,6 +293,18 @@ void pushPartialUpdate(int16_t x, int16_t y, int16_t w, int16_t h) {
     }
 }
 
+// Set display brightness (dim mode for extreme power saving)
+void setDisplayLowPowerMode(bool lowPower) {
+    // 0x81 is the Set Contrast command for both SSD1306 and SH1106
+    // 0x01 is minimum visible contrast, 0x7F is default
+    Wire.beginTransmission(I2C_ADDRESS);
+    Wire.write(0x00); // Command byte
+    Wire.write(0x81); // Set Contrast
+    Wire.write(lowPower ? 0x01 : 0x7F);
+    Wire.endTransmission();
+    Serial.println(lowPower ? F("[DISP] Display dimmed (Low Power Mode)") : F("[DISP] Display normal brightness"));
+}
+
 // ==================== Display Initialization ====================
 
 void initDisplay(Preferences& preferences) {

@@ -141,8 +141,8 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
       
       // Update connection parameters based on power mode
       if (bleLowPowerMode) {
-        // Low power: slower connection (saves battery, ~100-200ms)
-        pServer->updateConnParams(connInfo.getConnHandle(), 80, 160, 0, 400);
+        // Ultra-low power: very slow connection (saves battery, ~200-400ms)
+        pServer->updateConnParams(connInfo.getConnHandle(), 160, 320, 0, 600);
       } else {
         // Performance but still optimized for power (40ms - 60ms)
         pServer->updateConnParams(connInfo.getConnHandle(), 32, 48, 0, 400);
@@ -212,9 +212,9 @@ void setBLELowPowerMode(bool enabled) {
   bleLowPowerMode = enabled;
   
   if (enabled) {
-    // Low power: reduce TX power to -3dBm
+    // Low power: reduce TX power to -12dBm
     NimBLEDevice::setPower(BLE_TX_POWER_LOW);
-    Serial.println(F("[BLE] Low power mode ON (-3dBm)"));
+    Serial.println(F("[BLE] Low power mode ON (-12dBm)"));
   } else {
     // High power: increase TX power to +9dBm
     NimBLEDevice::setPower(BLE_TX_POWER_HIGH);
