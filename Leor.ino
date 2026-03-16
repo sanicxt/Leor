@@ -23,6 +23,7 @@
 #include <Adafruit_GFX.h>
 #include <NimBLEDevice.h>
 #include <Preferences.h>
+#include <esp_mac.h>
 #include <queue>
 
 // ==================== Modules ====================
@@ -144,7 +145,15 @@ void setup() {
     initShuffle(preferences);
 
     // 7. BLE
-    String bleName = preferences.getString("ble_name", BLE_DEVICE_NAME);
+    // If no custom name is saved, generate a unique one using the MAC address
+    String bleName = preferences.getString("ble_name", "");
+    if (bleName.length() == 0) {
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_BT);
+        char defaultName[16];
+        snprintf(defaultName, sizeof(defaultName), "Leor-%02X%02X", mac[4], mac[5]);
+        bleName = String(defaultName);
+    }
     initBLE(bleName.c_str());
     bool bleLP = preferences.getBool("ble_lp", false);
     setBLELowPowerMode(bleLP);

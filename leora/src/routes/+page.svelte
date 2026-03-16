@@ -73,55 +73,59 @@
   <title>Leor OS</title>
 </svelte:head>
 
-<div class="min-h-screen bg-paper text-ink font-sans selection:bg-bento-pink overflow-hidden">
+<div class="min-h-screen bg-paper text-ink font-sans selection:bg-bento-pink overflow-x-hidden">
   <MasterBackground />
 
-  <main class="relative z-10 h-screen overflow-y-auto pb-32">
-    <div class="p-4 md:p-8 max-w-7xl mx-auto min-h-full">
+  <main class="relative z-10 min-h-screen overflow-y-auto pb-32">
+    <div class="p-4 md:p-8 max-w-7xl mx-auto">
       
       <!-- Top Bento Header -->
-      <header class="bento-card bg-paper p-5 mb-8 flex justify-between items-center flex-wrap gap-4">
-        <div class="flex items-center gap-4">
-          <div class="w-14 h-14 bg-bento-peach border-4 border-ink rounded-2xl flex items-center justify-center shadow-[2px_2px_0px_0px_var(--color-ink)]">
+      <header class="bento-card bg-paper p-4 sm:p-5 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div class="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
+          <div class="w-12 h-12 sm:w-14 sm:h-14 shrink-0 bg-bento-peach border-4 border-ink rounded-2xl flex items-center justify-center shadow-[2px_2px_0px_0px_var(--color-ink)]">
              <!-- Simplified smiling robot avatar -->
-             <svg class="w-8 h-8 text-ink" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="6" width="18" height="12" rx="3" fill="white" />
-                <circle cx="8" cy="11" r="1.5" fill="var(--color-ink)" />
-                <circle cx="16" cy="11" r="1.5" fill="var(--color-ink)" />
-                <path d="M9 15 Q12 17 15 15" fill="none" />
-                <path d="M6 6 V4 M18 6 V4" stroke-width="2"/>
+             <svg class="w-7 h-7 sm:w-8 sm:h-8 text-ink" viewBox="0 0 24 24">
+                <!-- Antennae -->
+                <path d="M6 6V4 M18 6V4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <!-- Head -->
+                <rect x="3" y="6" width="18" height="12" rx="3" fill="var(--color-paper)" stroke="currentColor" stroke-width="2" />
+                <!-- Eyes -->
+                <circle cx="8" cy="11.5" r="1.5" fill="currentColor" />
+                <circle cx="16" cy="11.5" r="1.5" fill="currentColor" />
+                <!-- Smile -->
+                <path d="M10 14.5 Q12 16 14 14.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
              </svg>
           </div>
           <div>
-            <h1 class="text-2xl font-black uppercase tracking-tight">Leor OS</h1>
-            <div class="flex items-center gap-2 mt-1">
+            <h1 class="text-xl sm:text-2xl font-black uppercase tracking-tight leading-none mb-1">Leor OS</h1>
+            <div class="flex items-center gap-2">
               {#if getConnected()}
-                <span class="w-3 h-3 bg-bento-green border-2 border-ink rounded-full animate-pulse"></span>
-                <span class="text-sm font-bold">Connected</span>
+                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-bento-green border-2 border-ink rounded-full animate-pulse"></span>
+                <span class="text-xs sm:text-sm font-bold">Connected</span>
               {:else}
-                <span class="w-3 h-3 bg-bento-pink border-2 border-ink rounded-full"></span>
-                <span class="text-sm font-bold opacity-70">Disconnected</span>
+                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-bento-pink border-2 border-ink rounded-full"></span>
+                <span class="text-xs sm:text-sm font-bold opacity-70">Disconnected</span>
               {/if}
             </div>
           </div>
         </div>
 
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3 w-full sm:w-auto">
             {#if getConnected() && getLastGesture()}
-                <div class="hidden sm:flex bg-bento-yellow border-2 border-ink px-3 py-1 rounded-xl">
+                <div class="hidden sm:flex bg-bento-yellow border-2 border-ink px-3 py-1 rounded-xl mr-auto sm:mr-0">
                     <span class="font-bold text-sm">Gaze: {getLastGesture()}</span>
                 </div>
             {/if}
-            <button onclick={toggleDarkMode} class="bento-button bg-paper px-3 py-3 flex items-center justify-center text-ink w-[52px]" aria-label="Toggle Dark Mode">
+            <button onclick={toggleDarkMode} class="bento-button rounded-xl bg-paper w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center text-ink shrink-0" aria-label="Toggle Dark Mode">
                 {#if isDarkMode}
                     <Sun class="w-5 h-5" />
                 {:else}
                     <Moon class="w-5 h-5" />
                 {/if}
             </button>
-            <button onclick={handleConnect} class="bento-button bg-bento-blue px-6 py-3 flex items-center gap-2 text-ink">
-                <Wifi class="w-5 h-5" />
-                <span>{getConnected() ? 'Connected' : 'Connect'}</span>
+            <button onclick={handleConnect} class="bento-button rounded-xl bg-bento-blue px-4 sm:px-6 h-11 sm:h-12 flex items-center justify-center gap-2 text-ink flex-1 sm:flex-none">
+                <Wifi class="w-4 h-4 sm:w-5 sm:h-5" />
+                <span class="font-bold text-sm sm:text-base">{getConnected() ? 'Connected' : 'Connect'}</span>
             </button>
         </div>
       </header>

@@ -54,15 +54,21 @@
     let deviceNameSaved = $state(false);
     let deviceNameLoading = $state(false);
 
-    // When connected, request the current name; when bleState updates, reflect it
+    let nameInitialized = false;
+
+    // When connected, request the current name
     $effect(() => {
-        if (bleState.connected && deviceName === '') {
-            sendCommand('ble:name'); // response arrives async via status char → bleState.bleDeviceName
+        if (bleState.connected && !nameInitialized) {
+            sendCommand('ble:name'); 
         }
     });
+
+    // Only copy from bleState to local deviceName ONCE 
+    // This allows the user to delete/clear the input without it popping back.
     $effect(() => {
-        if (bleState.bleDeviceName && deviceName === '') {
+        if (bleState.bleDeviceName && !nameInitialized) {
             deviceName = bleState.bleDeviceName;
+            nameInitialized = true;
         }
     });
 
@@ -73,6 +79,8 @@
         await sendCommand(`ble:name=${deviceName.trim()}`);
         deviceNameLoading = false;
         deviceNameSaved = true;
+        // Update local bleState to reflect the new saved name
+        bleState.bleDeviceName = deviceName.trim();
         setTimeout(() => deviceNameSaved = false, 3000);
     }
 </script>
@@ -124,7 +132,7 @@
             />
             <button
                 onclick={saveDeviceName}
-                disabled={!bleState.connected || deviceNameLoading}
+                disabled={!bleState.connected || deviceNameLoading || !deviceName.trim()}
                 class="bento-button px-4 py-2 bg-bento-yellow text-ink text-sm disabled:opacity-50"
             >
                 {#if deviceNameLoading}
