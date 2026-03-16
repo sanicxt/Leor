@@ -165,39 +165,29 @@
 
 <div class="space-y-6">
     <!-- Quick Presets -->
-    <div
-        class="bg-gradient-to-br from-indigo-950/40 to-purple-950/30 border border-indigo-500/20 rounded-2xl p-5 backdrop-blur-lg"
-    >
-        <div class="flex items-center gap-2 mb-4">
-            <svg
-                class="w-4 h-4 text-indigo-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-                />
-            </svg>
-            <h3 class="text-indigo-300 text-sm font-semibold">Quick Presets</h3>
+    <div class="bento-card bg-bento-yellow p-6 space-y-4">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-paper flex items-center justify-center">
+                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+                    />
+                </svg>
+            </div>
+            <h3 class="text-ink text-xl font-black uppercase">Quick Presets</h3>
         </div>
         <div class="grid grid-cols-4 gap-3">
             {#each presets as preset}
                 <button
                     onclick={() => applyPreset(preset)}
                     disabled={!bleState.connected}
-                    class="group flex flex-col items-center gap-2 p-3 rounded-xl bg-white/5 hover:bg-indigo-500/20 border border-white/5 hover:border-indigo-500/30 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="bento-button group flex flex-col items-center gap-2 p-3 bg-paper transition-all duration-200 disabled:opacity-50"
                 >
-                    <span
-                        class="text-2xl group-hover:scale-110 transition-transform"
-                        >{preset.icon}</span
-                    >
-                    <span class="text-zinc-300 text-xs font-medium"
-                        >{preset.name}</span
-                    >
+                    <span class="text-2xl group-hover:scale-110 transition-transform">{preset.icon}</span>
+                    <span class="text-ink text-xs font-bold">{preset.name}</span>
                 </button>
             {/each}
         </div>
@@ -206,37 +196,23 @@
         <button
             onclick={resetToDefaults}
             disabled={!bleState.connected}
-            class="w-full mt-3 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 text-rose-400 text-xs font-medium transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+            class="bento-button w-full mt-3 py-2.5 bg-bento-peach text-ink text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
-            <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             Reset to Defaults
         </button>
     </div>
 
     <!-- Eye Appearance Card -->
-    <div
-        class="bg-gradient-to-br from-indigo-950/40 to-purple-950/30 border border-indigo-500/20 rounded-2xl p-5 backdrop-blur-lg space-y-6"
-    >
+    <div class="bento-card bg-bento-blue p-6 space-y-6">
         <!-- Header -->
         <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-3">
-                <div
-                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20"
-                >
+                <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-peach flex items-center justify-center">
                     <svg
-                        class="w-5 h-5 text-white"
+                        class="w-5 h-5 text-ink"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -256,8 +232,8 @@
                     </svg>
                 </div>
                 <div>
-                    <h3 class="text-white font-semibold">Eye Appearance</h3>
-                    <p class="text-indigo-300/60 text-xs">
+                    <h3 class="text-ink text-xl font-black uppercase">Eye Appearance</h3>
+                    <p class="text-ink/60 text-sm font-bold">
                         Customize geometry & style
                     </p>
                 </div>
@@ -287,161 +263,161 @@
         <!-- Eye Geometry Grid -->
         <div class="grid grid-cols-2 gap-4">
             <!-- Width -->
-            <div class="space-y-2 p-3 rounded-xl bg-white/5">
+            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <svg
-                            class="w-3.5 h-3.5 text-zinc-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                            />
+                        <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                         </svg>
-                        <span class="text-zinc-400 text-xs">Width</span>
+                        <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Width</span>
                     </div>
-                    <span class="text-indigo-400 font-mono text-xs font-bold"
-                        >{getSettingsEw()}px</span
-                    >
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsEw()}px</span>
                 </div>
                 <input
                     type="range"
                     min="10"
                     max="100"
                     value={getSettingsEw()}
-                    oninput={(e) =>
-                        setSettingsEw(parseInt(e.currentTarget.value))}
+                    oninput={(e) => setSettingsEw(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
+                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-sm
+                           [&::-webkit-slider-thumb]:bg-bento-yellow
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:border-2
+                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:transition-transform
+                           [&::-webkit-slider-thumb]:active:scale-125
+                           [&::-webkit-slider-thumb]:active:shadow-none
+                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
             </div>
 
             <!-- Height -->
-            <div class="space-y-2 p-3 rounded-xl bg-white/5">
+            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <svg
-                            class="w-3.5 h-3.5 text-zinc-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                            />
+                        <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                         </svg>
-                        <span class="text-zinc-400 text-xs">Height</span>
+                        <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Height</span>
                     </div>
-                    <span class="text-indigo-400 font-mono text-xs font-bold"
-                        >{getSettingsEh()}px</span
-                    >
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsEh()}px</span>
                 </div>
                 <input
                     type="range"
                     min="10"
                     max="100"
                     value={getSettingsEh()}
-                    oninput={(e) =>
-                        setSettingsEh(parseInt(e.currentTarget.value))}
+                    oninput={(e) => setSettingsEh(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
+                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-sm
+                           [&::-webkit-slider-thumb]:bg-bento-yellow
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:border-2
+                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:transition-transform
+                           [&::-webkit-slider-thumb]:active:scale-125
+                           [&::-webkit-slider-thumb]:active:shadow-none
+                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
             </div>
 
             <!-- Spacing -->
-            <div class="space-y-2 p-3 rounded-xl bg-white/5">
+            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <svg
-                            class="w-3.5 h-3.5 text-zinc-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M8 9l4-4 4 4m0 6l-4 4-4-4"
-                            />
+                        <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
                         </svg>
-                        <span class="text-zinc-400 text-xs">Spacing</span>
+                        <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Spacing</span>
                     </div>
-                    <span class="text-indigo-400 font-mono text-xs font-bold"
-                        >{getSettingsEs()}px</span
-                    >
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_var(--color-ink)]">{getSettingsEs()}px</span>
                 </div>
                 <input
                     type="range"
                     min="0"
                     max="50"
                     value={getSettingsEs()}
-                    oninput={(e) =>
-                        setSettingsEs(parseInt(e.currentTarget.value))}
+                    oninput={(e) => setSettingsEs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
+                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-sm
+                           [&::-webkit-slider-thumb]:bg-bento-yellow
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:border-2
+                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:transition-transform
+                           [&::-webkit-slider-thumb]:active:scale-125
+                           [&::-webkit-slider-thumb]:active:shadow-none
+                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
             </div>
 
             <!-- Roundness -->
-            <div class="space-y-2 p-3 rounded-xl bg-white/5">
+            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <svg
-                            class="w-3.5 h-3.5 text-zinc-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
+                        <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span class="text-zinc-400 text-xs">Roundness</span>
+                        <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Roundness</span>
                     </div>
-                    <span class="text-indigo-400 font-mono text-xs font-bold"
-                        >{getSettingsEr()}px</span
-                    >
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_var(--color-ink)]">{getSettingsEr()}px</span>
                 </div>
                 <input
                     type="range"
                     min="0"
                     max="50"
                     value={getSettingsEr()}
-                    oninput={(e) =>
-                        setSettingsEr(parseInt(e.currentTarget.value))}
+                    oninput={(e) => setSettingsEr(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50"
+                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-sm
+                           [&::-webkit-slider-thumb]:bg-bento-yellow
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:border-2
+                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:transition-transform
+                           [&::-webkit-slider-thumb]:active:scale-125
+                           [&::-webkit-slider-thumb]:active:shadow-none
+                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
             </div>
         </div>
     </div>
 
     <!-- Mouth & Animations Card -->
-    <div
-        class="bg-gradient-to-br from-pink-950/40 to-rose-950/30 border border-pink-500/20 rounded-2xl p-5 backdrop-blur-lg space-y-5"
-    >
+    <div class="bento-card bg-bento-pink p-6 space-y-5">
         <div class="flex items-center gap-3 mb-2">
-            <div
-                class="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-pink-500/20"
-            >
+            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-yellow flex items-center justify-center">
                 <svg
-                    class="w-5 h-5 text-white"
+                    class="w-5 h-5 text-ink"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -455,20 +431,18 @@
                 </svg>
             </div>
             <div>
-                <h3 class="text-white font-semibold">Mouth & Animations</h3>
-                <p class="text-pink-300/60 text-xs">
+                <h3 class="text-ink text-xl font-black uppercase">Mouth & Animations</h3>
+                <p class="text-ink/60 text-sm font-bold">
                     Control expressions & timing
                 </p>
             </div>
         </div>
 
         <!-- Mouth Width -->
-        <div class="space-y-2 p-3 rounded-xl bg-white/5">
+        <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
             <div class="flex items-center justify-between">
-                <span class="text-zinc-400 text-xs">Mouth Width</span>
-                <span class="text-pink-400 font-mono text-xs font-bold"
-                    >{getSettingsMw()}px</span
-                >
+                <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Mouth Width</span>
+                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsMw()}px</span>
             </div>
             <input
                 type="range"
@@ -478,22 +452,30 @@
                 oninput={(e) => setSettingsMw(parseInt(e.currentTarget.value))}
                 onchange={applySettings}
                 disabled={!bleState.connected}
-                class="w-full h-2 bg-zinc-700/50 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed
-                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-                       [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-br
-                       [&::-webkit-slider-thumb]:from-pink-400 [&::-webkit-slider-thumb]:to-rose-500
-                       [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-pink-500/50
-                       [&::-webkit-slider-thumb]:cursor-pointer"
+                class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                       [&::-webkit-slider-thumb]:appearance-none
+                       [&::-webkit-slider-thumb]:w-4
+                       [&::-webkit-slider-thumb]:h-4
+                       [&::-webkit-slider-thumb]:rounded-sm
+                       [&::-webkit-slider-thumb]:bg-bento-yellow
+                       [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                       [&::-webkit-slider-thumb]:cursor-pointer
+                       [&::-webkit-slider-thumb]:border-2
+                       [&::-webkit-slider-thumb]:border-ink
+                       [&::-webkit-slider-thumb]:transition-transform
+                       [&::-webkit-slider-thumb]:active:scale-125
+                       [&::-webkit-slider-thumb]:active:shadow-none
+                       [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                       [&::-webkit-slider-thumb]:active:translate-x-[2px]"
             />
         </div>
 
         <!-- Mouth Animation Triggers -->
         <div class="space-y-3">
-            <div class="space-y-2 p-3 rounded-xl bg-white/5">
+            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
                 <div class="flex items-center justify-between">
-                    <span class="text-zinc-400 text-xs">Animation Duration</span
-                    >
-                    <span class="text-pink-400 font-mono text-xs font-bold"
+                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Animation Duration</span>
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]"
                         >{mouthAnimDuration}ms</span
                     >
                 </div>
@@ -504,33 +486,42 @@
                     step="100"
                     bind:value={mouthAnimDuration}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-zinc-700/50 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed
-                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-br
-                           [&::-webkit-slider-thumb]:from-pink-400 [&::-webkit-slider-thumb]:to-rose-500
-                           [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-pink-500/50
-                           [&::-webkit-slider-thumb]:cursor-pointer"
+                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-sm
+                           [&::-webkit-slider-thumb]:bg-bento-yellow
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:border-2
+                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:transition-transform
+                           [&::-webkit-slider-thumb]:active:scale-125
+                           [&::-webkit-slider-thumb]:active:shadow-none
+                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
             </div>
-            <div class="grid grid-cols-3 gap-2 pt-2">
+            <div class="grid grid-cols-3 gap-2">
                 <button
                     onclick={triggerTalk}
                     disabled={!bleState.connected}
-                    class="px-3 py-2 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 border border-pink-500/30 text-pink-300 text-xs font-medium transition-all disabled:opacity-40"
+                    class="bento-button py-2 bg-paper text-ink transition-all disabled:opacity-50 text-xs"
                 >
                     💬 Talk
                 </button>
                 <button
                     onclick={triggerChew}
                     disabled={!bleState.connected}
-                    class="px-3 py-2 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 border border-pink-500/30 text-pink-300 text-xs font-medium transition-all disabled:opacity-40"
+                    class="bento-button py-2 bg-paper text-ink transition-all disabled:opacity-50 text-xs"
                 >
                     🍔 Chew
                 </button>
                 <button
                     onclick={triggerWobble}
                     disabled={!bleState.connected}
-                    class="px-3 py-2 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 border border-pink-500/30 text-pink-300 text-xs font-medium transition-all disabled:opacity-40"
+                    class="bento-button py-2 bg-paper text-ink transition-all disabled:opacity-50 text-xs"
                 >
                     〰️ Wobble
                 </button>
@@ -539,10 +530,10 @@
 
         <!-- Blink & Expression Timing -->
         <div class="grid grid-cols-2 gap-4 pt-2">
-            <div class="space-y-2 p-3 rounded-xl bg-white/5">
+            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
                 <div class="flex items-center justify-between">
-                    <span class="text-zinc-400 text-xs">Blink Interval</span>
-                    <span class="text-pink-400 font-mono text-xs font-bold"
+                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Blink Interval</span>
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]"
                         >{getSettingsBi()}s</span
                     >
                 </div>
@@ -556,13 +547,27 @@
                         setSettingsBi(parseFloat(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-pink-500 disabled:opacity-50"
+                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-sm
+                           [&::-webkit-slider-thumb]:bg-bento-yellow
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:border-2
+                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:transition-transform
+                           [&::-webkit-slider-thumb]:active:scale-125
+                           [&::-webkit-slider-thumb]:active:shadow-none
+                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
             </div>
-            <div class="space-y-2 p-3 rounded-xl bg-white/5">
+            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
                 <div class="flex items-center justify-between">
-                    <span class="text-zinc-400 text-xs">Transition Speed</span>
-                    <span class="text-pink-400 font-mono text-xs font-bold"
+                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Transition Speed</span>
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]"
                         >{transitionSpeed}</span
                     >
                 </div>
@@ -572,22 +577,32 @@
                     max="20"
                     bind:value={transitionSpeed}
                     disabled={!bleState.connected}
-                    class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-pink-500 disabled:opacity-50"
+                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-sm
+                           [&::-webkit-slider-thumb]:bg-bento-yellow
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:border-2
+                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:transition-transform
+                           [&::-webkit-slider-thumb]:active:scale-125
+                           [&::-webkit-slider-thumb]:active:shadow-none
+                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
             </div>
         </div>
     </div>
 
     <!-- Animation Speeds Card -->
-    <div
-        class="bg-gradient-to-br from-emerald-950/40 to-teal-950/30 border border-emerald-500/20 rounded-2xl p-5 backdrop-blur-lg space-y-5"
-    >
+    <div class="bento-card bg-bento-green p-6 space-y-5">
         <div class="flex items-center gap-3 mb-2">
-            <div
-                class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20"
-            >
+            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-peach flex items-center justify-center">
                 <svg
-                    class="w-5 h-5 text-white"
+                    class="w-5 h-5 text-ink"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -601,71 +616,98 @@
                 </svg>
             </div>
             <div>
-                <h3 class="text-white font-semibold">Animation Speeds</h3>
-                <p class="text-emerald-300/60 text-xs">How fast things move</p>
+                <h3 class="text-ink text-xl font-black uppercase">Animation Speeds</h3>
+                <p class="text-ink/60 text-sm font-bold">How fast things move</p>
             </div>
         </div>
 
         <div class="grid grid-cols-3 gap-3">
-            <div class="space-y-2 p-3 rounded-xl bg-white/5 text-center">
-                <span class="text-zinc-400 text-[10px] uppercase tracking-wide"
-                    >Gaze</span
-                >
+            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl text-center">
+                <span class="text-ink/80 text-[10px] uppercase font-bold tracking-wide">Gaze</span>
                 <input
                     type="range"
                     min="1"
                     max="20"
                     value={getSettingsGs()}
-                    oninput={(e) =>
-                        setSettingsGs(parseInt(e.currentTarget.value))}
+                    oninput={(e) => setSettingsGs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-emerald-500 disabled:opacity-50"
+                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-sm
+                           [&::-webkit-slider-thumb]:bg-bento-yellow
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:border-2
+                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:transition-transform
+                           [&::-webkit-slider-thumb]:active:scale-125
+                           [&::-webkit-slider-thumb]:active:shadow-none
+                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
-                <span class="text-emerald-400 font-mono text-xs font-bold block"
-                    >{getSettingsGs()}</span
-                >
+                <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-ink rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsGs()}</span>
             </div>
-            <div class="space-y-2 p-3 rounded-xl bg-white/5 text-center">
-                <span class="text-zinc-400 text-[10px] uppercase tracking-wide"
-                    >Blink</span
-                >
+            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl text-center">
+                <span class="text-ink/80 text-[10px] uppercase font-bold tracking-wide">Blink</span>
                 <input
                     type="range"
                     min="4"
                     max="30"
                     value={getSettingsOs()}
-                    oninput={(e) =>
-                        setSettingsOs(parseInt(e.currentTarget.value))}
+                    oninput={(e) => setSettingsOs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-emerald-500 disabled:opacity-50"
+                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-sm
+                           [&::-webkit-slider-thumb]:bg-bento-yellow
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:border-2
+                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:transition-transform
+                           [&::-webkit-slider-thumb]:active:scale-125
+                           [&::-webkit-slider-thumb]:active:shadow-none
+                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
-                <span class="text-emerald-400 font-mono text-xs font-bold block"
-                    >{getSettingsOs()}</span
-                >
+                <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-ink rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsOs()}</span>
             </div>
-            <div class="space-y-2 p-3 rounded-xl bg-white/5 text-center">
-                <span class="text-zinc-400 text-[10px] uppercase tracking-wide"
-                    >Squish</span
-                >
+            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl text-center">
+                <span class="text-ink/80 text-[10px] uppercase font-bold tracking-wide">Squish</span>
                 <input
                     type="range"
                     min="2"
                     max="20"
                     value={getSettingsSs()}
-                    oninput={(e) =>
-                        setSettingsSs(parseInt(e.currentTarget.value))}
+                    oninput={(e) => setSettingsSs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-1.5 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-emerald-500 disabled:opacity-50"
+                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                           [&::-webkit-slider-thumb]:appearance-none
+                           [&::-webkit-slider-thumb]:w-4
+                           [&::-webkit-slider-thumb]:h-4
+                           [&::-webkit-slider-thumb]:rounded-sm
+                           [&::-webkit-slider-thumb]:bg-bento-yellow
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:border-2
+                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:transition-transform
+                           [&::-webkit-slider-thumb]:active:scale-125
+                           [&::-webkit-slider-thumb]:active:shadow-none
+                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
-                <span class="text-emerald-400 font-mono text-xs font-bold block"
-                    >{getSettingsSs()}</span
-                >
+                <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-ink rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsSs()}</span>
             </div>
         </div>
-        <p class="text-zinc-600 text-[10px] text-center">
+        <p class="text-ink/60 font-bold text-[10px] text-center">
             Higher values = faster animations
         </p>
     </div>

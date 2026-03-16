@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { sendCommand } from "$lib/ble.svelte";
+    import { sendCommand, bleState } from "$lib/ble.svelte";
 
     const mouthTypes = ["smile", "frown", "open", "ooo", "flat", "uwum", "xdm"];
     const mouthAnims = ["talk", "chew", "wobble"];
@@ -9,10 +9,9 @@
     <div class="flex flex-wrap gap-3">
         {#each mouthTypes as mouth}
             <button
-                class="px-4 py-2 bg-zinc-900/50 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-xl
-               border border-white/5 hover:border-purple-500/50 transition-all duration-300 text-sm capitalize
-               shadow-sm hover:shadow-purple-500/20 hover:-translate-y-0.5"
+                class="bento-button bg-paper text-ink capitalize px-4 py-2 hover:bg-ink hover:text-paper disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-paper disabled:hover:text-ink"
                 onclick={() => sendCommand(mouth)}
+                disabled={!bleState.connected}
             >
                 {mouth}
             </button>
@@ -21,10 +20,9 @@
     <div class="flex flex-wrap gap-3">
         {#each mouthAnims as anim}
             <button
-                class="px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 hover:text-white rounded-xl
-               border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300 text-sm capitalize font-medium
-               shadow-sm hover:shadow-purple-500/20 hover:-translate-y-0.5"
+                class="bento-button bg-bento-peach text-ink capitalize px-4 py-2 hover:bg-ink hover:text-paper disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-bento-peach disabled:hover:text-ink"
                 onclick={() => sendCommand(anim)}
+                disabled={!bleState.connected}
             >
                 {anim}
             </button>

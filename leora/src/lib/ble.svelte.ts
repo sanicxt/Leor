@@ -32,7 +32,8 @@ export const bleState = $state({
     gestureConfidence: 70,
     gestureCooldown: 2000,
     gestureMappings: [] as GestureMapping[],  // synced from ESP32
-    bleLowPowerMode: false  // BLE power saving mode
+    bleLowPowerMode: false,  // BLE power saving mode
+    bleDeviceName: ''  // BLE device name (loaded on connect)
 });
 
 // BLE device and characteristics
@@ -110,9 +111,11 @@ export function setGestureCooldown(val: number) { bleState.gestureCooldown = val
 
 export async function connect(): Promise<boolean> {
     try {
+        // Use the main Service UUID for filtering.
+        // This allows the device to have any user-configured name,
+        // as long as the firmware advertises this UUID in its primary packet.
         device = await navigator.bluetooth.requestDevice({
             filters: [
-                { name: BLE_CONFIG.DEVICE_NAME },
                 { services: [BLE_CONFIG.SERVICE_UUID] }
             ],
             optionalServices: [BLE_CONFIG.SERVICE_UUID, BLE_CONFIG.OTA_SERVICE_UUID],
@@ -230,6 +233,12 @@ export async function connect(): Promise<boolean> {
             // Fallback to legacy line-by-line parsing for non-JSON or broken messages
             const value = chunk;
             bleState.lastStatus = value;
+
+            // Parse ble:name= response
+            if (value.startsWith('ble:name=')) {
+                bleState.bleDeviceName = value.substring(9).split(' ')[0]; // strip any trailing message
+                return;
+            }
 
             // Parse appearance and gesture settings
             const params = ['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss', 'td', 'wp', 'pp', 'rt', 'cf', 'cd', 'gm'];

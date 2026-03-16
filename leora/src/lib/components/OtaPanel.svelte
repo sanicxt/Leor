@@ -38,9 +38,7 @@
     }
 </script>
 
-<div
-    class="bg-gradient-to-br from-violet-950/40 to-purple-950/30 border border-violet-500/20 rounded-2xl p-5 backdrop-blur-lg"
->
+<div class="bento-card bg-bento-pink p-6 space-y-5">
     <!-- Header -->
     <div class="flex items-center gap-3 mb-4">
         <div
@@ -52,8 +50,8 @@
             </svg>
         </div>
         <div>
-            <h2 class="text-lg font-semibold text-white">OTA Firmware Update</h2>
-            <p class="text-xs text-zinc-400">Flash new firmware over Bluetooth</p>
+            <h2 class="text-ink text-xl font-black uppercase">OTA Firmware Update</h2>
+            <p class="text-ink/60 text-sm font-bold">Flash new firmware over Bluetooth</p>
         </div>
     </div>
 
@@ -105,15 +103,10 @@
             <p class="text-xs text-zinc-400">{statusMsg}</p>
         {/if}
 
-        <!-- Flash button -->
         <button
             onclick={startOTA}
             disabled={!selectedFile || !bleState.connected || running}
-            class="w-full py-2.5 rounded-xl font-semibold text-sm transition-all
-                   {selectedFile && bleState.connected && !running
-                       ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:opacity-90 shadow-lg shadow-violet-500/20'
-                       : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}
-                   disabled:opacity-50"
+            class="bento-button w-full py-2.5 flex items-center justify-center gap-2 {selectedFile && bleState.connected && !running ? 'bg-bento-green text-ink' : 'bg-paper text-ink'} disabled:opacity-50"
         >
             {#if running}
                 <span class="flex items-center justify-center gap-2">

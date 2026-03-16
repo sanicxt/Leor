@@ -678,6 +678,21 @@ String handleCommand(String cmd) {
     preferences.putBool("ble_lp", val == 1);
     return "ble:lp=" + String(val == 1 ? "1" : "0");
   }
+  // ble:name = get current device name
+  else if (cmd == "ble:name") {
+    String name = preferences.getString("ble_name", BLE_DEVICE_NAME);
+    return "ble:name=" + name;
+  }
+  // ble:name=X = set device name (saved, applied on restart)
+  else if (cmd.startsWith("ble:name=")) {
+    String newName = cmd.substring(9);
+    newName.trim();
+    if (newName.length() == 0 || newName.length() > 30) {
+      return "err:ble:name invalid (1-30 chars)";
+    }
+    preferences.putString("ble_name", newName);
+    return "ble:name=" + newName + " saved. Restart to apply.";
+  }
 
   // ==================== TOUCH POWER COMMANDS ====================
   // tw: = get touch wake/deep sleep status

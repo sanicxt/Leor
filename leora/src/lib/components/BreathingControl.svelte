@@ -47,21 +47,12 @@
     }
 </script>
 
-<div
-    class="bg-gradient-to-br from-cyan-950/40 to-blue-950/30 border border-cyan-500/20 rounded-2xl p-5 backdrop-blur-lg space-y-5"
->
+<div class="bento-card bg-bento-blue p-6 space-y-5">
     <!-- Header with Main Toggle -->
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <div
-                class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20"
-            >
-                <svg
-                    class="w-5 h-5 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
+            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-peach flex items-center justify-center">
+                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -71,38 +62,30 @@
                 </svg>
             </div>
             <div>
-                <h3 class="text-white text-sm font-semibold">
+                <h3 class="text-ink text-xl font-black uppercase">
                     Breathing Effect
                 </h3>
-                <p class="text-cyan-300/60 text-xs">Living eye animation</p>
+                <p class="text-ink/60 text-sm font-bold">Living eye animation</p>
             </div>
         </div>
         <button
-            class="w-14 h-8 rounded-full transition-all duration-300 relative focus:outline-none focus:ring-2 focus:ring-cyan-500/50 disabled:opacity-50
-             {breathingEnabled
-                ? 'bg-gradient-to-r from-cyan-500 to-blue-500 shadow-lg shadow-cyan-500/30'
-                : 'bg-zinc-700/80'}"
+            class="w-14 h-8 rounded-full border-2 border-ink transition-all duration-300 relative focus:outline-none disabled:opacity-50
+             {breathingEnabled ? 'bg-bento-yellow shadow-[2px_2px_0px_0px_var(--color-ink)]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-ink)]'}"
             onclick={toggleBreathing}
             disabled={!bleState.connected}
             aria-label="Toggle breathing"
         >
             <span
-                class="absolute left-1 top-1 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-md flex items-center justify-center
+                class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-ink rounded-full transition-transform duration-300 flex items-center justify-center
                {breathingEnabled ? 'translate-x-6' : 'translate-x-0'}"
             >
                 {#if breathingEnabled}
-                    <svg
-                        class="w-3.5 h-3.5 text-cyan-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="3"
-                            d="M5 13l4 4L19 7"
-                        />
+                    <svg class="w-3 h-3 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                    </svg>
+                {:else}
+                    <svg class="w-3 h-3 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 {/if}
             </span>
@@ -114,38 +97,33 @@
         <button
             onclick={setSubtle}
             disabled={!bleState.connected}
-            class="px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-200 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+            class="bento-button px-3 py-2 bg-paper text-ink text-xs disabled:opacity-50"
         >
             Subtle
         </button>
         <button
             onclick={setNormal}
             disabled={!bleState.connected}
-            class="px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-200 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+            class="bento-button px-3 py-2 bg-paper text-ink text-xs disabled:opacity-50"
         >
             Normal
         </button>
         <button
             onclick={setStrong}
             disabled={!bleState.connected}
-            class="px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-200 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+            class="bento-button px-3 py-2 bg-paper text-ink text-xs disabled:opacity-50"
         >
             Strong
         </button>
     </div>
 
     <!-- Intensity Slider -->
-    <div class="p-3 rounded-xl bg-white/5 space-y-2">
+    <div class="p-3 rounded-xl bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] space-y-2">
         <div class="flex justify-between items-center">
-            <label
-                for="breath-intensity"
-                class="text-cyan-300 text-xs font-medium"
-            >
+            <label for="breath-intensity" class="text-ink text-xs font-bold uppercase tracking-wider">
                 Intensity
             </label>
-            <span
-                class="text-cyan-400 text-xs font-mono px-2 py-0.5 rounded"
-            >
+            <span class="text-ink text-xs font-mono font-bold px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
                 {(breathingIntensity * 100).toFixed(0)}%
             </span>
         </div>
@@ -156,31 +134,37 @@
             max="0.20"
             step="0.01"
             value={breathingIntensity}
-            oninput={(e) =>
-                updateIntensity(
-                    parseFloat((e.target as HTMLInputElement).value),
-                )}
+            oninput={(e) => updateIntensity(parseFloat((e.target as HTMLInputElement).value))}
             disabled={!bleState.connected}
-            class="w-full h-2 bg-zinc-700/50 rounded-lg appearance-none cursor-pointer accent-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed
-                   [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-                   [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-br
-                   [&::-webkit-slider-thumb]:from-cyan-400 [&::-webkit-slider-thumb]:to-blue-500
-                   [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-cyan-500/50
-                   [&::-webkit-slider-thumb]:cursor-pointer"
+            class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                   [&::-webkit-slider-thumb]:appearance-none
+                   [&::-webkit-slider-thumb]:w-4
+                   [&::-webkit-slider-thumb]:h-4
+                   [&::-webkit-slider-thumb]:rounded-sm
+                   [&::-webkit-slider-thumb]:bg-bento-yellow
+                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                   [&::-webkit-slider-thumb]:cursor-pointer
+                   [&::-webkit-slider-thumb]:border-2
+                   [&::-webkit-slider-thumb]:border-ink
+                   [&::-webkit-slider-thumb]:transition-transform
+                   [&::-webkit-slider-thumb]:active:scale-125
+                   [&::-webkit-slider-thumb]:active:shadow-none
+                   [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                   [&::-webkit-slider-thumb]:active:translate-x-[2px]"
         />
-        <div class="flex justify-between text-[10px] text-cyan-300/40">
+        <div class="flex justify-between text-[10px] text-ink/60 font-bold">
             <span>Subtle</span>
             <span>Strong</span>
         </div>
     </div>
 
     <!-- Speed Slider -->
-    <div class="p-3 rounded-xl bg-white/5 space-y-2">
+    <div class="p-3 rounded-xl bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] space-y-2">
         <div class="flex justify-between items-center">
-            <label for="breath-speed" class="text-cyan-300 text-xs font-medium">
+            <label for="breath-speed" class="text-ink text-xs font-bold uppercase tracking-wider">
                 Speed
             </label>
-            <span class="text-cyan-400 text-xs font-mono">
+            <span class="text-ink text-xs font-mono font-bold px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
                 {(1 / breathingSpeed).toFixed(1)}s
             </span>
         </div>
@@ -191,17 +175,25 @@
             max="1.0"
             step="0.05"
             value={breathingSpeed}
-            oninput={(e) =>
-                updateSpeed(parseFloat((e.target as HTMLInputElement).value))}
+            oninput={(e) => updateSpeed(parseFloat((e.target as HTMLInputElement).value))}
             disabled={!bleState.connected}
-            class="w-full h-2 bg-zinc-700/50 rounded-lg appearance-none cursor-pointer accent-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed
-                   [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-                   [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gradient-to-br
-                   [&::-webkit-slider-thumb]:from-cyan-400 [&::-webkit-slider-thumb]:to-blue-500
-                   [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-cyan-500/50
-                   [&::-webkit-slider-thumb]:cursor-pointer"
+            class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                   [&::-webkit-slider-thumb]:appearance-none
+                   [&::-webkit-slider-thumb]:w-4
+                   [&::-webkit-slider-thumb]:h-4
+                   [&::-webkit-slider-thumb]:rounded-sm
+                   [&::-webkit-slider-thumb]:bg-bento-yellow
+                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                   [&::-webkit-slider-thumb]:cursor-pointer
+                   [&::-webkit-slider-thumb]:border-2
+                   [&::-webkit-slider-thumb]:border-ink
+                   [&::-webkit-slider-thumb]:transition-transform
+                   [&::-webkit-slider-thumb]:active:scale-125
+                   [&::-webkit-slider-thumb]:active:shadow-none
+                   [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                   [&::-webkit-slider-thumb]:active:translate-x-[2px]"
         />
-        <div class="flex justify-between text-[10px] text-cyan-300/40">
+        <div class="flex justify-between text-[10px] text-ink/60 font-bold">
             <span>Slow (10s)</span>
             <span>Fast (1s)</span>
         </div>

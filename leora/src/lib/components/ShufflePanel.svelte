@@ -46,50 +46,36 @@
     }
 </script>
 
-<div
-    class="bg-gradient-to-br from-violet-950/40 to-fuchsia-950/30 border border-violet-500/20 rounded-2xl p-5 backdrop-blur-lg space-y-5"
->
+<div class="bento-card bg-bento-pink p-6 space-y-5">
     <!-- Header with Main Toggle -->
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <div
-                class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-500/20"
-            >
-                <svg
-                    class="w-5 h-5 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
+            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-yellow flex items-center justify-center">
+                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
             </div>
             <div>
-                <h3 class="text-white text-sm font-semibold">Shuffle Mode</h3>
-                <p class="text-violet-300/60 text-xs">Auto-cycle expressions</p>
+                <h3 class="text-ink text-xl font-black uppercase">Shuffle Mode</h3>
+                <p class="text-ink/60 text-sm font-bold">Auto-cycle expressions</p>
             </div>
         </div>
         <button
-            class="w-14 h-8 rounded-full transition-all duration-300 relative focus:outline-none focus:ring-2 focus:ring-violet-500/50 disabled:opacity-50
+            class="w-14 h-8 rounded-full border-2 border-ink transition-all duration-300 relative focus:outline-none disabled:opacity-50
              {getShuffleEnabled()
-                ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-500/30'
-                : 'bg-zinc-700/80'}"
+                ? 'bg-bento-green shadow-[2px_2px_0px_0px_var(--color-ink)]'
+                : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-ink)]'}"
             onclick={toggleShuffle}
             disabled={!bleState.connected}
             aria-label="Toggle shuffle mode"
         >
             <span
-                class="absolute left-1 top-1 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-md flex items-center justify-center
+                class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-ink rounded-full transition-transform duration-300 flex items-center justify-center
                {getShuffleEnabled() ? 'translate-x-6' : 'translate-x-0'}"
             >
                 {#if getShuffleEnabled()}
                     <svg
-                        class="w-3.5 h-3.5 text-violet-500"
+                        class="w-3 h-3 text-ink"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -103,7 +89,7 @@
                     </svg>
                 {:else}
                     <svg
-                        class="w-3.5 h-3.5 text-zinc-400"
+                        class="w-3 h-3 text-ink"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -122,42 +108,23 @@
 
     <!-- Status Badge -->
     {#if getShuffleEnabled()}
-        <div
-            class="flex items-center justify-center gap-2 py-2 px-4 bg-violet-500/10 border border-violet-500/20 rounded-xl"
-        >
-            <span class="w-2 h-2 bg-violet-400 rounded-full animate-pulse"
-            ></span>
-            <span class="text-violet-300 text-xs font-medium"
-                >Shuffling expressions...</span
-            >
+        <div class="flex items-center justify-center gap-2 py-2 px-4 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+            <span class="w-2 h-2 bg-bento-green border border-ink rounded-full animate-pulse"></span>
+            <span class="text-ink text-xs font-bold uppercase tracking-wider">Shuffling expressions...</span>
         </div>
     {/if}
 
     <!-- Timing Controls -->
     <div class="space-y-4">
         <!-- Expression Duration -->
-        <div class="p-4 rounded-xl bg-white/5 space-y-3">
+        <div class="p-3 rounded-xl bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] space-y-3">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                    <svg
-                        class="w-4 h-4 text-violet-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                    </svg>
-                    <span class="text-zinc-300 text-sm">Expression Time</span>
+                    <span class="text-ink font-bold uppercase tracking-wider text-xs">Expression Time</span>
                 </div>
-                <span
-                    class="text-violet-400 font-mono text-sm font-bold px-2 py-0.5 bg-violet-500/20 rounded-lg"
-                    >{getShuffleExprMin()}-{getShuffleExprMax()}s</span
-                >
+                <span class="text-ink font-mono text-sm font-black px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
+                    {getShuffleExprMin()}-{getShuffleExprMax()}s
+                </span>
             </div>
             <DualRangeSlider
                 min={1}
@@ -167,34 +134,20 @@
                 onchange={handleExprChange}
                 disabled={!bleState.connected}
             />
-            <p class="text-zinc-500 text-[10px]">
+            <p class="text-ink/60 font-bold text-[10px]">
                 Duration each expression is displayed
             </p>
         </div>
 
         <!-- Neutral Duration -->
-        <div class="p-4 rounded-xl bg-white/5 space-y-3">
+        <div class="p-3 rounded-xl bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] space-y-3">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                    <svg
-                        class="w-4 h-4 text-fuchsia-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                    </svg>
-                    <span class="text-zinc-300 text-sm">Rest Period</span>
+                    <span class="text-ink font-bold uppercase tracking-wider text-xs">Rest Period</span>
                 </div>
-                <span
-                    class="text-fuchsia-400 font-mono text-sm font-bold px-2 py-0.5 bg-fuchsia-500/20 rounded-lg"
-                    >{getShuffleNeutralMin()}-{getShuffleNeutralMax()}s</span
-                >
+                <span class="text-ink font-mono text-sm font-black px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
+                    {getShuffleNeutralMin()}-{getShuffleNeutralMax()}s
+                </span>
             </div>
             <DualRangeSlider
                 min={1}
@@ -204,53 +157,34 @@
                 onchange={handleNeutralChange}
                 disabled={!bleState.connected}
             />
-            <p class="text-zinc-500 text-[10px]">
+            <p class="text-ink/60 font-bold text-[10px]">
                 Neutral pause between expressions
             </p>
         </div>
     </div>
 
     <!-- Quick Presets -->
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-2 gap-3 mt-4">
         <button
             onclick={applyQuickChange}
             disabled={!bleState.connected}
-            class="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-500/20 hover:bg-violet-500/30 border border-violet-500/30 text-violet-300 text-sm font-medium transition-all disabled:opacity-40"
+            class="bento-button py-2.5 bg-paper text-ink transition-all flex items-center justify-center gap-2 text-xs"
         >
-            <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            Quick Changes
+            <span class="font-bold">Quick Changes</span>
         </button>
+        
         <button
             onclick={applySlowChange}
             disabled={!bleState.connected}
-            class="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-fuchsia-500/20 hover:bg-fuchsia-500/30 border border-fuchsia-500/30 text-fuchsia-300 text-sm font-medium transition-all disabled:opacity-40"
+            class="bento-button py-2.5 bg-paper text-ink transition-all flex items-center justify-center gap-2 text-xs"
         >
-            <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Slow & Calm
+            <span class="font-bold">Slow & Calm</span>
         </button>
     </div>
 </div>

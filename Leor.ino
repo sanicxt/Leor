@@ -144,7 +144,8 @@ void setup() {
     initShuffle(preferences);
 
     // 7. BLE
-    initBLE(BLE_DEVICE_NAME);
+    String bleName = preferences.getString("ble_name", BLE_DEVICE_NAME);
+    initBLE(bleName.c_str());
     bool bleLP = preferences.getBool("ble_lp", false);
     setBLELowPowerMode(bleLP);
     setDisplayLowPowerMode(bleLP);

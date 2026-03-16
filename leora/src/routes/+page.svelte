@@ -1,19 +1,12 @@
 <script lang="ts">
-  import { fly, fade } from "svelte/transition";
+  import { fly } from "svelte/transition";
+  import { onMount } from "svelte";
   import MasterBackground from "$lib/components/MasterBackground.svelte";
   import AnimatedTabs from "$lib/components/AnimatedTabs.svelte";
-  import ShimmerButton from "$lib/components/ShimmerButton.svelte";
-  import { cn } from "$lib/utils";
-
-  // Icons
-  import {
-    Home,
-    Settings,
-    TvMinimalPlay,
-    PencilLine,
-    Wifi,
-    WifiOff,
-  } from "lucide-svelte";
+  
+  import Wifi from "lucide-svelte/icons/wifi";
+  import Moon from "lucide-svelte/icons/moon";
+  import Sun from "lucide-svelte/icons/sun";
 
   // Components
   import ExpressionGrid from "$lib/components/ExpressionGrid.svelte";
@@ -28,19 +21,44 @@
   import PowerSettings from "$lib/components/PowerSettings.svelte";
   import BreathingControl from "$lib/components/BreathingControl.svelte";
   import OtaPanel from "$lib/components/OtaPanel.svelte";
-  import { base } from "$app/paths";
-
+  
   import {
     getConnected,
     getLastStatus,
     getLastGesture,
     connect,
     disconnect,
-    isWebBluetoothSupported,
     bleState,
   } from "$lib/ble.svelte";
 
-  let activeTab = "home"; // 'home' | 'settings' | 'gestures'
+  let activeTab = $state("home"); // 'home' | 'settings' | 'gestures'
+  let isDarkMode = $state(false);
+
+  onMount(() => {
+    // Initialize dark mode based on existing class or system preference
+    isDarkMode = document.documentElement.classList.contains("dark") || 
+      (!document.documentElement.classList.contains("light") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    
+    // Apply explicitly on mount to ensure variables are set
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+    }
+  });
+
+  function toggleDarkMode() {
+    isDarkMode = !isDarkMode;
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+    }
+  }
 
   async function handleConnect() {
     if (getConnected()) {
@@ -55,377 +73,115 @@
   <title>Leor OS</title>
 </svelte:head>
 
-<div
-  class="min-h-screen bg-black text-white font-sans selection:bg-pink-500/30 overflow-hidden relative"
->
-  <!-- Background: Master Grid & Lights -->
+<div class="min-h-screen bg-paper text-ink font-sans selection:bg-bento-pink overflow-hidden">
   <MasterBackground />
 
-  <!-- Content Area -->
-  <main class="relative z-10 h-screen overflow-y-auto pb-32 scrollbar-hide">
-    <div class="p-6 max-w-6xl mx-auto min-h-full">
-      <!-- Premium Header -->
-      <header class="mb-8">
-        <div
-          class="relative bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 backdrop-blur-xl p-5 rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
-        >
-          <!-- Decorative gradient -->
-          <div
-            class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-orange-500/10 to-transparent rounded-full blur-3xl"
-          ></div>
-          <div
-            class="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-cyan-500/10 to-transparent rounded-full blur-3xl"
-          ></div>
-
-          <div
-            class="relative flex justify-between items-center gap-4 flex-wrap"
-          >
-            <!-- Logo & Status -->
-            <div class="flex items-center gap-4">
-              <div
-                class="w-12 h-12 rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center shadow-lg shadow-orange-500/20 border border-orange-500/20"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="w-10 h-10"
-                  viewBox="0 0 200 200"
-                  fill="none"
-                >
-                  <rect
-                    x="40"
-                    y="50"
-                    width="120"
-                    height="125"
-                    rx="30"
-                    stroke="#FF8C00"
-                    stroke-width="8"
-                    fill="white"
-                  />
-
-                  <rect
-                    x="44"
-                    y="60"
-                    width="112"
-                    height="110"
-                    rx="22"
-                    fill="#333333"
-                  />
-
-                  <path
-                    d="M40 80C40 63.4315 53.4315 50 70 50H130C146.569 50 160 63.4315 160 80V85H40V80Z"
-                    fill="#FF8C00"
-                  />
-                  <path
-                    d="M35 85H165V95C165 97.2091 163.209 99 161 99H39C36.7909 99 35 97.2091 35 95V85Z"
-                    fill="#FF8C00"
-                  />
-
-                  <line
-                    x1="32.5"
-                    y1="90"
-                    x2="32.5"
-                    y2="60"
-                    stroke="#FF8C00"
-                    stroke-width="4"
-                    stroke-linecap="round"
-                  />
-                  <circle cx="32.5" cy="58" r="6" fill="#FF8C00" />
-                  <rect
-                    x="25"
-                    y="90"
-                    width="15"
-                    height="40"
-                    rx="7.5"
-                    fill="#FF8C00"
-                  />
-
-                  <line
-                    x1="167.5"
-                    y1="90"
-                    x2="167.5"
-                    y2="60"
-                    stroke="#FF8C00"
-                    stroke-width="4"
-                    stroke-linecap="round"
-                  />
-                  <circle cx="167.5" cy="58" r="6" fill="#FF8C00" />
-                  <rect
-                    x="160"
-                    y="90"
-                    width="15"
-                    height="40"
-                    rx="7.5"
-                    fill="#FF8C00"
-                  />
-
-                  <path
-                    d="M75 125C75 122 78 120 81 120C84 120 87 122 87 125"
-                    stroke="#00F0FF"
-                    stroke-width="4"
-                    stroke-linecap="round"
-                  />
-                  <path
-                    d="M113 125C113 122 116 120 119 120C122 120 125 122 125 125"
-                    stroke="#00F0FF"
-                    stroke-width="4"
-                    stroke-linecap="round"
-                  />
-                  <path
-                    d="M85 145C85 145 90 152 100 152C110 152 115 145 115 145"
-                    stroke="#00F0FF"
-                    stroke-width="4"
-                    stroke-linecap="round"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h1
-                  class="text-2xl font-bold bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent"
-                >
-                  Leor OS
-                </h1>
-                <div class="flex items-center gap-2 mt-0.5">
-                  {#if getConnected()}
-                    <span class="flex items-center gap-1.5">
-                      <span
-                        class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-500/50"
-                      ></span>
-                      <span class="text-emerald-400 text-xs font-medium"
-                        >Connected</span
-                      >
-                    </span>
-                  {:else}
-                    <span class="flex items-center gap-1.5">
-                      <span class="w-2 h-2 bg-rose-400 rounded-full"></span>
-                      <span class="text-rose-400 text-xs font-medium"
-                        >Disconnected</span
-                      >
-                    </span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-
-            <!-- Live Status & Connect -->
-            <div class="flex items-center gap-4">
+  <main class="relative z-10 h-screen overflow-y-auto pb-32">
+    <div class="p-4 md:p-8 max-w-7xl mx-auto min-h-full">
+      
+      <!-- Top Bento Header -->
+      <header class="bento-card bg-paper p-5 mb-8 flex justify-between items-center flex-wrap gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 bg-bento-peach border-4 border-ink rounded-2xl flex items-center justify-center shadow-[2px_2px_0px_0px_var(--color-ink)]">
+             <!-- Simplified smiling robot avatar -->
+             <svg class="w-8 h-8 text-ink" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="6" width="18" height="12" rx="3" fill="white" />
+                <circle cx="8" cy="11" r="1.5" fill="var(--color-ink)" />
+                <circle cx="16" cy="11" r="1.5" fill="var(--color-ink)" />
+                <path d="M9 15 Q12 17 15 15" fill="none" />
+                <path d="M6 6 V4 M18 6 V4" stroke-width="2"/>
+             </svg>
+          </div>
+          <div>
+            <h1 class="text-2xl font-black uppercase tracking-tight">Leor OS</h1>
+            <div class="flex items-center gap-2 mt-1">
               {#if getConnected()}
-                <div class="hidden sm:flex flex-col items-end gap-1">
-                  {#if getLastStatus()}
-                    <span class="text-zinc-500 text-[10px] font-mono">
-                      {getLastStatus().split("\n")[0]}
-                    </span>
-                  {/if}
-                  {#if getLastGesture()}
-                    <span
-                      class="text-cyan-400 text-xs font-mono flex items-center gap-1"
-                    >
-                      <svg
-                        class="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"
-                        />
-                      </svg>
-                      {getLastGesture()}
-                    </span>
-                  {/if}
-                </div>
+                <span class="w-3 h-3 bg-bento-green border-2 border-ink rounded-full animate-pulse"></span>
+                <span class="text-sm font-bold">Connected</span>
+              {:else}
+                <span class="w-3 h-3 bg-bento-pink border-2 border-ink rounded-full"></span>
+                <span class="text-sm font-bold opacity-70">Disconnected</span>
               {/if}
-
-              <button
-                onclick={handleConnect}
-                class="group relative px-5 py-2.5 rounded-xl font-medium transition-all duration-300 {getConnected()
-                  ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-400'
-                  : 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/30'}"
-              >
-                <div class="flex items-center gap-2">
-                  {#if getConnected()}
-                    <TvMinimalPlay class="w-4 h-4 animate-pulse" />
-                    <span class="text-sm">Connected</span>
-                  {:else}
-                    <TvMinimalPlay class="w-4 h-4" />
-                    <span class="text-sm">Connect</span>
-                  {/if}
-                </div>
-              </button>
             </div>
           </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            {#if getConnected() && getLastGesture()}
+                <div class="hidden sm:flex bg-bento-yellow border-2 border-ink px-3 py-1 rounded-xl">
+                    <span class="font-bold text-sm">Gaze: {getLastGesture()}</span>
+                </div>
+            {/if}
+            <button onclick={toggleDarkMode} class="bento-button bg-paper px-3 py-3 flex items-center justify-center text-ink w-[52px]" aria-label="Toggle Dark Mode">
+                {#if isDarkMode}
+                    <Sun class="w-5 h-5" />
+                {:else}
+                    <Moon class="w-5 h-5" />
+                {/if}
+            </button>
+            <button onclick={handleConnect} class="bento-button bg-bento-blue px-6 py-3 flex items-center gap-2 text-ink">
+                <Wifi class="w-5 h-5" />
+                <span>{getConnected() ? 'Connected' : 'Connect'}</span>
+            </button>
         </div>
       </header>
 
-      <!-- Views -->
       {#if activeTab === "home"}
-        <div
-          in:fly={{ y: 20, duration: 300 }}
-          class="grid grid-cols-1 lg:grid-cols-12 gap-5"
-        >
-          <!-- Expressions Card -->
-          <div class="lg:col-span-12">
-            <div
-              class="bg-gradient-to-br from-indigo-950/40 to-purple-950/30 border border-indigo-500/20 rounded-2xl p-5 backdrop-blur-lg"
-            >
-              <div class="flex items-center gap-3 mb-5">
-                <div
-                  class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center"
-                >
-                  <svg
-                    class="w-4 h-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h2 class="text-white text-sm font-semibold">Expressions</h2>
-                  <p class="text-indigo-300/60 text-xs">Tap to trigger</p>
-                </div>
-              </div>
-              <ExpressionGrid />
-            </div>
+        <div in:fly={{ y: 20, duration: 300 }} class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          <!-- Expressions (Spans 2 columns) -->
+          <div class="bento-card bg-bento-pink p-6 lg:col-span-2">
+             <div class="mb-4 border-b-2 border-ink pb-2">
+                <h2 class="text-xl font-black uppercase">Expressions</h2>
+                <p class="text-sm font-bold opacity-80">Tap to trigger</p>
+             </div>
+             <!-- The nested component will be updated next to remove its inner backgrounds -->
+             <ExpressionGrid />
           </div>
 
-          <!-- Controls Column -->
-          <div class="lg:col-span-8 space-y-5">
-            <!-- Keyboard/Actions -->
-            <div
-              class="bg-gradient-to-br from-pink-950/40 to-rose-950/30 border border-pink-500/20 rounded-2xl p-5 backdrop-blur-lg"
-            >
-              <div class="flex items-center gap-3 mb-5">
-                <div
-                  class="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center"
-                >
-                  <svg
-                    class="w-4 h-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h2 class="text-white text-sm font-semibold">
-                    Quick Actions
-                  </h2>
-                  <p class="text-pink-300/60 text-xs">Keyboard shortcuts</p>
-                </div>
-              </div>
-              <ActionButtons />
-            </div>
-
-            <!-- Mouth Controls -->
-            <div
-              class="bg-gradient-to-br from-amber-950/40 to-orange-950/30 border border-amber-500/20 rounded-2xl p-5 backdrop-blur-lg"
-            >
-              <div class="flex items-center gap-3 mb-5">
-                <div
-                  class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center"
-                >
-                  <svg
-                    class="w-4 h-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h2 class="text-white text-sm font-semibold">Mouth</h2>
-                  <p class="text-amber-300/60 text-xs">Shape & expression</p>
-                </div>
-              </div>
-              <MouthControls />
-            </div>
+          <!-- Quick Actions -->
+          <div class="bento-card bg-bento-yellow p-6 md:col-span-1">
+             <div class="mb-4 border-b-2 border-ink pb-2">
+                 <h2 class="text-xl font-black uppercase">Quick Actions</h2>
+                 <p class="text-sm font-bold opacity-80">Overrides</p>
+             </div>
+             <ActionButtons />
           </div>
 
-          <!-- Gaze Control Pad -->
-          <div class="lg:col-span-4">
-            <div
-              class="bg-gradient-to-br from-cyan-950/40 to-teal-950/30 border border-cyan-500/20 rounded-2xl p-5 backdrop-blur-lg h-full flex flex-col"
-            >
-              <div class="flex items-center gap-3 mb-5">
-                <div
-                  class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center"
-                >
-                  <svg
-                    class="w-4 h-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h2 class="text-white text-sm font-semibold">Gaze Control</h2>
-                  <p class="text-cyan-300/60 text-xs">Drag to look</p>
-                </div>
-              </div>
-              <div class="flex-1 flex items-center justify-center">
-                <LookPad />
-              </div>
-            </div>
+          <!-- Gaze Control -->
+          <div class="bento-card bg-bento-green p-6 md:col-span-1 lg:row-span-2 flex flex-col">
+             <div class="mb-4 border-b-2 border-ink pb-2">
+                 <h2 class="text-xl font-black uppercase">Gaze Control</h2>
+                 <p class="text-sm font-bold opacity-80">Drag to look</p>
+             </div>
+             <div class="flex-1 flex items-center justify-center">
+                 <LookPad />
+             </div>
           </div>
+
+          <!-- Mouth Control Array -->
+          <div class="bento-card bg-bento-blue p-6 lg:col-span-3">
+             <div class="mb-4 border-b-2 border-ink pb-2">
+                 <h2 class="text-xl font-black uppercase">Mouth Control</h2>
+                 <p class="text-sm font-bold opacity-80">Shape & Type</p>
+             </div>
+             <MouthControls />
+          </div>
+
         </div>
       {:else if activeTab === "settings"}
-        <div
-          in:fly={{ y: 20, duration: 300 }}
-          class="max-w-6xl mx-auto space-y-5"
-        >
-          <!-- Top row: Shuffle & Gesture Tuning -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div in:fly={{ y: 20, duration: 300 }} class="space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <ShufflePanel />
             <GestureSettings />
           </div>
-
-          <!-- Full width: Appearance -->
           <AppearanceSettings />
-
-          <!-- Display Settings -->
           <DisplaySettings />
-
           <BreathingControl />
-
-          <!-- Power Management -->
           <PowerSettings />
         </div>
       {:else if activeTab === "gestures"}
-        <div in:fly={{ y: 20, duration: 300 }} class="max-w-4xl mx-auto">
+        <div in:fly={{ y: 20, duration: 300 }}>
           <GestureManager />
         </div>
       {:else if activeTab === "ota"}
@@ -434,15 +190,13 @@
         </div>
       {/if}
 
-      <!-- Bottom Spacer for Tabs -->
+      <!-- Bottom Spacer -->
       <div class="h-32"></div>
     </div>
   </main>
 
   <!-- Navigation Tabs -->
-  <div
-    class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
-  >
+  <div class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
     <div class="pointer-events-auto">
       <AnimatedTabs
         bind:activeTab
