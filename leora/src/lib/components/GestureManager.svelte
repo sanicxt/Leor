@@ -209,7 +209,7 @@
 
     <!-- Last Detection Display -->
     {#if lastDetectedGesture}
-        <div class="bento-card bg-bento-yellow p-4 text-center">
+        <div class="p-4 text-center bg-paper border-2 border-ink shadow-[4px_4px_0px_0px_var(--color-ink)] rounded-2xl">
             <div class="relative text-center">
                 <div class="text-4xl mb-2 flex items-center justify-center gap-3">
                     <span class="transform hover:scale-110 transition-transform">
@@ -243,8 +243,8 @@
 
         {#each gestures as gesture, i}
             <div
-                class="flex items-center justify-between p-3 transition-all duration-300 bento-card {lastDetectedGesture === gesture.name
-                    ? 'bg-bento-yellow border-4 border-ink shadow-[4px_4px_0px_0px_var(--color-ink)] scale-[1.02]'
+                class="flex items-center justify-between p-3 transition-all duration-300 border-2 border-ink rounded-xl {lastDetectedGesture === gesture.name
+                    ? 'bg-bento-yellow shadow-[4px_4px_0px_0px_var(--color-ink)] scale-[1.02]'
                     : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-ink)] hover:bg-paper/80'}"
             >
                 <div class="flex items-center gap-3">
