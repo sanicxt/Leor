@@ -31,6 +31,10 @@ static uint64_t clockBaseEpochMs = 0;
 static int16_t  clockTimezoneOffsetMinutes = 0;
 static bool     clockUse24Hour   = true;
 static uint32_t clockLastDrawKey = UINT32_MAX;
+static bool     clockTransitionActive = false;
+static bool     clockTransitionToClock = false;
+static uint32_t clockTransitionStartMs = 0;
+static const uint16_t CLOCK_TRANSITION_MS = 650;
 
 inline uint32_t getClockSecondsOfDay();
 
@@ -91,12 +95,19 @@ inline void setClockBaseSeconds(uint32_t secondsOfDay) {
 }
 
 inline void setClockEnabled(bool enabled) {
+    if (clockModeEnabled == enabled && !clockTransitionActive) {
+        return;
+    }
+
     clockModeEnabled = enabled;
     if (enabled && !clockHasTime) {
         clockBaseMillis = millis();
         clockBaseSeconds = 0;
         clockHasTime = true;
     }
+    clockTransitionActive = true;
+    clockTransitionToClock = enabled;
+    clockTransitionStartMs = millis();
     clockLastDrawKey = -1;
     persistClockToRtc();
 }
@@ -194,8 +205,7 @@ inline void drawDefaultClockFace(Adafruit_GFX* display, const char* dateBuf, con
     }
 }
 
-inline void drawClockScreen() {
-    uint16_t WHITE_COLOR = (activeDisplayType == DISP_SSD1306) ? SSD1306_WHITE : SH110X_WHITE;
+inline void renderClockScreen(bool forceRedraw = false) {
     uint32_t seconds = getClockSecondsOfDay();
     uint32_t minuteOfDay = seconds / 60UL;
     uint8_t hh = seconds / 3600UL;
@@ -214,7 +224,7 @@ inline void drawClockScreen() {
                        ((seconds % 2UL) << 29) |
                        (clockUse24Hour ? 0x80000000UL : 0UL) |
                        (isBLEConnected() ? 0x40000000UL : 0UL);
-    if (drawKey == clockLastDrawKey) {
+    if (!forceRedraw && drawKey == clockLastDrawKey) {
         return;
     }
     clockLastDrawKey = drawKey;
@@ -235,11 +245,69 @@ inline void drawClockScreen() {
     if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
         display_ssd1306->clearDisplay();
         drawDefaultClockFace(display_ssd1306, dateBuf, timeBuf, isPM);
-        display_ssd1306->display();
-        pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     } else if (display_sh1106) {
         display_sh1106->clearDisplay();
         drawDefaultClockFace(display_sh1106, dateBuf, timeBuf, isPM);
+    }
+
+}
+
+inline bool updateClockTransitionFrame() {
+    if (!clockTransitionActive) {
+        return false;
+    }
+
+    uint32_t elapsed = millis() - clockTransitionStartMs;
+    if (elapsed >= CLOCK_TRANSITION_MS) {
+        clockTransitionActive = false;
+        clockLastDrawKey = UINT32_MAX;
+        return false;
+    }
+
+    uint8_t revealH = (uint8_t)((elapsed * SCREEN_HEIGHT) / CLOCK_TRANSITION_MS);
+    if (revealH > SCREEN_HEIGHT) revealH = SCREEN_HEIGHT;
+    uint8_t coverH = SCREEN_HEIGHT - revealH;
+
+    if (clockTransitionToClock) {
+        renderClockScreen(true);
+    } else {
+        if (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306) {
+            display_ssd1306->clearDisplay();
+            pMochiEyes_ssd1306->update();
+        } else if (pMochiEyes_sh1106) {
+            display_sh1106->clearDisplay();
+            pMochiEyes_sh1106->update();
+        }
+    }
+
+    if (coverH > 0) {
+        if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
+            display_ssd1306->fillRect(0, 0, SCREEN_WIDTH, coverH, 0);
+        } else if (display_sh1106) {
+            display_sh1106->fillRect(0, 0, SCREEN_WIDTH, coverH, 0);
+        }
+    }
+
+    if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
+        display_ssd1306->display();
+    } else if (display_sh1106) {
+        display_sh1106->display();
+    }
+
+    pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    return true;
+}
+
+inline bool isClockTransitionActive() {
+    return clockTransitionActive;
+}
+
+inline void drawClockScreen() {
+    renderClockScreen();
+    if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
+        display_ssd1306->display();
+        pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    } else if (display_sh1106) {
         display_sh1106->display();
         pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     }

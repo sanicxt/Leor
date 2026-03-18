@@ -76,7 +76,7 @@ Whether you poke it, shake it, or pick it up, Leor reacts with distinct emotions
 
 ## 🔌 Wiring
 
-All peripherals connect via the I2C bus. A PNP transistor on the high-side power rail switches the OLED and IMU off during deep sleep.
+All peripherals connect via the I2C bus. A PNP transistor on the high-side power rail switches the OLED and IMU off during deep sleep, while the TP223 touch sensor stays powered from always-on 3.3V so it can wake the device reliably.
 
 ```mermaid
 graph TD
@@ -88,12 +88,13 @@ graph TD
     subgraph ESP32-C3 Super Mini
       SDA[I2C SDA<br>see config.h]
       SCL[I2C SCL<br>see config.h]
-      GPIO0[GPIO 0<br>Touch Wake]
+      GPIO0[GPIO 0<br>TP223 Touch Input]
       GPIO1[GPIO 1<br>PNP Base Control]
     end
 
     PNP[PNP Transistor<br>BC557 or equivalent]
     VPERIPH[VCC_PERIPH<br>Switched 3.3V]
+    TP223[TP223 Touch Sensor]
 
     subgraph Peripherals
       OLED[OLED Display<br>Addr: 0x3C]
@@ -104,17 +105,20 @@ graph TD
     VCC --> PNP
     PNP --> VPERIPH
     VPERIPH --> OLED & IMU
-    GND --> OLED & IMU & SDA & SCL & GPIO0 & GPIO1 & PNP
+    VCC --> TP223
+    GND --> OLED & IMU & SDA & SCL & GPIO0 & GPIO1 & PNP & TP223
 
     %% Data Connections
     SDA == I2C Data ==> OLED & IMU
     SCL == I2C Clock ==> OLED & IMU
+    TP223 --> GPIO0
     GPIO1 -. Base via resistor .-> PNP
 
     style VCC fill:#f9f,stroke:#333,stroke-width:2px
     style GND fill:#333,stroke:#fff,stroke-width:2px,color:#fff
     style PNP fill:#ffd6d6,stroke:#b33,stroke-width:2px
     style VPERIPH fill:#fff2cc,stroke:#b38f00,stroke-width:2px
+    style TP223 fill:#d6f5ff,stroke:#0088aa,stroke-width:2px
 
 ```
 
@@ -123,9 +127,10 @@ graph TD
 | Pin | Function | Notes |
 | --- | --- | --- |
 | **See `config.h`** | I2C SDA / SCL | Shared bus for OLED + IMU |
-| **GPIO 0** | Touch/button wake | Configurable via BLE |
+| **GPIO 0** | TP223 touch input | Powered directly from 3.3V, not switched by the PNP |
 | **GPIO 1** | PNP power control | LOW = peripherals ON, HIGH = peripherals OFF |
 
+> The TP223 touch sensor should connect directly to always-on 3.3V so touch wake still works while the display and IMU are powered off.
 > The I2C pull-ups should connect to the switched rail (VCC_PERIPH), not always-on 3.3V.
 
 ---

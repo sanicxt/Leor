@@ -200,7 +200,17 @@ void loop() {
     // Update display (skip during training)
     bool training = isTraining();
     if (!training) {
-        if (isClockEnabled()) {
+        if (isClockTransitionActive()) {
+            if (!updateClockTransitionFrame()) {
+                if (isClockEnabled()) {
+                    drawClockScreen();
+                } else if (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306) {
+                    pMochiEyes_ssd1306->update();
+                } else if (pMochiEyes_sh1106) {
+                    pMochiEyes_sh1106->update();
+                }
+            }
+        } else if (isClockEnabled()) {
             drawClockScreen();
         } else if (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306) {
             pMochiEyes_ssd1306->update();
