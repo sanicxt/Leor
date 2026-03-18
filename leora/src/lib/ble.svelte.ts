@@ -132,24 +132,6 @@ export function setClockSeconds(val: number) { bleState.clockSeconds = val; }
 export function setClockTimezoneOffset(val: number) { bleState.clockTimezoneOffset = val; }
 export function setClock24Hour(val: boolean) { bleState.clock24Hour = val; }
 
-function formatBrowserClock(now = new Date()) {
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    const ss = String(now.getSeconds()).padStart(2, '0');
-    return { hh, mm, ss, tz: now.getTimezoneOffset() };
-}
-
-export async function syncClockFromBrowser(): Promise<void> {
-    if (!commandChar) return;
-    const { tz } = formatBrowserClock();
-    await sendCommand(`clock:sync=${Date.now()},${tz}`);
-}
-
-export async function setClockFormat24Hour(enabled: boolean): Promise<void> {
-    bleState.clock24Hour = enabled;
-    await sendCommand(`clock:fmt=${enabled ? '24' : '12'}`);
-}
-
 export async function connect(): Promise<boolean> {
     try {
         // Use the main Service UUID for filtering.
@@ -382,7 +364,7 @@ export async function connect(): Promise<boolean> {
             console.log('Requesting full device sync...');
             await sendCommand('s:');
             await new Promise(r => setTimeout(r, 120));
-            await syncClockFromBrowser();
+            await sendCommand(`clock:sync=${Date.now()},${new Date().getTimezoneOffset()}`);
         }, 300);
 
         return true;

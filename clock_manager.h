@@ -11,6 +11,7 @@
 #include <esp_sleep.h>
 #include <time.h>
 #include "config.h"
+#include "ble_manager.h"
 #include "display_manager.h"
 
 // ==================== Clock Mode ====================
@@ -72,12 +73,12 @@ inline void restoreClockFromPreferences(Preferences& preferences) {
 
     clockTimezoneOffsetMinutes = (int16_t)preferences.getInt("clk_tz", 0);
     uint32_t clockSeconds = preferences.getUInt("clk_sec", 0);
+    clockBaseEpochMs = preferences.getULong64("clk_epoch", 0ULL);
     clockModeEnabled = preferences.getBool("clk_on", false);
     clockUse24Hour = preferences.getBool("clk_24", true);
     clockHasTime = (clockSeconds < 86400UL);
     clockBaseSeconds = clockSeconds % 86400UL;
     clockBaseMillis = millis();
-    clockBaseEpochMs = 0;
 }
 
 inline void setClockBaseSeconds(uint32_t secondsOfDay) {
@@ -161,85 +162,84 @@ inline String getClockStatusString() {
     return String(buf);
 }
 
+inline void drawDefaultClockFace(Adafruit_GFX* display, const char* dateBuf, const char* timeBuf, bool isPM) {
+    display->setTextWrap(false);
+
+    display->setTextSize(1);
+    display->setCursor(4, 4);
+    display->print(dateBuf);
+
+    const char* bleText = isBLEConnected() ? "BLE OK" : "BLE OFF";
+    int16_t bleWidth = (int16_t)strlen(bleText) * 6;
+    int16_t bleX = SCREEN_WIDTH - bleWidth - 4;
+    if (bleX < 4) bleX = 4;
+    display->setCursor(bleX, 4);
+    display->print(bleText);
+
+    display->setTextSize(4);
+    int16_t timeWidth = (int16_t)strlen(timeBuf) * 24;
+    int16_t timeX = (SCREEN_WIDTH - timeWidth) / 2;
+    if (timeX < 0) timeX = 0;
+    display->setCursor(timeX, 20);
+    display->print(timeBuf);
+
+    if (!clockUse24Hour) {
+        const char* ampmText = isPM ? "PM" : "AM";
+        display->setTextSize(1);
+        int16_t ampmWidth = (int16_t)strlen(ampmText) * 6;
+        int16_t ampmX = SCREEN_WIDTH - ampmWidth - 4;
+        if (ampmX < 4) ampmX = 4;
+        display->setCursor(ampmX, 54);
+        display->print(ampmText);
+    }
+}
+
 inline void drawClockScreen() {
     uint16_t WHITE_COLOR = (activeDisplayType == DISP_SSD1306) ? SSD1306_WHITE : SH110X_WHITE;
     uint32_t seconds = getClockSecondsOfDay();
     uint32_t minuteOfDay = seconds / 60UL;
     uint8_t hh = seconds / 3600UL;
     uint8_t mm = (seconds % 3600UL) / 60UL;
-    uint8_t ss = seconds % 60UL;
     uint8_t displayHour = hh;
-    const char* ampm = "";
+    bool isPM = (hh >= 12);
     if (!clockUse24Hour) {
-        ampm = (hh >= 12) ? "PM" : "AM";
         displayHour = hh % 12;
         if (displayHour == 0) displayHour = 12;
     }
 
+    bool colonOn = ((seconds % 2UL) == 0);
     char timeBuf[8];
-    snprintf(timeBuf, sizeof(timeBuf), "%u:%02u", displayHour, mm);
-    uint32_t drawKey = minuteOfDay | (clockUse24Hour ? 0x80000000UL : 0UL);
+    snprintf(timeBuf, sizeof(timeBuf), "%02u%c%02u", displayHour, colonOn ? ':' : ' ', mm);
+    uint32_t drawKey = minuteOfDay |
+                       ((seconds % 2UL) << 29) |
+                       (clockUse24Hour ? 0x80000000UL : 0UL) |
+                       (isBLEConnected() ? 0x40000000UL : 0UL);
     if (drawKey == clockLastDrawKey) {
         return;
     }
     clockLastDrawKey = drawKey;
 
     static const char* const WEEKDAYS[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    static const char* const MONTHS[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    char dateBuf[20] = "-- --- --";
+    char dateBuf[16] = "--- --";
     if (clockBaseEpochMs != 0) {
         uint64_t epochMs = getClockEpochMs();
         time_t epochS = (time_t)(epochMs / 1000ULL) - ((time_t)clockTimezoneOffsetMinutes * 60);
         struct tm localTm;
-        localtime_r(&epochS, &localTm);
+        gmtime_r(&epochS, &localTm); // Avoid system timezone offsets, since we already offset manually
         int wday = localTm.tm_wday;
-        int mon = localTm.tm_mon;
         int mday = localTm.tm_mday;
         if (wday < 0 || wday > 6) wday = 0;
-        if (mon < 0 || mon > 11) mon = 0;
-        snprintf(dateBuf, sizeof(dateBuf), "%s %s %d", WEEKDAYS[wday], MONTHS[mon], mday);
+        snprintf(dateBuf, sizeof(dateBuf), "%s %02d", WEEKDAYS[wday], mday);
     }
 
     if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
         display_ssd1306->clearDisplay();
-        display_ssd1306->drawRoundRect(2, 2, 124, 60, 8, WHITE_COLOR);
-        display_ssd1306->drawFastHLine(10, 14, 108, WHITE_COLOR);
-
-        display_ssd1306->setTextColor(WHITE_COLOR);
-        display_ssd1306->setTextWrap(false);
-        display_ssd1306->setTextSize(1);
-        display_ssd1306->setCursor(10, 5);
-        display_ssd1306->print(dateBuf);
-
-        display_ssd1306->setTextSize(3);
-        int16_t timeW = (int16_t)strlen(timeBuf) * 18;
-        display_ssd1306->setCursor((SCREEN_WIDTH - timeW) / 2, 24);
-        display_ssd1306->print(timeBuf);
-
-        if (!clockUse24Hour) {
-            display_ssd1306->setTextSize(1);
-            display_ssd1306->setCursor(102, 34);
-            display_ssd1306->print(ampm);
-        }
+        drawDefaultClockFace(display_ssd1306, dateBuf, timeBuf, isPM);
         display_ssd1306->display();
         pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     } else if (display_sh1106) {
         display_sh1106->clearDisplay();
-        display_sh1106->drawRoundRect(2, 2, 124, 60, 8, WHITE_COLOR);
-        display_sh1106->drawFastHLine(10, 14, 108, WHITE_COLOR);
-
-        display_sh1106->setTextColor(WHITE_COLOR);
-        display_sh1106->setTextWrap(false);
-        display_sh1106->setTextSize(3);
-        int16_t timeW = (int16_t)strlen(timeBuf) * 18;
-        display_sh1106->setCursor((SCREEN_WIDTH - timeW) / 2, 24);
-        display_sh1106->print(timeBuf);
-
-        if (!clockUse24Hour) {
-            display_sh1106->setTextSize(1);
-            display_sh1106->setCursor(102, 34);
-            display_sh1106->print(ampm);
-        }
+        drawDefaultClockFace(display_sh1106, dateBuf, timeBuf, isPM);
         display_sh1106->display();
         pushPartialUpdate(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     }

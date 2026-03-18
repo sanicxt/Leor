@@ -20,9 +20,9 @@
 
 ## 📖 Overview
 
-**Leor** is an open-source desktop companion that brings character to your workspace. Powered by an **ESP32-C3** (with ESP32 and ESP32-C6 support), Leor uses an OLED display to render fluid, procedural eye animations and an IMU to understand physical interactions.
+**Leor** is an open-source desktop companion that brings character to your workspace. Powered by an **ESP32-C3** (with ESP32 and ESP32-C6 support), Leor uses an OLED display to render fluid, procedural eye animations, a built-in clock mode, and an IMU to understand physical interactions.
 
-Whether you poke it, shake it, or pick it up, Leor reacts with distinct emotions powered by **Edge Impulse** machine learning. Control Leor's mood, sensitivity, and settings wirelessly via a modern SvelteKit web interface, and update firmware over-the-air via BLE OTA.
+Whether you poke it, shake it, or pick it up, Leor reacts with distinct emotions powered by **Edge Impulse** machine learning. Control Leor's mood, sensitivity, clock, and display settings wirelessly via a modern SvelteKit web interface, and update firmware over-the-air via BLE OTA.
 
 ---
 
@@ -47,6 +47,7 @@ Whether you poke it, shake it, or pick it up, Leor reacts with distinct emotions
 * **BLE Control:** Low-latency Bluetooth Low Energy connection.
 * **BLE OTA Firmware Updates:** Flash new firmware wirelessly from the web dashboard.
 * **Web Dashboard:** A beautiful SvelteKit app with real-time gesture tuning, eye customization, and OTA.
+* **Clock Mode:** Toggle the OLED clock, sync from browser time, choose 12/24-hour format, and keep the date persistent across reboots.
 * **Persistent Memory:** All settings saved to NVS Flash — survive reboots and deep sleep.
 * **Serial & BLE API:** Full command reference in [`API.md`](API.md).
 
@@ -75,7 +76,7 @@ Whether you poke it, shake it, or pick it up, Leor reacts with distinct emotions
 
 ## 🔌 Wiring
 
-All peripherals connect via the I2C bus. A PNP transistor on the power rail allows the MCU to cut peripheral power during deep sleep.
+All peripherals connect via the I2C bus. A PNP transistor on the high-side power rail switches the OLED and IMU off during deep sleep.
 
 ```mermaid
 graph TD
@@ -85,11 +86,14 @@ graph TD
     end
 
     subgraph ESP32-C3 Super Mini
-      GPIO8[GPIO 8<br>SDA]
-      GPIO9[GPIO 9<br>SCL]
-      GPIO2[GPIO 2<br>Touch Wake]
-      GPIO3[GPIO 3<br>PWR CTRL]
+      SDA[I2C SDA<br>see config.h]
+      SCL[I2C SCL<br>see config.h]
+      GPIO0[GPIO 0<br>Touch Wake]
+      GPIO1[GPIO 1<br>PNP Base Control]
     end
+
+    PNP[PNP Transistor<br>BC557 or equivalent]
+    VPERIPH[VCC_PERIPH<br>Switched 3.3V]
 
     subgraph Peripherals
       OLED[OLED Display<br>Addr: 0x3C]
@@ -97,28 +101,32 @@ graph TD
     end
 
     %% Power Connections
-    VCC --> OLED & IMU & ESP32-C3
-    GND --> OLED & IMU & ESP32-C3
+    VCC --> PNP
+    PNP --> VPERIPH
+    VPERIPH --> OLED & IMU
+    GND --> OLED & IMU & SDA & SCL & GPIO0 & GPIO1 & PNP
 
     %% Data Connections
-    GPIO8 == I2C Data ==> OLED & IMU
-    GPIO9 == I2C Clock ==> OLED & IMU
+    SDA == I2C Data ==> OLED & IMU
+    SCL == I2C Clock ==> OLED & IMU
+    GPIO1 -. Base via resistor .-> PNP
 
     style VCC fill:#f9f,stroke:#333,stroke-width:2px
     style GND fill:#333,stroke:#fff,stroke-width:2px,color:#fff
+    style PNP fill:#ffd6d6,stroke:#b33,stroke-width:2px
+    style VPERIPH fill:#fff2cc,stroke:#b38f00,stroke-width:2px
 
 ```
 
-**Pin Mapping (ESP32-C3 defaults):**
+**Pin Mapping:**
 
 | Pin | Function | Notes |
 | --- | --- | --- |
-| **GPIO 8** | I2C SDA | Shared bus for OLED + IMU |
-| **GPIO 9** | I2C SCL | Shared bus for OLED + IMU |
-| **GPIO 2** | Touch/button wake | Configurable via BLE |
-| **GPIO 3** | PNP power control | LOW = peripherals ON |
+| **See `config.h`** | I2C SDA / SCL | Shared bus for OLED + IMU |
+| **GPIO 0** | Touch/button wake | Configurable via BLE |
+| **GPIO 1** | PNP power control | LOW = peripherals ON, HIGH = peripherals OFF |
 
-> Pins are configurable at runtime via BLE commands and stored in NVS.
+> The I2C pull-ups should connect to the switched rail (VCC_PERIPH), not always-on 3.3V.
 
 ---
 
@@ -136,6 +144,7 @@ Leor/
 ├── shuffle_manager.h        # Auto-expression shuffle logic
 ├── ble_manager.h            # NimBLE BLE stack and characteristics
 ├── ota_manager.h            # BLE OTA firmware update service
+├── clock_manager.h          # OLED clock mode, sync, persistence, and rendering
 ├── commands.h               # Serial/BLE command parser
 ├── ei_gesture.h             # Edge Impulse inference integration
 ├── MochiEyes.h              # Procedural eye animation engine
@@ -220,6 +229,19 @@ bun run dev
 
 Open `http://localhost:5173` in a BLE-supported browser (Chrome, Edge, Opera).
 
+### 3. Clock Controls
+
+The OLED clock is controlled from the web dashboard or through the serial/BLE API.
+
+Common commands:
+
+* `clock:on` / `clock:off` - enable or disable clock mode
+* `clock:sync=EPOCH_MS[,TZ]` - sync from browser time
+* `clock:set=HH:MM[:SS]` - set a manual clock time
+* `clock:fmt=12|24` - switch the time format
+
+The synced epoch and timezone are saved in NVS so the clock can restore its date after reboot or deep sleep.
+
 ---
 
 ## 🎮 Gestures & Expressions
@@ -249,16 +271,21 @@ Open `http://localhost:5173` in a BLE-supported browser (Chrome, Edge, Opera).
 Hardware settings in `config.h`:
 
 ```cpp
-const char* BLE_DEVICE_NAME = "Leor";
+const char* BLE_DEVICE_NAME = "LeorDevKitTest55";
 
 #define I2C_ADDRESS   0x3c
 #define SCREEN_WIDTH  128
-#define FRAME_RATE    100
+#define FRAME_RATE    25
 
-#define TOUCH_WAKE_PIN   2
-#define PWR_CTRL_PIN     3
+#define I2C_SDA_PIN      10
+#define I2C_SCL_PIN      7
+
+#define TOUCH_WAKE_PIN   0
+#define PWR_CTRL_PIN     1
 #define BLINK_INTERVAL   3   // Seconds between blinks
 ```
+
+Most runtime settings, including the display type, BLE name, shuffle ranges, breathing, and clock state, are stored in `Preferences` and can be adjusted from the dashboard or via `API.md`.
 
 ---
 
@@ -266,12 +293,12 @@ const char* BLE_DEVICE_NAME = "Leor";
 
 <details>
 <summary><strong>Display Not Found / No Display Connected</strong></summary>
-Leor will continue booting without a display — BLE still activates. Use the BLE web interface to send <code>display:addr:0x3C</code> or <code>display:type:sh1106</code> to reconfigure, then <code>restart</code>.
+Leor will continue booting without a display — BLE still activates. Use the BLE web interface to send <code>display:addr=0x3C</code> or <code>display:type=sh1106</code> to reconfigure, then <code>restart</code>.
 </details>
 
 <details>
 <summary><strong>IMU Initialization Failed</strong></summary>
-Check wiring. Ensure SDA → GPIO8 and SCL → GPIO9. Verify the MPU6050 address is 0x68 (default) in <code>config.h</code>.
+Check wiring and confirm the configured I2C pins in `config.h`. Verify the MPU6050 address is 0x68 (default) and match the display/IMU address if needed.
 </details>
 
 <details>

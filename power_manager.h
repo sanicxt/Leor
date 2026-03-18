@@ -93,17 +93,23 @@ void enterDeepSleepFromTouch() {
     // 1. Goodbye screen
     if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {
         display_ssd1306->clearDisplay();
+        const char* byeText = "Bye bye!";
         display_ssd1306->setTextColor(SSD1306_WHITE);
+        display_ssd1306->setTextWrap(false);
         display_ssd1306->setTextSize(2);
-        display_ssd1306->setCursor(28, 24);
-        display_ssd1306->print(F("Bye bye!"));
+        int16_t byeWidth = (int16_t)strlen(byeText) * 12;
+        display_ssd1306->setCursor((SCREEN_WIDTH - byeWidth) / 2, 24);
+        display_ssd1306->print(byeText);
         display_ssd1306->display();
     } else if (display_sh1106) {
         display_sh1106->clearDisplay();
+        const char* byeText = "Bye bye!";
         display_sh1106->setTextColor(SH110X_WHITE);
+        display_sh1106->setTextWrap(false);
         display_sh1106->setTextSize(2);
-        display_sh1106->setCursor(28, 24);
-        display_sh1106->print(F("Bye bye!"));
+        int16_t byeWidth = (int16_t)strlen(byeText) * 12;
+        display_sh1106->setCursor((SCREEN_WIDTH - byeWidth) / 2, 24);
+        display_sh1106->print(byeText);
         display_sh1106->display();
     }
     delay(300);

@@ -2,8 +2,7 @@
     import { onMount } from "svelte";
     import {
         bleState,
-        syncClockFromBrowser,
-        setClockFormat24Hour,
+        sendCommand,
         getClockEnabled,
         getClockSeconds,
         getClockTimezoneOffset,
@@ -44,7 +43,19 @@
         if (!bleState.connected) return;
         syncing = true;
         try {
-            await syncClockFromBrowser();
+            await sendCommand(`clock:sync=${Date.now()},${new Date().getTimezoneOffset()}`);
+        } finally {
+            syncing = false;
+        }
+    }
+
+    async function toggleClock() {
+        if (!bleState.connected) return;
+        syncing = true;
+        try {
+            const enabled = !getClockEnabled();
+            bleState.clockEnabled = enabled;
+            await sendCommand(enabled ? "clock:on" : "clock:off");
         } finally {
             syncing = false;
         }
@@ -54,7 +65,8 @@
         if (!bleState.connected) return;
         formatBusy = true;
         try {
-            await setClockFormat24Hour(use24);
+            bleState.clock24Hour = use24;
+            await sendCommand(`clock:fmt=${use24 ? '24' : '12'}`);
         } finally {
             formatBusy = false;
         }
@@ -70,37 +82,50 @@
 </script>
 
 <div class="bento-card bg-bento-peach p-6 space-y-5">
-    <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-start justify-between gap-3">
+    <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between gap-3">
         <div>
-            <h2 class="text-xl font-black uppercase tracking-tight">Clock Sync</h2>
-            <p class="text-sm font-bold opacity-80">Date + time sync from browser</p>
+            <h2 class="text-xl font-black uppercase tracking-tight">Clock</h2>
+            <p class="text-sm font-bold opacity-80">Browser sync for the OLED clock</p>
         </div>
         <div class="px-3 py-1 rounded-full border-2 border-bento-border bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)] text-[10px] font-black uppercase tracking-wider text-ink">
-            {getClockEnabled() ? "awake" : "sleepy"}
+            {bleState.connected ? "BLE connected" : "BLE disconnected"}
         </div>
     </div>
 
+    <button
+        onclick={toggleClock}
+        disabled={!bleState.connected || syncing}
+        class={`bento-button w-full rounded-xl border-2 border-bento-border px-4 py-3 text-left transition-all disabled:opacity-50 ${getClockEnabled() ? 'bg-bento-blue text-ink shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper text-ink'}`}
+    >
+        <div class="flex items-center justify-between gap-3">
+            <div>
+                <div class="text-xs font-black uppercase tracking-wider">Clock Power</div>
+                <div class="text-[10px] font-bold opacity-70">Turn the OLED clock on or off</div>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class={`w-12 h-7 rounded-full border-2 border-bento-border p-1 transition-all ${getClockEnabled() ? 'bg-bento-green' : 'bg-paper'}`}>
+                    <div class={`h-4 w-4 rounded-full bg-ink transition-transform ${getClockEnabled() ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                </div>
+                <span class="text-[10px] font-black uppercase tracking-wider">{getClockEnabled() ? 'On' : 'Off'}</span>
+            </div>
+        </div>
+    </button>
+
     <div class="space-y-3">
         <div class="p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-3">
-            <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center justify-between gap-2">
                 <div>
                     <div class="text-ink font-black uppercase text-xs tracking-wider">Browser Time</div>
-                    <div class="text-ink/60 text-[10px] font-bold">Used to sync the device clock</div>
+                    <div class="text-ink/60 text-[10px] font-bold">Used to sync the OLED</div>
                 </div>
                 <span class="font-mono text-sm font-black px-2.5 py-1 rounded-xl border-2 border-bento-border bg-paper text-ink shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                     {formatBrowserTime(browserNow)}
                 </span>
             </div>
 
-            <div class="grid grid-cols-2 gap-2 text-[10px] font-bold">
-                <div class="rounded-xl border-2 border-bento-border bg-paper px-3 py-2 shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
-                    <div class="uppercase text-ink/60">Device</div>
-                    <div class="font-mono text-sm text-ink">{formatDeviceClock(getClockSeconds(), getClock24Hour()).time}{getClock24Hour() ? '' : ` ${formatDeviceClock(getClockSeconds(), false).ampm}`}</div>
-                </div>
-                <div class="rounded-xl border-2 border-bento-border bg-paper px-3 py-2 shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
-                    <div class="uppercase text-ink/60">Format</div>
-                    <div class="font-mono text-sm text-ink">{getClock24Hour() ? "24H" : "12H"}</div>
-                </div>
+            <div class="flex items-center justify-between gap-2 text-[10px] font-bold">
+                <span class="uppercase text-ink/60">Device</span>
+                <span class="font-mono text-sm text-ink">{formatDeviceClock(getClockSeconds(), getClock24Hour()).time}{getClock24Hour() ? '' : ` ${formatDeviceClock(getClockSeconds(), false).ampm}`}</span>
             </div>
         </div>
 
@@ -108,7 +133,7 @@
             <div class="flex items-center justify-between gap-2">
                 <div>
                     <div class="text-ink font-black uppercase text-xs tracking-wider">Display Format</div>
-                    <div class="text-ink/60 text-[10px] font-bold">Switch between 12-hour and 24-hour display</div>
+                    <div class="text-ink/60 text-[10px] font-bold">Match the OLED theme</div>
                 </div>
                 <div class="px-2.5 py-1 rounded-full border-2 border-bento-border bg-bento-yellow text-[10px] font-black uppercase tracking-wider text-ink shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                     {getClock24Hour() ? "24h" : "12h"}
@@ -135,23 +160,12 @@
             </div>
         </div>
 
-        <div class="p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
-                <div>
-                    <div class="text-ink font-black uppercase text-xs tracking-wider">Clock Sync</div>
-                    <div class="text-ink/60 text-[10px] font-bold">Stores the time so it survives deep sleep</div>
-                </div>
-                <button
-                    onclick={syncNow}
-                    disabled={!bleState.connected || syncing}
-                    class="bento-button px-3 py-2 rounded-xl bg-bento-pink text-ink text-xs disabled:opacity-50"
-                >
-                    {syncing ? "Syncing…" : "Sync now"}
-                </button>
-            </div>
-            <div class="text-[10px] text-ink/60 font-bold leading-relaxed">
-                The OLED clock uses the device time, while this panel uses your browser clock.
-            </div>
-        </div>
+        <button
+            onclick={syncNow}
+            disabled={!bleState.connected || syncing}
+            class="bento-button w-full px-3 py-3 rounded-xl bg-bento-pink text-ink text-sm disabled:opacity-50"
+        >
+            {syncing ? "Syncing…" : "Sync now"}
+        </button>
     </div>
 </div>

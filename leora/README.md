@@ -1,90 +1,39 @@
-# Svelte library
+# Leor Web Dashboard
 
-Everything you need to build a Svelte library, powered by [`sv`](https://npmjs.com/package/sv).
+SvelteKit dashboard for controlling the Leor ESP32 companion over Web Bluetooth.
 
-Read more about creating a library [in the docs](https://svelte.dev/docs/kit/packaging).
+## Features
 
-## Creating a project
+- Connect to Leor from a BLE-supported browser
+- Tune eye, breathing, gesture, and display settings
+- Control the OLED clock mode
+- Sync the clock from browser time
+- Switch between 12-hour and 24-hour format
+- Send OTA updates when supported by the firmware
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with Bun, start a development server:
+## Development
 
 ```sh
 bun install
 bun run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-Everything inside `src/lib` is part of your library, everything inside `src/routes` can be used as a showcase or preview app.
+Open the local app in Chrome, Edge, or another browser with Web Bluetooth support.
 
-## Building
-
-To build your library:
+## Build
 
 ```sh
-npm pack
+bun run build
 ```
 
-To create a production version of your showcase app:
+## Pages build
 
 ```sh
-npm run build
-```
-
-## GitHub Pages
-
-If you publish this app to GitHub Pages from a repository that is **not** named `your-username.github.io`, the site is served from a subpath:
-
-`https://your-username.github.io/your-repo-name/`
-
-This project is configured to:
-
-- Automatically set `config.kit.paths.base` to `/${repo}` when `GITHUB_REPOSITORY=owner/repo` is present.
-- Generate a fallback `404.html` (via `adapter-static`) so client-side routing works on refresh.
-
-Build for Pages from the `leora/` folder:
-
-```sh
-bun install
 bun run build:pages
 ```
 
-### GitHub Actions deploy
+## Notes
 
-This repo includes a workflow that builds and deploys to GitHub Pages on pushes to `main`:
-
-- Workflow: `.github/workflows/deploy.yml`
-- Output folder: `leora/build/`
-
-Optional override (if you want to force a specific base path):
-
-```sh
-BASE_PATH=/your-repo-name bun run build:pages
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
-
-## Publishing
-
-Go into the `package.json` and give your package the desired name through the `"name"` option. Also consider adding a `"license"` field and point it to a `LICENSE` file which you can create from a template (one popular option is the [MIT license](https://opensource.org/license/mit/)).
-
-To publish your library to [npm](https://www.npmjs.com):
-
-```sh
-npm publish
-```
+- The dashboard talks to the firmware through the BLE command API in [`../API.md`](../API.md).
+- Clock sync uses browser time and timezone offset, and the firmware persists the synced epoch.
+- The repo root README contains the full firmware and hardware overview.
