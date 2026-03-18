@@ -85,6 +85,8 @@ graph TD
       GND[Ground]
     end
 
+    ESPGND[ESP32 Ground]
+
     subgraph ESP32-C3 Super Mini
       SDA[I2C SDA<br>see config.h]
       SCL[I2C SCL<br>see config.h]
@@ -106,7 +108,8 @@ graph TD
     PNP --> VPERIPH
     VPERIPH --> OLED & IMU
     VCC --> TP223
-    GND --> OLED & IMU & SDA & SCL & GPIO0 & GPIO1 & PNP & TP223
+    GND --> ESPGND
+    ESPGND --> OLED & IMU & SDA & SCL & GPIO0 & GPIO1 & PNP & TP223
 
     %% Data Connections
     SDA == I2C Data ==> OLED & IMU
@@ -130,6 +133,8 @@ graph TD
 | **GPIO 0** | TP223 touch input | Powered directly from 3.3V, not switched by the PNP |
 | **GPIO 1** | PNP power control | LOW = peripherals ON, HIGH = peripherals OFF |
 
+> The TP223 GND pin should connect to the ESP32 ground.
+> The power bus ground should also connect to the ESP32 ground.
 > The TP223 touch sensor should connect directly to always-on 3.3V so touch wake still works while the display and IMU are powered off.
 > The I2C pull-ups should connect to the switched rail (VCC_PERIPH), not always-on 3.3V.
 
