@@ -59,6 +59,7 @@
 #include "esp_rom_gpio.h"
 #include "config.h"
 #include "display_manager.h"
+#include "clock_manager.h"
 
 #if SOC_RTCIO_PIN_COUNT > 0
   #include "driver/rtc_io.h"
@@ -85,6 +86,9 @@ inline bool isTouchWakePressed() {
 
 void enterDeepSleepFromTouch() {
     Serial.println(F("[POWER] Long-touch → entering deep sleep"));
+
+    // Keep the current clock value across deep sleep.
+    persistClockToRtc();
 
     // 1. Goodbye screen
     if (activeDisplayType == DISP_SSD1306 && display_ssd1306) {

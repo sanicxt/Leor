@@ -10,6 +10,9 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <time.h>
+#include <esp_attr.h>
+#include <esp_sleep.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_SH110X.h>

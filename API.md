@@ -119,6 +119,13 @@ Examples:
 - display:clear — Clear the display.
 - display:info — Return current display info (type, address, resolution, saved prefs).
 
+## Clock mode
+- clock: — Return clock status and current time.
+- clock:on / clock:off — Enable or disable clock mode.
+- clock:set=HH:MM[:SS] — Set the clock time and enable clock mode.
+- clock:sync=EPOCH_MS[,TZ] — Sync from browser time and timezone offset.
+- clock:fmt=12|24 — Switch display format between 12-hour and 24-hour mode.
+
 ## Weight transfer / Model upload
 - `gw+<BASE64_CHUNK>` — Append a base64-encoded weight chunk for weight transfer (used by model upload tools). Returns `gw+ok` on success.
 - `gw!` — Finalize weight transfer. Returns `gw:ok` or `gw:err`.

@@ -13,6 +13,7 @@
 #include "imu_manager.h"
 #include "shuffle_manager.h"
 #include "power_manager.h"
+#include "clock_manager.h"
 #include "ei_gesture.h"
 #include "ble_manager.h"
 
@@ -77,6 +78,8 @@ inline bool isTraining() { return false; }  // EI model is pre-trained
 
 // Reset all effects to default
 void resetEffects() {
+  setClockEnabled(false);
+
   // Reset emotions
   MOCHI_CALL_VOID_NOARGS(resetEmotions);
   
@@ -116,6 +119,12 @@ void printHelp() {
   Serial.println(F("  display:test - test display animation"));
   Serial.println(F("  display:clear - clear display"));
   Serial.println(F("  display:info - show display info"));
+  Serial.println(F("\nCLOCK:"));
+  Serial.println(F("  clock: - show clock status"));
+  Serial.println(F("  clock:on / clock:off - enable or disable clock mode"));
+  Serial.println(F("  clock:set=HH:MM[:SS] - set clock time and enable clock mode"));
+  Serial.println(F("  clock:sync=EPOCH_MS[,TZ] - sync from browser time"));
+  Serial.println(F("  clock:fmt=12|24 - switch display format"));
   Serial.println(F("\nSYSTEM:"));
   Serial.println(F("  restart/reboot - restart ESP32"));
   Serial.println(F("  tw: - touch wake/deep sleep status"));
@@ -481,6 +490,13 @@ String handleCommand(String cmd) {
       JsonObject state = doc["state"].to<JsonObject>();
       state["shuf"] = shuffleEnabled ? 1 : 0;
       state["mpu"]  = mpuVerbose ? 1 : 0;
+      state["clk"]  = isClockEnabled() ? 1 : 0;
+
+      JsonObject clock = doc["clock"].to<JsonObject>();
+      clock["on"] = isClockEnabled() ? 1 : 0;
+      clock["tz"] = (int)clockTimezoneOffsetMinutes;
+      clock["sec"] = (int)getClockSecondsOfDay();
+      clock["fmt"] = isClock24Hour() ? 24 : 12;
 
       // Shuffle timings (seconds)
       JsonObject shuffle = doc["shuffle"].to<JsonObject>();
@@ -925,6 +941,99 @@ String handleCommand(String cmd) {
     else {
       return "display: usage - type=<sh1106|ssd1306>, addr=<hex>, test, clear, info";
     }
+  }
+
+  // ==================== CLOCK MODE ====================
+  else if (cmd.startsWith("clock:")) {
+    String params = cmd.substring(6);
+    params.trim();
+
+    if (params.length() == 0) {
+      return getClockStatusString();
+    }
+
+    if (params == "on") {
+      setClockEnabled(true);
+      preferences.putBool("clk_on", true);
+      return getClockStatusString();
+    }
+
+    if (params == "off") {
+      setClockEnabled(false);
+      preferences.putBool("clk_on", false);
+      return getClockStatusString();
+    }
+
+    if (params.startsWith("fmt=")) {
+      int fmt = params.substring(4).toInt();
+      if (fmt == 12 || fmt == 24) {
+        bool use24 = (fmt == 24);
+        setClock24Hour(use24);
+        preferences.putBool("clk_24", use24);
+        return getClockStatusString();
+      }
+      return "clock:fmt invalid. Use 12 or 24";
+    }
+
+    if (params == "fmt:") {
+      return String("clock:fmt=") + (isClock24Hour() ? "24" : "12");
+    }
+
+    if (params.startsWith("sync=") || params.startsWith("set=")) {
+      String value = params.substring(params.indexOf('=') + 1);
+      value.trim();
+
+      if (params.startsWith("sync=")) {
+        int commaPos = value.indexOf(',');
+        uint64_t epochMs = 0;
+        int16_t tzOffset = 0;
+        if (commaPos > 0) {
+          epochMs = (uint64_t)strtoull(value.substring(0, commaPos).c_str(), NULL, 10);
+          tzOffset = (int16_t)value.substring(commaPos + 1).toInt();
+        } else {
+          epochMs = (uint64_t)strtoull(value.c_str(), NULL, 10);
+        }
+
+        setClockFromEpochMs(epochMs, tzOffset);
+        setClockEnabled(true);
+        preferences.putBool("clk_on", true);
+        preferences.putUInt("clk_sec", getClockSecondsOfDay());
+        preferences.putInt("clk_tz", tzOffset);
+        return getClockStatusString();
+      }
+
+      int firstColon = value.indexOf(':');
+      if (firstColon <= 0) {
+        return "clock:set invalid. Use HH:MM or HH:MM:SS";
+      }
+
+      int secondColon = value.indexOf(':', firstColon + 1);
+      int hours = value.substring(0, firstColon).toInt();
+      int minutes = 0;
+      int seconds = 0;
+
+      if (secondColon > firstColon) {
+        minutes = value.substring(firstColon + 1, secondColon).toInt();
+        seconds = value.substring(secondColon + 1).toInt();
+      } else {
+        minutes = value.substring(firstColon + 1).toInt();
+      }
+
+      if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 ||
+          seconds < 0 || seconds > 59) {
+        return "clock:set invalid. Use HH:MM or HH:MM:SS";
+      }
+
+      setClockTimeOfDay((uint8_t)hours, (uint8_t)minutes, (uint8_t)seconds);
+      setClockEnabled(true);
+      preferences.putBool("clk_on", true);
+      preferences.putUInt("clk_sec", (uint32_t)hours * 3600UL +
+                                         (uint32_t)minutes * 60UL +
+                                         (uint32_t)seconds);
+      return getClockStatusString();
+    }
+
+    return "clock: usage - on, off, set=HH:MM[:SS], sync=EPOCH_MS[,TZ], fmt=12|24";
   }
 
   // ==================== RESTART ====================

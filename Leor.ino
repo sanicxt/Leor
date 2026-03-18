@@ -144,6 +144,9 @@ void setup() {
     // 6. Shuffle
     initShuffle(preferences);
 
+    // 6b. Clock mode
+    restoreClockFromPreferences(preferences);
+
     // 7. BLE
     // If no custom name is saved, generate a unique one using the MAC address
     String bleName = preferences.getString("ble_name", "");
@@ -197,7 +200,9 @@ void loop() {
     // Update display (skip during training)
     bool training = isTraining();
     if (!training) {
-        if (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306) {
+        if (isClockEnabled()) {
+            drawClockScreen();
+        } else if (activeDisplayType == DISP_SSD1306 && pMochiEyes_ssd1306) {
             pMochiEyes_ssd1306->update();
         } else if (pMochiEyes_sh1106) {
             pMochiEyes_sh1106->update();

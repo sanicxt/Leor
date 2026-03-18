@@ -1,5 +1,16 @@
+/// <reference lib="dom" />
+
 // Svelte 5 state management using $state rune in .svelte.ts file
-import { BLE_CONFIG } from './ble-config';
+import { BLE_CONFIG } from './ble-config.js';
+
+declare global {
+    interface Navigator {
+        bluetooth: any;
+    }
+}
+
+type BluetoothDevice = any;
+type BluetoothRemoteGATTCharacteristic = any;
 
 // Gesture mapping type
 export type GestureMapping = { name: string; action: string };
@@ -33,7 +44,11 @@ export const bleState = $state({
     gestureCooldown: 2000,
     gestureMappings: [] as GestureMapping[],  // synced from ESP32
     bleLowPowerMode: false,  // BLE power saving mode
-    bleDeviceName: ''  // BLE device name (loaded on connect)
+    bleDeviceName: '',  // BLE device name (loaded on connect)
+    clockEnabled: false,
+    clockTimezoneOffset: 0,
+    clockSeconds: 0,
+    clock24Hour: true
 });
 
 // BLE device and characteristics
@@ -77,6 +92,10 @@ export function getGestureReactionTime() { return bleState.gestureReactionTime; 
 export function getGestureConfidence() { return bleState.gestureConfidence; }
 export function getGestureCooldown() { return bleState.gestureCooldown; }
 export function getGestureMappings() { return bleState.gestureMappings; }
+export function getClockEnabled() { return bleState.clockEnabled; }
+export function getClockSeconds() { return bleState.clockSeconds; }
+export function getClockTimezoneOffset() { return bleState.clockTimezoneOffset; }
+export function getClock24Hour() { return bleState.clock24Hour; }
 
 // Setters
 export function setShuffleEnabled(val: boolean) { bleState.shuffleEnabled = val; }
@@ -108,6 +127,28 @@ export function setGestureMatching(val: boolean) { bleState.gestureMatching = va
 export function setGestureReactionTime(val: number) { bleState.gestureReactionTime = val; }
 export function setGestureConfidence(val: number) { bleState.gestureConfidence = val; }
 export function setGestureCooldown(val: number) { bleState.gestureCooldown = val; }
+export function setClockEnabled(val: boolean) { bleState.clockEnabled = val; }
+export function setClockSeconds(val: number) { bleState.clockSeconds = val; }
+export function setClockTimezoneOffset(val: number) { bleState.clockTimezoneOffset = val; }
+export function setClock24Hour(val: boolean) { bleState.clock24Hour = val; }
+
+function formatBrowserClock(now = new Date()) {
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    return { hh, mm, ss, tz: now.getTimezoneOffset() };
+}
+
+export async function syncClockFromBrowser(): Promise<void> {
+    if (!commandChar) return;
+    const { tz } = formatBrowserClock();
+    await sendCommand(`clock:sync=${Date.now()},${tz}`);
+}
+
+export async function setClockFormat24Hour(enabled: boolean): Promise<void> {
+    bleState.clock24Hour = enabled;
+    await sendCommand(`clock:fmt=${enabled ? '24' : '12'}`);
+}
 
 export async function connect(): Promise<boolean> {
     try {
@@ -146,7 +187,7 @@ export async function connect(): Promise<boolean> {
 
         // Subscribe to status notifications
         await statusChar.startNotifications();
-        statusChar.addEventListener('characteristicvaluechanged', (e) => {
+        statusChar.addEventListener('characteristicvaluechanged', (e: Event) => {
             const chunk = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
             console.log('[BLE RX Chunk]', chunk);
 
@@ -200,6 +241,12 @@ export async function connect(): Promise<boolean> {
                                         action: m.a
                                     }));
                                 }
+                            }
+                            if (data.clock) {
+                                if ('on' in data.clock) bleState.clockEnabled = (data.clock.on === 1);
+                                if ('tz' in data.clock) bleState.clockTimezoneOffset = data.clock.tz;
+                                if ('sec' in data.clock) bleState.clockSeconds = data.clock.sec;
+                                if ('fmt' in data.clock) bleState.clock24Hour = (data.clock.fmt === 24);
                             }
                         }
 
@@ -297,11 +344,28 @@ export async function connect(): Promise<boolean> {
                 bleState.breathingSpeed = parseFloat(breathMatch[3]);
                 console.log('[BLE] Breathing:', breathMatch[1], 'intensity:', breathMatch[2], 'speed:', breathMatch[3]);
             }
+
+            const clockMatch = value.match(/clock:(on|off)\s+(\d{1,2}):(\d{2}):(\d{2})(?:\s+tz=(-?\d+))?(?:\s+fmt=(12|24))?/);
+            if (clockMatch) {
+                bleState.clockEnabled = (clockMatch[1] === 'on');
+                bleState.clockSeconds = (parseInt(clockMatch[2]) * 3600) + (parseInt(clockMatch[3]) * 60) + parseInt(clockMatch[4]);
+                if (clockMatch[5] !== undefined) {
+                    bleState.clockTimezoneOffset = parseInt(clockMatch[5]);
+                }
+                if (clockMatch[6] !== undefined) {
+                    bleState.clock24Hour = (clockMatch[6] === '24');
+                }
+            }
+
+            const clockFmtMatch = value.match(/clock:fmt=(12|24)/);
+            if (clockFmtMatch) {
+                bleState.clock24Hour = (clockFmtMatch[1] === '24');
+            }
         });
 
         // Subscribe to gesture notifications
         await gestureChar.startNotifications();
-        gestureChar.addEventListener('characteristicvaluechanged', (e) => {
+        gestureChar.addEventListener('characteristicvaluechanged', (e: Event) => {
             const value = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
             bleState.lastGesture = value;
         });
@@ -317,6 +381,8 @@ export async function connect(): Promise<boolean> {
         setTimeout(async () => {
             console.log('Requesting full device sync...');
             await sendCommand('s:');
+            await new Promise(r => setTimeout(r, 120));
+            await syncClockFromBrowser();
         }, 300);
 
         return true;
