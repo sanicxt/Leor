@@ -25,7 +25,7 @@
     {#each directions as row}
         {#each row as dir}
             <button
-                class="bento-button w-14 h-14 text-xl flex items-center justify-center {dir === 'center' ? 'bg-ink text-paper scale-105 hover:bg-paper hover:text-ink' : 'bg-paper text-ink hover:bg-ink hover:text-paper'} disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-paper disabled:hover:text-ink"
+                class="bento-button w-14 h-14 text-xl flex items-center justify-center {dir === 'center' ? 'bg-ink text-paper scale-105 hover:bg-paper hover:text-ink' : 'bg-paper text-ink hover:bg-ink hover:text-bento-border'} disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-paper disabled:hover:text-ink"
                 onclick={() => sendCommand(dir)}
                 disabled={!bleState.connected}
             >

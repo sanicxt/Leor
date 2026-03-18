@@ -6,7 +6,7 @@
 </script>
 
 <div
-    class="relative flex flex-nowrap items-center justify-center bg-paper p-2 rounded-full border-4 border-ink shadow-[4px_4px_0px_0px_var(--color-ink)]"
+    class="relative flex flex-nowrap items-center justify-center bg-paper p-2 rounded-full border-4 border-bento-border shadow-[4px_4px_0px_0px_var(--color-bento-border)]"
 >
     <AnimateSharedLayout>
         {#each tabs as item}
@@ -30,7 +30,7 @@
                     >
                         <div
                             use:motion
-                            class="absolute inset-0 rounded-full bg-bento-peach border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)]"
+                            class="absolute inset-0 rounded-full bg-bento-peach border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)]"
                         ></div>
                     </Motion>
                 {/if}

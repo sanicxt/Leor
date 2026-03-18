@@ -9,7 +9,7 @@
     <div class="flex flex-wrap gap-3">
         {#each mouthTypes as mouth}
             <button
-                class="bento-button bg-paper text-ink capitalize px-4 py-2 hover:bg-ink hover:text-paper disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-paper disabled:hover:text-ink"
+                class="bento-button bg-paper text-ink capitalize px-4 py-2 hover:bg-ink hover:text-bento-border disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-paper disabled:hover:text-ink"
                 onclick={() => sendCommand(mouth)}
                 disabled={!bleState.connected}
             >
@@ -20,7 +20,7 @@
     <div class="flex flex-wrap gap-3">
         {#each mouthAnims as anim}
             <button
-                class="bento-button bg-paper text-ink capitalize px-4 py-2 hover:bg-ink hover:text-paper disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-paper disabled:hover:text-ink"
+                class="bento-button bg-paper text-ink capitalize px-4 py-2 hover:bg-ink hover:text-bento-border disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-paper disabled:hover:text-ink"
                 onclick={() => sendCommand(anim)}
                 disabled={!bleState.connected}
             >

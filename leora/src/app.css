@@ -2,6 +2,7 @@
 
 @theme {
     --color-ink: #2D2424;
+    --color-bento-border: #2D2424;
     --color-paper: #FDFBF7;
     --color-bento-pink: #fbc6d0;
     --color-bento-blue: #a3d9ff;
@@ -115,11 +116,11 @@
 }
 
 @utility bento-card {
-    @apply rounded-3xl border-4 border-ink shadow-[4px_4px_0px_0px_var(--color-ink)] overflow-hidden transition-all duration-300;
+    @apply rounded-3xl border-4 border-bento-border shadow-[4px_4px_0px_0px_var(--color-bento-border)] overflow-hidden transition-all duration-300;
 }
 
 @utility bento-button {
-    @apply rounded-2xl border-4 border-ink shadow-[4px_4px_0px_0px_var(--color-ink)] active:shadow-none active:translate-y-[4px] active:translate-x-[4px] transition-all duration-150 font-bold;
+    @apply rounded-2xl border-4 border-bento-border shadow-[4px_4px_0px_0px_var(--color-bento-border)] active:shadow-none active:translate-y-[4px] active:translate-x-[4px] transition-all duration-150 font-bold;
 }
 
 @layer base {
@@ -135,6 +136,7 @@
     /* Dark mode override */
     :root.dark {
         --color-ink: #f2eedc;
+        --color-bento-border: #111111;
         --color-paper: #201c1a;
         --color-bento-pink: #6e1c3b;
         --color-bento-blue: #163a5f;
@@ -147,6 +149,7 @@
     @media (prefers-color-scheme: dark) {
         :root:not(.light) {
             --color-ink: #f2eedc;
+            --color-bento-border: #111111;
             --color-paper: #201c1a;
             --color-bento-pink: #6e1c3b;
             --color-bento-blue: #163a5f;
