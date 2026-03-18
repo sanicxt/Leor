@@ -166,18 +166,8 @@
 <div class="space-y-6">
     <!-- Quick Presets -->
     <div class="bento-card bg-bento-yellow p-6 space-y-4">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-paper flex items-center justify-center">
-                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-                    />
-                </svg>
-            </div>
-            <h3 class="text-ink text-xl font-black uppercase">Quick Presets</h3>
+        <div class="mb-4 border-b-2 border-ink pb-2">
+            <h2 class="text-xl font-black uppercase">Quick Presets</h2>
         </div>
         <div class="grid grid-cols-4 gap-3">
             {#each presets as preset}
@@ -208,35 +198,12 @@
     <!-- Eye Appearance Card -->
     <div class="bento-card bg-bento-blue p-6 space-y-6">
         <!-- Header -->
-        <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-peach flex items-center justify-center">
-                    <svg
-                        class="w-5 h-5 text-ink"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="text-ink text-xl font-black uppercase">Eye Appearance</h3>
-                    <p class="text-ink/60 text-sm font-bold">
-                        Customize geometry & style
-                    </p>
-                </div>
+        <div class="mb-4 border-b-2 border-ink pb-2 flex items-center justify-between">
+            <div>
+                <h2 class="text-xl font-black uppercase">Eye Appearance</h2>
+                <p class="text-sm font-bold opacity-80">
+                    Customize geometry & style
+                </p>
             </div>
             <button
                 onclick={syncSettings}
@@ -414,28 +381,11 @@
 
     <!-- Mouth & Animations Card -->
     <div class="bento-card bg-bento-pink p-6 space-y-5">
-        <div class="flex items-center gap-3 mb-2">
-            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-yellow flex items-center justify-center">
-                <svg
-                    class="w-5 h-5 text-ink"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                </svg>
-            </div>
-            <div>
-                <h3 class="text-ink text-xl font-black uppercase">Mouth & Animations</h3>
-                <p class="text-ink/60 text-sm font-bold">
-                    Control expressions & timing
-                </p>
-            </div>
+        <div class="mb-4 border-b-2 border-ink pb-2">
+            <h2 class="text-xl font-black uppercase">Mouth & Animations</h2>
+            <p class="text-sm font-bold opacity-80">
+                Control expressions & timing
+            </p>
         </div>
 
         <!-- Mouth Width -->
@@ -599,26 +549,9 @@
 
     <!-- Animation Speeds Card -->
     <div class="bento-card bg-bento-green p-6 space-y-5">
-        <div class="flex items-center gap-3 mb-2">
-            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-peach flex items-center justify-center">
-                <svg
-                    class="w-5 h-5 text-ink"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                    />
-                </svg>
-            </div>
-            <div>
-                <h3 class="text-ink text-xl font-black uppercase">Animation Speeds</h3>
-                <p class="text-ink/60 text-sm font-bold">How fast things move</p>
-            </div>
+        <div class="mb-4 border-b-2 border-ink pb-2">
+            <h2 class="text-xl font-black uppercase">Animation Speeds</h2>
+            <p class="text-sm font-bold opacity-80">How fast things move</p>
         </div>
 
         <div class="grid grid-cols-3 gap-3">

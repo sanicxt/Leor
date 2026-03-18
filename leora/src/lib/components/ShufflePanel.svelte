@@ -48,17 +48,10 @@
 
 <div class="bento-card bg-bento-pink p-6 space-y-5">
     <!-- Header with Main Toggle -->
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-yellow flex items-center justify-center">
-                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-            </div>
-            <div>
-                <h3 class="text-ink text-xl font-black uppercase">Shuffle Mode</h3>
-                <p class="text-ink/60 text-sm font-bold">Auto-cycle expressions</p>
-            </div>
+    <div class="mb-4 border-b-2 border-ink pb-2 flex items-center justify-between">
+        <div>
+            <h2 class="text-xl font-black uppercase">Shuffle Mode</h2>
+            <p class="text-sm font-bold opacity-80">Auto-cycle expressions</p>
         </div>
         <button
             class="w-14 h-8 rounded-full border-2 border-ink transition-all duration-300 relative focus:outline-none disabled:opacity-50

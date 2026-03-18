@@ -87,23 +87,9 @@
 
 <div class="bento-card bg-bento-green p-6 space-y-5">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-yellow flex items-center justify-center">
-                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                    />
-                </svg>
-            </div>
-            <div>
-                <h2 class="text-ink text-xl font-black uppercase">Power Settings</h2>
-                <p class="text-ink/60 text-sm font-bold">BLE power management</p>
-            </div>
-        </div>
+    <div class="mb-4 border-b-2 border-ink pb-2">
+        <h2 class="text-xl font-black uppercase">Power Settings</h2>
+        <p class="text-sm font-bold opacity-80">BLE power management</p>
     </div>
 
     <!-- BLE Device Name -->

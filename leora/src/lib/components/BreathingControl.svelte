@@ -49,24 +49,10 @@
 
 <div class="bento-card bg-bento-blue p-6 space-y-5">
     <!-- Header with Main Toggle -->
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-peach flex items-center justify-center">
-                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                    />
-                </svg>
-            </div>
-            <div>
-                <h3 class="text-ink text-xl font-black uppercase">
-                    Breathing Effect
-                </h3>
-                <p class="text-ink/60 text-sm font-bold">Living eye animation</p>
-            </div>
+    <div class="mb-4 border-b-2 border-ink pb-2 flex items-center justify-between">
+        <div>
+            <h2 class="text-xl font-black uppercase">Breathing Effect</h2>
+            <p class="text-sm font-bold opacity-80">Living eye animation</p>
         </div>
         <button
             class="w-14 h-8 rounded-full border-2 border-ink transition-all duration-300 relative focus:outline-none disabled:opacity-50

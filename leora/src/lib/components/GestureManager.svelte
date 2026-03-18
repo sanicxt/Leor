@@ -160,17 +160,10 @@
 
 <div class="bento-card bg-bento-green p-6 space-y-5">
     <!-- Header -->
-    <div class="flex items-center justify-between flex-wrap gap-3">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-paper border-2 border-ink flex items-center justify-center shadow-[2px_2px_0px_0px_var(--color-ink)]">
-                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
-                </svg>
-            </div>
-            <div>
-                <h3 class="text-ink text-xl font-black uppercase">Gesture Recognition</h3>
-                <p class="text-ink/60 text-sm font-bold">Edge Impulse • 5 gestures @ 23Hz</p>
-            </div>
+    <div class="mb-4 border-b-2 border-ink pb-2 flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-xl font-black uppercase">Gesture Recognition</h2>
+            <p class="text-sm font-bold opacity-80">Edge Impulse • 5 gestures @ 23Hz</p>
         </div>
 
         <div class="flex items-center gap-3">

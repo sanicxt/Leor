@@ -42,18 +42,11 @@
 
 <div class="bento-card bg-bento-peach p-6 space-y-5">
     <!-- Header -->
-    <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-pink flex items-center justify-center">
-            <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-            </svg>
-        </div>
-        <div>
-            <h3 class="text-ink text-xl font-black uppercase">Gesture Tuning</h3>
-            <p class="text-ink/60 text-sm font-bold">
-                Fine-tune detection parameters
-            </p>
-        </div>
+    <div class="mb-4 border-b-2 border-ink pb-2">
+        <h2 class="text-xl font-black uppercase">Gesture Tuning</h2>
+        <p class="text-sm font-bold opacity-80">
+            Fine-tune detection parameters
+        </p>
     </div>
 
     <!-- Tuning Presets -->

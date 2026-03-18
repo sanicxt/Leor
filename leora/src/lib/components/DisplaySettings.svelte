@@ -59,29 +59,9 @@
 
 <div class="bento-card bg-bento-peach p-6 space-y-5">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-blue flex items-center justify-center">
-                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <rect
-                        x="2"
-                        y="3"
-                        width="20"
-                        height="14"
-                        rx="2"
-                        stroke-width="2"
-                    />
-                    <path d="M8 21h8" stroke-width="2" stroke-linecap="round" />
-                    <path d="M12 17v4" stroke-width="2" stroke-linecap="round" />
-                </svg>
-            </div>
-            <div>
-                <h3 class="text-ink text-xl font-black uppercase">
-                    Display Settings
-                </h3>
-                <p class="text-ink/60 text-sm font-bold">Configure OLED display</p>
-            </div>
-        </div>
+    <div class="mb-4 border-b-2 border-ink pb-2">
+        <h2 class="text-xl font-black uppercase">Display Settings</h2>
+        <p class="text-sm font-bold opacity-80">Configure OLED display</p>
     </div>
 
     <!-- Display Type Selection -->
