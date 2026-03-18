@@ -48,22 +48,22 @@
 
 <div class="bento-card bg-bento-pink p-6 space-y-5">
     <!-- Header with Main Toggle -->
-    <div class="mb-4 border-b-2 border-ink pb-2 flex items-center justify-between">
+    <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between">
         <div>
             <h2 class="text-xl font-black uppercase">Shuffle Mode</h2>
             <p class="text-sm font-bold opacity-80">Auto-cycle expressions</p>
         </div>
         <button
-            class="w-14 h-8 rounded-full border-2 border-ink transition-all duration-300 relative focus:outline-none disabled:opacity-50
+            class="w-14 h-8 rounded-full border-2 border-bento-border transition-all duration-300 relative focus:outline-none disabled:opacity-50
              {getShuffleEnabled()
-                ? 'bg-bento-green shadow-[2px_2px_0px_0px_var(--color-ink)]'
-                : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-ink)]'}"
+                ? 'bg-bento-green shadow-[2px_2px_0px_0px_var(--color-bento-border)]'
+                : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)]'}"
             onclick={toggleShuffle}
             disabled={!bleState.connected}
             aria-label="Toggle shuffle mode"
         >
             <span
-                class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-ink rounded-full transition-transform duration-300 flex items-center justify-center
+                class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-bento-border rounded-full transition-transform duration-300 flex items-center justify-center
                {getShuffleEnabled() ? 'translate-x-6' : 'translate-x-0'}"
             >
                 {#if getShuffleEnabled()}
@@ -101,8 +101,8 @@
 
     <!-- Status Badge -->
     {#if getShuffleEnabled()}
-        <div class="flex items-center justify-center gap-2 py-2 px-4 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
-            <span class="w-2 h-2 bg-bento-green border border-ink rounded-full animate-pulse"></span>
+        <div class="flex items-center justify-center gap-2 py-2 px-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+            <span class="w-2 h-2 bg-bento-green border border-bento-border rounded-full animate-pulse"></span>
             <span class="text-ink text-xs font-bold uppercase tracking-wider">Shuffling expressions...</span>
         </div>
     {/if}
@@ -110,12 +110,12 @@
     <!-- Timing Controls -->
     <div class="space-y-4">
         <!-- Expression Duration -->
-        <div class="p-3 rounded-xl bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] space-y-3">
+        <div class="p-3 rounded-xl bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] space-y-3">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="text-ink font-bold uppercase tracking-wider text-xs">Expression Time</span>
                 </div>
-                <span class="text-ink font-mono text-sm font-black px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
+                <span class="text-ink font-mono text-sm font-black px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                     {getShuffleExprMin()}-{getShuffleExprMax()}s
                 </span>
             </div>
@@ -133,12 +133,12 @@
         </div>
 
         <!-- Neutral Duration -->
-        <div class="p-3 rounded-xl bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] space-y-3">
+        <div class="p-3 rounded-xl bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] space-y-3">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="text-ink font-bold uppercase tracking-wider text-xs">Rest Period</span>
                 </div>
-                <span class="text-ink font-mono text-sm font-black px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
+                <span class="text-ink font-mono text-sm font-black px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                     {getShuffleNeutralMin()}-{getShuffleNeutralMax()}s
                 </span>
             </div>

@@ -49,20 +49,20 @@
 
 <div class="bento-card bg-bento-blue p-6 space-y-5">
     <!-- Header with Main Toggle -->
-    <div class="mb-4 border-b-2 border-ink pb-2 flex items-center justify-between">
+    <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between">
         <div>
             <h2 class="text-xl font-black uppercase">Breathing Effect</h2>
             <p class="text-sm font-bold opacity-80">Living eye animation</p>
         </div>
         <button
-            class="w-14 h-8 rounded-full border-2 border-ink transition-all duration-300 relative focus:outline-none disabled:opacity-50
-             {breathingEnabled ? 'bg-bento-yellow shadow-[2px_2px_0px_0px_var(--color-ink)]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-ink)]'}"
+            class="w-14 h-8 rounded-full border-2 border-bento-border transition-all duration-300 relative focus:outline-none disabled:opacity-50
+             {breathingEnabled ? 'bg-bento-yellow shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)]'}"
             onclick={toggleBreathing}
             disabled={!bleState.connected}
             aria-label="Toggle breathing"
         >
             <span
-                class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-ink rounded-full transition-transform duration-300 flex items-center justify-center
+                class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-bento-border rounded-full transition-transform duration-300 flex items-center justify-center
                {breathingEnabled ? 'translate-x-6' : 'translate-x-0'}"
             >
                 {#if breathingEnabled}
@@ -104,12 +104,12 @@
     </div>
 
     <!-- Intensity Slider -->
-    <div class="p-3 rounded-xl bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] space-y-2">
+    <div class="p-3 rounded-xl bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] space-y-2">
         <div class="flex justify-between items-center">
             <label for="breath-intensity" class="text-ink text-xs font-bold uppercase tracking-wider">
                 Intensity
             </label>
-            <span class="text-ink text-xs font-mono font-bold px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
+            <span class="text-ink text-xs font-mono font-bold px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                 {(breathingIntensity * 100).toFixed(0)}%
             </span>
         </div>
@@ -122,16 +122,16 @@
             value={breathingIntensity}
             oninput={(e) => updateIntensity(parseFloat((e.target as HTMLInputElement).value))}
             disabled={!bleState.connected}
-            class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+            class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                    [&::-webkit-slider-thumb]:appearance-none
                    [&::-webkit-slider-thumb]:w-4
                    [&::-webkit-slider-thumb]:h-4
                    [&::-webkit-slider-thumb]:rounded-sm
                    [&::-webkit-slider-thumb]:bg-bento-yellow
-                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                    [&::-webkit-slider-thumb]:cursor-pointer
                    [&::-webkit-slider-thumb]:border-2
-                   [&::-webkit-slider-thumb]:border-ink
+                   [&::-webkit-slider-thumb]:border-bento-border
                    [&::-webkit-slider-thumb]:transition-transform
                    [&::-webkit-slider-thumb]:active:scale-125
                    [&::-webkit-slider-thumb]:active:shadow-none
@@ -145,12 +145,12 @@
     </div>
 
     <!-- Speed Slider -->
-    <div class="p-3 rounded-xl bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] space-y-2">
+    <div class="p-3 rounded-xl bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] space-y-2">
         <div class="flex justify-between items-center">
             <label for="breath-speed" class="text-ink text-xs font-bold uppercase tracking-wider">
                 Speed
             </label>
-            <span class="text-ink text-xs font-mono font-bold px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
+            <span class="text-ink text-xs font-mono font-bold px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                 {(1 / breathingSpeed).toFixed(1)}s
             </span>
         </div>
@@ -163,16 +163,16 @@
             value={breathingSpeed}
             oninput={(e) => updateSpeed(parseFloat((e.target as HTMLInputElement).value))}
             disabled={!bleState.connected}
-            class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+            class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                    [&::-webkit-slider-thumb]:appearance-none
                    [&::-webkit-slider-thumb]:w-4
                    [&::-webkit-slider-thumb]:h-4
                    [&::-webkit-slider-thumb]:rounded-sm
                    [&::-webkit-slider-thumb]:bg-bento-yellow
-                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                    [&::-webkit-slider-thumb]:cursor-pointer
                    [&::-webkit-slider-thumb]:border-2
-                   [&::-webkit-slider-thumb]:border-ink
+                   [&::-webkit-slider-thumb]:border-bento-border
                    [&::-webkit-slider-thumb]:transition-transform
                    [&::-webkit-slider-thumb]:active:scale-125
                    [&::-webkit-slider-thumb]:active:shadow-none

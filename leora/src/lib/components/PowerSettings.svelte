@@ -87,15 +87,15 @@
 
 <div class="bento-card bg-bento-green p-6 space-y-5">
     <!-- Header -->
-    <div class="mb-4 border-b-2 border-ink pb-2">
+    <div class="mb-4 border-b-2 border-bento-border pb-2">
         <h2 class="text-xl font-black uppercase">Power Settings</h2>
         <p class="text-sm font-bold opacity-80">BLE power management</p>
     </div>
 
     <!-- BLE Device Name -->
-    <div class="p-4 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl space-y-3">
+    <div class="p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-3">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-pink flex items-center justify-center">
+            <div class="w-10 h-10 rounded-lg border-2 border-bento-border bg-bento-pink flex items-center justify-center">
                 <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
                 </svg>
@@ -112,9 +112,9 @@
                 maxlength={30}
                 placeholder="e.g. Leor"
                 disabled={!bleState.connected}
-                class="flex-1 px-3 py-2 bg-paper border-2 border-ink rounded-xl text-ink text-sm font-bold font-mono
-                       placeholder:text-ink/40 focus:outline-none focus:shadow-[2px_2px_0px_0px_var(--color-ink)]
-                       disabled:opacity-50 shadow-[2px_2px_0px_0px_var(--color-ink)]"
+                class="flex-1 px-3 py-2 bg-paper border-2 border-bento-border rounded-xl text-ink text-sm font-bold font-mono
+                       placeholder:text-ink/40 focus:outline-none focus:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
+                       disabled:opacity-50 shadow-[2px_2px_0px_0px_var(--color-bento-border)]"
             />
             <button
                 onclick={saveDeviceName}
@@ -136,10 +136,10 @@
     </div>
 
     <!-- Touch Hold Delay -->
-    <div class="mt-4 p-4 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl space-y-3">
+    <div class="mt-4 p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-3">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-blue flex items-center justify-center">
+                <div class="w-10 h-10 rounded-lg border-2 border-bento-border bg-bento-blue flex items-center justify-center">
                     <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11V6a3 3 0 016 0v5m-6 0h6m-6 0v5a3 3 0 006 0v-5" />
                     </svg>
@@ -149,7 +149,7 @@
                     <div class="text-ink/60 font-bold text-xs">Long touch duration before deep sleep</div>
                 </div>
             </div>
-            <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
+            <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                 {(touchHoldDelay / 1000).toFixed(1)}s
             </span>
         </div>
@@ -162,16 +162,16 @@
             value={touchHoldDelay}
             onchange={(e) => updateTouchHoldDelay(parseInt(e.currentTarget.value))}
             disabled={!bleState.connected}
-            class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+            class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                    [&::-webkit-slider-thumb]:appearance-none
                    [&::-webkit-slider-thumb]:w-4
                    [&::-webkit-slider-thumb]:h-4
                    [&::-webkit-slider-thumb]:rounded-sm
                    [&::-webkit-slider-thumb]:bg-bento-yellow
-                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                    [&::-webkit-slider-thumb]:cursor-pointer
                    [&::-webkit-slider-thumb]:border-2
-                   [&::-webkit-slider-thumb]:border-ink
+                   [&::-webkit-slider-thumb]:border-bento-border
                    [&::-webkit-slider-thumb]:transition-transform
                    [&::-webkit-slider-thumb]:active:scale-125
                    [&::-webkit-slider-thumb]:active:shadow-none
@@ -186,9 +186,9 @@
     </div>
 
     <!-- Pin Configuration -->
-    <div class="mt-3 p-4 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl space-y-4">
+    <div class="mt-3 p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-4">
         <div class="flex items-center gap-3 mb-1">
-            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-yellow flex items-center justify-center">
+            <div class="w-10 h-10 rounded-lg border-2 border-bento-border bg-bento-yellow flex items-center justify-center">
                 <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
                 </svg>
@@ -208,7 +208,7 @@
             <div class="flex gap-1">
                 {#each rtcPins as pin}
                     <button
-                        class="w-8 h-8 rounded-lg border-2 border-ink text-xs font-mono font-bold transition-all disabled:opacity-50 {wakePin === pin ? 'bg-bento-yellow text-ink shadow-[2px_2px_0px_0px_var(--color-ink)]' : 'bg-paper text-ink hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:shadow-[1px_1px_0px_0px_var(--color-ink)]'}"
+                        class="w-8 h-8 rounded-lg border-2 border-bento-border text-xs font-mono font-bold transition-all disabled:opacity-50 {wakePin === pin ? 'bg-bento-yellow text-ink shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper text-ink hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:shadow-[1px_1px_0px_0px_var(--color-bento-border)]'}"
                         onclick={() => updateWakePin(pin)}
                         disabled={!bleState.connected || pin === pwrPin}
                     >{pin}</button>
@@ -225,7 +225,7 @@
             <div class="flex gap-1">
                 {#each rtcPins as pin}
                     <button
-                        class="w-8 h-8 rounded-lg border-2 border-ink text-xs font-mono font-bold transition-all disabled:opacity-50 {pwrPin === pin ? 'bg-bento-pink text-ink shadow-[2px_2px_0px_0px_var(--color-ink)]' : 'bg-paper text-ink hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:shadow-[1px_1px_0px_0px_var(--color-ink)]'}"
+                        class="w-8 h-8 rounded-lg border-2 border-bento-border text-xs font-mono font-bold transition-all disabled:opacity-50 {pwrPin === pin ? 'bg-bento-pink text-ink shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper text-ink hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:shadow-[1px_1px_0px_0px_var(--color-bento-border)]'}"
                         onclick={() => updatePwrPin(pin)}
                         disabled={!bleState.connected || pin === wakePin}
                     >{pin}</button>
@@ -261,9 +261,9 @@
     </div>
 
     <!-- Low Power Toggle -->
-    <div class="flex items-center justify-between p-4 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+    <div class="flex items-center justify-between p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg border-2 border-ink bg-bento-pink flex items-center justify-center">
+            <div class="w-10 h-10 rounded-lg border-2 border-bento-border bg-bento-pink flex items-center justify-center">
                 <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                 </svg>
@@ -275,12 +275,12 @@
         </div>
 
         <button
-            class="w-14 h-8 rounded-full border-2 border-ink transition-all duration-300 relative focus:outline-none disabled:opacity-50 {bleState.bleLowPowerMode ? 'bg-bento-yellow shadow-[2px_2px_0px_0px_var(--color-ink)]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-ink)]'}"
+            class="w-14 h-8 rounded-full border-2 border-bento-border transition-all duration-300 relative focus:outline-none disabled:opacity-50 {bleState.bleLowPowerMode ? 'bg-bento-yellow shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)]'}"
             onclick={toggleLowPowerMode}
             disabled={!bleState.connected}
             aria-label="Toggle low power mode"
         >
-            <span class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-ink rounded-full transition-transform duration-300 flex items-center justify-center {bleState.bleLowPowerMode ? 'translate-x-6' : 'translate-x-0'}">
+            <span class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-bento-border rounded-full transition-transform duration-300 flex items-center justify-center {bleState.bleLowPowerMode ? 'translate-x-6' : 'translate-x-0'}">
                 {#if bleState.bleLowPowerMode}
                     <svg class="w-3 h-3 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />

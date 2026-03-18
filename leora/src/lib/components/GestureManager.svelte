@@ -160,7 +160,7 @@
 
 <div class="bento-card bg-bento-green p-6 space-y-5">
     <!-- Header -->
-    <div class="mb-4 border-b-2 border-ink pb-2 flex items-center justify-between flex-wrap gap-3">
+    <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between flex-wrap gap-3">
         <div>
             <h2 class="text-xl font-black uppercase">Gesture Recognition</h2>
             <p class="text-sm font-bold opacity-80">Edge Impulse • 5 gestures @ 23Hz</p>
@@ -168,22 +168,22 @@
 
         <div class="flex items-center gap-3">
             {#if bleState.gestureMatching}
-                <span class="flex items-center gap-1.5 px-2.5 py-1 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-full">
-                    <span class="w-2 h-2 bg-bento-green border border-ink rounded-full animate-pulse"></span>
+                <span class="flex items-center gap-1.5 px-2.5 py-1 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-full">
+                    <span class="w-2 h-2 bg-bento-green border border-bento-border rounded-full animate-pulse"></span>
                     <span class="text-ink text-[10px] font-bold uppercase tracking-wide">Live</span>
                 </span>
             {/if}
             <button
-                class="w-14 h-8 rounded-full border-2 border-ink transition-all duration-300 relative focus:outline-none disabled:opacity-50
+                class="w-14 h-8 rounded-full border-2 border-bento-border transition-all duration-300 relative focus:outline-none disabled:opacity-50
                  {bleState.gestureMatching
-                    ? 'bg-bento-yellow shadow-[2px_2px_0px_0px_var(--color-ink)]'
-                    : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-ink)]'}"
+                    ? 'bg-bento-yellow shadow-[2px_2px_0px_0px_var(--color-bento-border)]'
+                    : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)]'}"
                 onclick={toggleMatch}
                 disabled={!bleState.connected}
                 aria-label="Toggle gesture matching"
             >
                 <span
-                    class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-ink rounded-full transition-transform duration-300 flex items-center justify-center
+                    class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-bento-border rounded-full transition-transform duration-300 flex items-center justify-center
                    {bleState.gestureMatching ? 'translate-x-6' : 'translate-x-0'}"
                 >
                     {#if bleState.gestureMatching}
@@ -202,7 +202,7 @@
 
     <!-- Last Detection Display -->
     {#if lastDetectedGesture}
-        <div class="p-4 text-center bg-paper border-2 border-ink shadow-[4px_4px_0px_0px_var(--color-ink)] rounded-2xl">
+        <div class="p-4 text-center bg-paper border-2 border-bento-border shadow-[4px_4px_0px_0px_var(--color-bento-border)] rounded-2xl">
             <div class="relative text-center">
                 <div class="text-4xl mb-2 flex items-center justify-center gap-3">
                     <span class="transform hover:scale-110 transition-transform">
@@ -236,12 +236,12 @@
 
         {#each gestures as gesture, i}
             <div
-                class="flex items-center justify-between p-3 transition-all duration-300 border-2 border-ink rounded-xl {lastDetectedGesture === gesture.name
-                    ? 'bg-bento-yellow shadow-[4px_4px_0px_0px_var(--color-ink)] scale-[1.02]'
-                    : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-ink)] hover:bg-paper/80'}"
+                class="flex items-center justify-between p-3 transition-all duration-300 border-2 border-bento-border rounded-xl {lastDetectedGesture === gesture.name
+                    ? 'bg-bento-yellow shadow-[4px_4px_0px_0px_var(--color-bento-border)] scale-[1.02]'
+                    : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)] hover:bg-paper/80'}"
             >
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-paper border-2 border-ink flex items-center justify-center text-xl shadow-[2px_2px_0px_0px_var(--color-ink)]">
+                    <div class="w-10 h-10 rounded-xl bg-paper border-2 border-bento-border flex items-center justify-center text-xl shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                         {gesture.icon}
                     </div>
                     <div>
@@ -259,7 +259,7 @@
                         <span class="text-ink/60 font-bold text-xs uppercase pr-2">BASELINE</span>
                     {:else if editingGesture === gesture.name}
                         <select
-                            class="bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl px-2 py-1 text-sm text-ink font-bold focus:outline-none"
+                            class="bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl px-2 py-1 text-sm text-ink font-bold focus:outline-none"
                             value={gesture.action}
                             onchange={(e) => updateGestureMapping(gesture.name, (e.target as HTMLSelectElement).value)}
                             onblur={() => (editingGesture = null)}

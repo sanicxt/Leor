@@ -166,7 +166,7 @@
 <div class="space-y-6">
     <!-- Quick Presets -->
     <div class="bento-card bg-bento-yellow p-6 space-y-4">
-        <div class="mb-4 border-b-2 border-ink pb-2">
+        <div class="mb-4 border-b-2 border-bento-border pb-2">
             <h2 class="text-xl font-black uppercase">Quick Presets</h2>
         </div>
         <div class="grid grid-cols-4 gap-3">
@@ -198,7 +198,7 @@
     <!-- Eye Appearance Card -->
     <div class="bento-card bg-bento-blue p-6 space-y-6">
         <!-- Header -->
-        <div class="mb-4 border-b-2 border-ink pb-2 flex items-center justify-between">
+        <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between">
             <div>
                 <h2 class="text-xl font-black uppercase">Eye Appearance</h2>
                 <p class="text-sm font-bold opacity-80">
@@ -230,7 +230,7 @@
         <!-- Eye Geometry Grid -->
         <div class="grid grid-cols-2 gap-4">
             <!-- Width -->
-            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,7 +238,7 @@
                         </svg>
                         <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Width</span>
                     </div>
-                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsEw()}px</span>
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getSettingsEw()}px</span>
                 </div>
                 <input
                     type="range"
@@ -248,16 +248,16 @@
                     oninput={(e) => setSettingsEw(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
@@ -267,7 +267,7 @@
             </div>
 
             <!-- Height -->
-            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -275,7 +275,7 @@
                         </svg>
                         <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Height</span>
                     </div>
-                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsEh()}px</span>
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getSettingsEh()}px</span>
                 </div>
                 <input
                     type="range"
@@ -285,16 +285,16 @@
                     oninput={(e) => setSettingsEh(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
@@ -304,7 +304,7 @@
             </div>
 
             <!-- Spacing -->
-            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,7 +312,7 @@
                         </svg>
                         <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Spacing</span>
                     </div>
-                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_var(--color-ink)]">{getSettingsEs()}px</span>
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_var(--color-bento-border)]">{getSettingsEs()}px</span>
                 </div>
                 <input
                     type="range"
@@ -322,16 +322,16 @@
                     oninput={(e) => setSettingsEs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
@@ -341,7 +341,7 @@
             </div>
 
             <!-- Roundness -->
-            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -349,7 +349,7 @@
                         </svg>
                         <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Roundness</span>
                     </div>
-                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_var(--color-ink)]">{getSettingsEr()}px</span>
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_var(--color-bento-border)]">{getSettingsEr()}px</span>
                 </div>
                 <input
                     type="range"
@@ -359,16 +359,16 @@
                     oninput={(e) => setSettingsEr(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
@@ -381,7 +381,7 @@
 
     <!-- Mouth & Animations Card -->
     <div class="bento-card bg-bento-pink p-6 space-y-5">
-        <div class="mb-4 border-b-2 border-ink pb-2">
+        <div class="mb-4 border-b-2 border-bento-border pb-2">
             <h2 class="text-xl font-black uppercase">Mouth & Animations</h2>
             <p class="text-sm font-bold opacity-80">
                 Control expressions & timing
@@ -389,10 +389,10 @@
         </div>
 
         <!-- Mouth Width -->
-        <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+        <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
             <div class="flex items-center justify-between">
                 <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Mouth Width</span>
-                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsMw()}px</span>
+                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getSettingsMw()}px</span>
             </div>
             <input
                 type="range"
@@ -402,16 +402,16 @@
                 oninput={(e) => setSettingsMw(parseInt(e.currentTarget.value))}
                 onchange={applySettings}
                 disabled={!bleState.connected}
-                class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                        [&::-webkit-slider-thumb]:appearance-none
                        [&::-webkit-slider-thumb]:w-4
                        [&::-webkit-slider-thumb]:h-4
                        [&::-webkit-slider-thumb]:rounded-sm
                        [&::-webkit-slider-thumb]:bg-bento-yellow
-                       [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                       [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                        [&::-webkit-slider-thumb]:cursor-pointer
                        [&::-webkit-slider-thumb]:border-2
-                       [&::-webkit-slider-thumb]:border-ink
+                       [&::-webkit-slider-thumb]:border-bento-border
                        [&::-webkit-slider-thumb]:transition-transform
                        [&::-webkit-slider-thumb]:active:scale-125
                        [&::-webkit-slider-thumb]:active:shadow-none
@@ -422,10 +422,10 @@
 
         <!-- Mouth Animation Triggers -->
         <div class="space-y-3">
-            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Animation Duration</span>
-                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]"
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]"
                         >{mouthAnimDuration}ms</span
                     >
                 </div>
@@ -436,16 +436,16 @@
                     step="100"
                     bind:value={mouthAnimDuration}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
@@ -480,10 +480,10 @@
 
         <!-- Blink & Expression Timing -->
         <div class="grid grid-cols-2 gap-4 pt-2">
-            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Blink Interval</span>
-                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]"
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]"
                         >{getSettingsBi()}s</span
                     >
                 </div>
@@ -497,16 +497,16 @@
                         setSettingsBi(parseFloat(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
@@ -514,10 +514,10 @@
                            [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
             </div>
-            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
                 <div class="flex items-center justify-between">
                     <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Transition Speed</span>
-                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]"
+                    <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]"
                         >{transitionSpeed}</span
                     >
                 </div>
@@ -527,16 +527,16 @@
                     max="20"
                     bind:value={transitionSpeed}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
@@ -549,13 +549,13 @@
 
     <!-- Animation Speeds Card -->
     <div class="bento-card bg-bento-green p-6 space-y-5">
-        <div class="mb-4 border-b-2 border-ink pb-2">
+        <div class="mb-4 border-b-2 border-bento-border pb-2">
             <h2 class="text-xl font-black uppercase">Animation Speeds</h2>
             <p class="text-sm font-bold opacity-80">How fast things move</p>
         </div>
 
         <div class="grid grid-cols-3 gap-3">
-            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl text-center">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl text-center">
                 <span class="text-ink/80 text-[10px] uppercase font-bold tracking-wide">Gaze</span>
                 <input
                     type="range"
@@ -565,25 +565,25 @@
                     oninput={(e) => setSettingsGs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
                            [&::-webkit-slider-thumb]:active:translate-y-[2px]
                            [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
-                <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-ink rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsGs()}</span>
+                <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-bento-border rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getSettingsGs()}</span>
             </div>
-            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl text-center">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl text-center">
                 <span class="text-ink/80 text-[10px] uppercase font-bold tracking-wide">Blink</span>
                 <input
                     type="range"
@@ -593,25 +593,25 @@
                     oninput={(e) => setSettingsOs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
                            [&::-webkit-slider-thumb]:active:translate-y-[2px]
                            [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
-                <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-ink rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsOs()}</span>
+                <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-bento-border rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getSettingsOs()}</span>
             </div>
-            <div class="space-y-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl text-center">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl text-center">
                 <span class="text-ink/80 text-[10px] uppercase font-bold tracking-wide">Squish</span>
                 <input
                     type="range"
@@ -621,23 +621,23 @@
                     oninput={(e) => setSettingsSs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
                            [&::-webkit-slider-thumb]:active:translate-y-[2px]
                            [&::-webkit-slider-thumb]:active:translate-x-[2px]"
                 />
-                <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-ink rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-ink)]">{getSettingsSs()}</span>
+                <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-bento-border rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getSettingsSs()}</span>
             </div>
         </div>
         <p class="text-ink/60 font-bold text-[10px] text-center">

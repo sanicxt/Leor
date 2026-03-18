@@ -59,7 +59,7 @@
 
 <div class="bento-card bg-bento-peach p-6 space-y-5">
     <!-- Header -->
-    <div class="mb-4 border-b-2 border-ink pb-2">
+    <div class="mb-4 border-b-2 border-bento-border pb-2">
         <h2 class="text-xl font-black uppercase">Display Settings</h2>
         <p class="text-sm font-bold opacity-80">Configure OLED display</p>
     </div>
@@ -75,7 +75,7 @@
                     class="bento-button group relative p-3 transition-all duration-200 disabled:opacity-50 {selectedDisplay === display.value ? 'bg-bento-yellow' : 'bg-paper'}"
                 >
                     <div class="flex flex-col items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg border-2 border-ink flex items-center justify-center transition-colors {selectedDisplay === display.value ? 'bg-paper text-ink' : 'bg-black/10 dark:bg-white/10 text-ink/60 group-hover:text-ink'}">
+                        <div class="w-8 h-8 rounded-lg border-2 border-bento-border flex items-center justify-center transition-colors {selectedDisplay === display.value ? 'bg-paper text-ink' : 'bg-black/10 dark:bg-white/10 text-ink/60 group-hover:text-ink'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <rect x="3" y="4" width="18" height="14" rx="2" stroke-width="2" />
                                 <path d="M8 2v4M16 2v4" stroke-width="2" stroke-linecap="round" />
@@ -105,9 +105,9 @@
                 bind:value={i2cAddress}
                 disabled={!bleState.connected}
                 placeholder="0x3C"
-                class="flex-1 px-3 py-2.5 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl text-ink font-bold placeholder-ink/40 outline-none transition-all disabled:opacity-50 font-mono text-sm"
+                class="flex-1 px-3 py-2.5 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl text-ink font-bold placeholder-ink/40 outline-none transition-all disabled:opacity-50 font-mono text-sm"
             />
-            <div class="flex items-center px-3 py-2 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+            <div class="flex items-center px-3 py-2 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
                 <span class="text-ink font-bold text-xs">Hex</span>
             </div>
         </div>
@@ -128,7 +128,7 @@
 
     <!-- Restart Required Banner -->
     {#if restartRequired}
-        <div class="flex gap-3 p-3 bg-bento-peach border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl items-center">
+        <div class="flex gap-3 p-3 bg-bento-peach border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl items-center">
             <svg class="w-5 h-5 text-ink flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -143,7 +143,7 @@
     {/if}
 
     <!-- Info Note -->
-    <div class="flex gap-2 p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl">
+    <div class="flex gap-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
         <svg class="w-4 h-4 text-ink flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>

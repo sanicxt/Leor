@@ -40,18 +40,18 @@
 
 <div class="bento-card bg-bento-peach p-6 space-y-5">
     <!-- Header -->
-    <div class="mb-4 border-b-2 border-ink pb-2">
+    <div class="mb-4 border-b-2 border-bento-border pb-2">
         <h2 class="text-xl font-black uppercase">Firmware Update</h2>
         <p class="text-sm font-bold opacity-80">Flash new firmware over BLE</p>
     </div>
 
     <!-- File picker -->
     <div
-        class="p-4 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl space-y-3"
+        class="p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-3"
     >
         <label
             class="flex flex-col items-center justify-center gap-2 border-2 border-dashed
-                   {selectedFile ? 'border-bento-blue bg-bento-blue/20' : 'border-ink/30 hover:border-ink/60 bg-paper hover:bg-ink/5'}
+                   {selectedFile ? 'border-bento-blue bg-bento-blue/20' : 'border-bento-border/30 hover:border-bento-border/60 bg-paper hover:bg-ink/5'}
                    rounded-xl p-5 cursor-pointer transition-colors"
         >
             <svg class="w-8 h-8 {selectedFile ? 'text-bento-blue' : 'text-ink/60'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,9 +73,9 @@
         <!-- Progress bar -->
         {#if running || done || failed}
             <div class="space-y-1.5">
-                <div class="w-full h-3 border-2 border-ink rounded-full overflow-hidden bg-paper shadow-[inset_1px_1px_0px_0px_var(--color-ink)]">
+                <div class="w-full h-3 border-2 border-bento-border rounded-full overflow-hidden bg-paper shadow-[inset_1px_1px_0px_0px_var(--color-bento-border)]">
                     <div
-                        class="h-full border-r-2 border-ink transition-all duration-300
+                        class="h-full border-r-2 border-bento-border transition-all duration-300
                                {done ? 'bg-bento-green'
                                      : failed ? 'bg-bento-pink'
                                      : 'bg-bento-blue'}"
@@ -119,14 +119,14 @@
     </div>
 
     <!-- Info -->
-    <div class="mt-3 text-xs font-bold text-ink/70 flex items-start gap-2 bg-paper p-3 rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)]">
+    <div class="mt-3 text-xs font-bold text-ink/70 flex items-start gap-2 bg-paper p-3 rounded-xl border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span class="leading-relaxed">
-            Select <code class="bg-bento-yellow px-1 border border-ink rounded">.bin</code> from the build output
-            (<code class="bg-bento-yellow px-1 border border-ink rounded">sketch/Leor.ino.bin</code>).
+            Select <code class="bg-bento-yellow px-1 border border-bento-border rounded">.bin</code> from the build output
+            (<code class="bg-bento-yellow px-1 border border-bento-border rounded">sketch/Leor.ino.bin</code>).
             The device restarts automatically.
             Rollback is automatic if the new firmware fails to boot.
         </span>

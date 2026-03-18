@@ -49,10 +49,10 @@
 
 <div class="relative h-6 {disabled ? 'opacity-50' : ''}">
     <!-- Track background -->
-    <div class="absolute bottom-2 left-0 right-0 h-2 bg-paper border-2 border-ink rounded-full"></div>
+    <div class="absolute bottom-2 left-0 right-0 h-2 bg-paper border-2 border-bento-border rounded-full"></div>
 
     <!-- Highlighted range track -->
-    <div class="absolute bottom-2 h-2 bg-bento-peach border-y-2 border-ink" style="left: {leftPercent}%; right: {100 - rightPercent}%"></div>
+    <div class="absolute bottom-2 h-2 bg-bento-peach border-y-2 border-bento-border" style="left: {leftPercent}%; right: {100 - rightPercent}%"></div>
 
     <!-- Min slider -->
     <input
@@ -70,10 +70,10 @@
                [&::-webkit-slider-thumb]:h-4
                [&::-webkit-slider-thumb]:rounded-sm
                [&::-webkit-slider-thumb]:bg-bento-yellow
-               [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+               [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                [&::-webkit-slider-thumb]:cursor-pointer
                [&::-webkit-slider-thumb]:border-2
-               [&::-webkit-slider-thumb]:border-ink
+               [&::-webkit-slider-thumb]:border-bento-border
                [&::-webkit-slider-thumb]:transition-transform
                [&::-webkit-slider-thumb]:active:scale-125
                [&::-webkit-slider-thumb]:active:shadow-none
@@ -97,10 +97,10 @@
                [&::-webkit-slider-thumb]:h-4
                [&::-webkit-slider-thumb]:rounded-sm
                [&::-webkit-slider-thumb]:bg-bento-yellow
-               [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+               [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                [&::-webkit-slider-thumb]:cursor-pointer
                [&::-webkit-slider-thumb]:border-2
-               [&::-webkit-slider-thumb]:border-ink
+               [&::-webkit-slider-thumb]:border-bento-border
                [&::-webkit-slider-thumb]:transition-transform
                [&::-webkit-slider-thumb]:active:scale-125
                [&::-webkit-slider-thumb]:active:shadow-none

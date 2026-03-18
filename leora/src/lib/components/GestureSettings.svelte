@@ -42,7 +42,7 @@
 
 <div class="bento-card bg-bento-peach p-6 space-y-5">
     <!-- Header -->
-    <div class="mb-4 border-b-2 border-ink pb-2">
+    <div class="mb-4 border-b-2 border-bento-border pb-2">
         <h2 class="text-xl font-black uppercase">Gesture Tuning</h2>
         <p class="text-sm font-bold opacity-80">
             Fine-tune detection parameters
@@ -80,7 +80,7 @@
     <!-- Fine Controls -->
     <div class="space-y-4">
         <!-- Expression Duration -->
-        <div class="p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl space-y-2">
+        <div class="p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-2">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +88,7 @@
                     </svg>
                     <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Expression Duration</span>
                 </div>
-                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
+                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                     {(getGestureReactionTime() / 1000).toFixed(1)}s
                 </span>
             </div>
@@ -100,16 +100,16 @@
                     value={getGestureReactionTime()}
                     onchange={(e) => updateReactionTime(parseInt(e.currentTarget.value))}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                            [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:w-4
                            [&::-webkit-slider-thumb]:h-4
                            [&::-webkit-slider-thumb]:rounded-sm
                            [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                            [&::-webkit-slider-thumb]:cursor-pointer
                            [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-ink
+                           [&::-webkit-slider-thumb]:border-bento-border
                            [&::-webkit-slider-thumb]:transition-transform
                            [&::-webkit-slider-thumb]:active:scale-125
                            [&::-webkit-slider-thumb]:active:shadow-none
@@ -120,7 +120,7 @@
         </div>
 
         <!-- Confidence Threshold -->
-        <div class="p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl space-y-2">
+        <div class="p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-2">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,7 +128,7 @@
                     </svg>
                     <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Confidence Threshold</span>
                 </div>
-                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
+                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                     {getGestureConfidence()}%
                 </span>
             </div>
@@ -140,16 +140,16 @@
                 value={getGestureConfidence()}
                 onchange={(e) => updateConfidence(parseInt(e.currentTarget.value))}
                 disabled={!bleState.connected}
-                class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                        [&::-webkit-slider-thumb]:appearance-none
                        [&::-webkit-slider-thumb]:w-4
                        [&::-webkit-slider-thumb]:h-4
                        [&::-webkit-slider-thumb]:rounded-sm
                        [&::-webkit-slider-thumb]:bg-bento-yellow
-                       [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                       [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                        [&::-webkit-slider-thumb]:cursor-pointer
                        [&::-webkit-slider-thumb]:border-2
-                       [&::-webkit-slider-thumb]:border-ink
+                       [&::-webkit-slider-thumb]:border-bento-border
                        [&::-webkit-slider-thumb]:transition-transform
                        [&::-webkit-slider-thumb]:active:scale-125
                        [&::-webkit-slider-thumb]:active:shadow-none
@@ -163,7 +163,7 @@
         </div>
 
         <!-- Cooldown -->
-        <div class="p-3 bg-paper border-2 border-ink shadow-[2px_2px_0px_0px_var(--color-ink)] rounded-xl space-y-2">
+        <div class="p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-2">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,7 +171,7 @@
                     </svg>
                     <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Detection Cooldown</span>
                 </div>
-                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-ink rounded-lg shadow-[2px_2px_0px_0px_var(--color-ink)]">
+                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                     {(getGestureCooldown() / 1000).toFixed(1)}s
                 </span>
             </div>
@@ -183,16 +183,16 @@
                 value={getGestureCooldown()}
                 onchange={(e) => updateCooldown(parseInt(e.currentTarget.value))}
                 disabled={!bleState.connected}
-                class="w-full h-2 bg-paper border-2 border-ink rounded-full appearance-none cursor-pointer disabled:opacity-50
+                class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
                        [&::-webkit-slider-thumb]:appearance-none
                        [&::-webkit-slider-thumb]:w-4
                        [&::-webkit-slider-thumb]:h-4
                        [&::-webkit-slider-thumb]:rounded-sm
                        [&::-webkit-slider-thumb]:bg-bento-yellow
-                       [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-ink)]
+                       [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
                        [&::-webkit-slider-thumb]:cursor-pointer
                        [&::-webkit-slider-thumb]:border-2
-                       [&::-webkit-slider-thumb]:border-ink
+                       [&::-webkit-slider-thumb]:border-bento-border
                        [&::-webkit-slider-thumb]:transition-transform
                        [&::-webkit-slider-thumb]:active:scale-125
                        [&::-webkit-slider-thumb]:active:shadow-none
