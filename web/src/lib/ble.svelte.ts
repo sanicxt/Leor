@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 // Svelte 5 state management using $state rune in .svelte.ts file
-import { BLE_CONFIG } from './ble-config.js';
+import { BLE_CONFIG } from './ble-config.ts';
 
 declare global {
     interface Navigator {
