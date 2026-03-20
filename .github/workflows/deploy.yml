@@ -28,11 +28,11 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        working-directory: leora
+        working-directory: web
         run: bun install --frozen-lockfile
 
       - name: Build
-        working-directory: leora
+        working-directory: web
         env:
           BASE_PATH: '/${{ github.event.repository.name }}'
         run: bun run build:pages
@@ -40,7 +40,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: leora/build
+          path: web/build
 
   deploy:
     runs-on: ubuntu-latest
