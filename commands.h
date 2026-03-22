@@ -995,8 +995,6 @@ String handleCommand(String cmd) {
         }
 
         setClockFromEpochMs(epochMs, tzOffset);
-        setClockEnabled(true);
-        preferences.putBool("clk_on", true);
         preferences.putUInt("clk_sec", getClockSecondsOfDay());
         preferences.putInt("clk_tz", tzOffset);
         preferences.putULong64("clk_epoch", (unsigned long long)epochMs);
@@ -1026,8 +1024,6 @@ String handleCommand(String cmd) {
       }
 
       setClockTimeOfDay((uint8_t)hours, (uint8_t)minutes, (uint8_t)seconds);
-      setClockEnabled(true);
-      preferences.putBool("clk_on", true);
       preferences.putUInt("clk_sec", (uint32_t)hours * 3600UL +
                                          (uint32_t)minutes * 60UL +
                                          (uint32_t)seconds);
