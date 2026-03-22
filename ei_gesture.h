@@ -11,9 +11,11 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+#include "mpu/MPU6050_AHRS.h"
 
 // Preferences declared in Leor.ino
 extern Preferences preferences;
+extern MPU6050_AHRS mpu;
 
 // Edge Impulse Arduino library (renamed from ges to leor)
 #include <leor_inferencing.h>
@@ -35,6 +37,14 @@ static unsigned long ei_last_sample_time = 0;
 static unsigned long ei_last_gesture_time = 0;
 static bool ei_matching_enabled = false;
 static bool ei_streaming = false;
+
+void syncMpuPowerState() {
+    if (ei_matching_enabled || ei_streaming) {
+        mpu.wake();
+    } else {
+        mpu.sleep();
+    }
+}
 
 // ==================== Tuning Setters ====================
 void setGestureConfidence(int percent) {
@@ -163,6 +173,7 @@ void initEIGesture() {
     if (ei_matching_enabled) {
         Serial.println(F("  Gesture matching: ON (restored)"));
     }
+    syncMpuPowerState();
 }
 
 // ==================== Run Inference ====================
@@ -211,7 +222,7 @@ int runEIInference() {
 
 // ==================== Process Sample ====================
 // Call this with 6-axis sensor data at ~24Hz
-// Input: gyro in °/s (from FastIMU), accel in g (from FastIMU)
+// Input: gyro in °/s and accel in g from the IMU backend
 void processEISample(float gx, float gy, float gz, float ax, float ay, float az) {
     if (!ei_matching_enabled) return;
     
@@ -270,11 +281,13 @@ void processEISample(float gx, float gy, float gz, float ax, float ay, float az)
 // ==================== Streaming Mode (for data collection) ====================
 void startEIStreaming() {
     ei_streaming = true;
+    syncMpuPowerState();
     Serial.println(F("EI Streaming started"));
 }
 
 void stopEIStreaming() {
     ei_streaming = false;
+    syncMpuPowerState();
     Serial.println(F("EI Streaming stopped"));
 }
 
@@ -298,10 +311,15 @@ void streamEISample(float gx, float gy, float gz, float ax, float ay, float az) 
 
 // ==================== Control Functions ====================
 void setEIMatchingEnabled(bool enabled) {
+    bool changed = (ei_matching_enabled != enabled);
     ei_matching_enabled = enabled;
     ei_sample_index = 0;
     memset(ei_input_buffer, 0, sizeof(ei_input_buffer));
     ei_printf("EI Matching: %s\n", enabled ? "ON" : "OFF");
+
+    if (changed) {
+        syncMpuPowerState();
+    }
     
     // Save state to flash for persistence
     preferences.putBool("ges_match", enabled);

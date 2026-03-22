@@ -1,7 +1,7 @@
 /*
- * Edge Impulse Data Forwarder - FastIMU with Calibration
+ * Edge Impulse Data Forwarder - MPU6050_AHRS
  * 
- * Uses FastIMU library for counterfeit/generic IMU support with calibration.
+ * Uses the local MPU6050_AHRS implementation for calibration and raw data output.
  * Outputs gyro (°/s) and accelerometer (g) data at 24Hz for Edge Impulse.
  * 
  * Usage:
@@ -11,18 +11,34 @@
  * 4. When prompted for sensor axes, enter: gX, gY, gZ, aX, aY, aZ
  */
 
-#include "FastIMU.h"
-#include <Wire.h>
+#include "../mpu/MPU6050_AHRS.h"
 
 #define IMU_ADDRESS 0x68
-#define PERFORM_CALIBRATION  // Comment to skip calibration
 
-// Use IMU_Generic for counterfeit sensors, or MPU6050 for genuine
-IMU_Generic IMU;
+MPU6050_AHRS mpu(IMU_ADDRESS);
 
-calData calib = { 0 };
-AccelData accelData;
-GyroData gyroData;
+static void waitForCalibration() {
+    Serial.println(F("\n--- CALIBRATION ---"));
+    Serial.println(F("Keep device STILL..."));
+
+    int lastPercent = -1;
+
+    while (!mpu.isCalibrated()) {
+        mpu.update();
+        uint16_t progress = mpu.calibrationProgress();
+        if (progress > 500) progress = 500;
+        int percent = (int)map((long)progress, 0L, 500L, 0L, 100L);
+        if (percent != lastPercent) {
+            Serial.print(F("Calibration: "));
+            Serial.print(percent);
+            Serial.println(F("%"));
+            lastPercent = percent;
+        }
+        delay(2);
+    }
+
+    Serial.println(F("Calibration done!"));
+}
 
 void setup() {
     Wire.begin();
@@ -31,38 +47,15 @@ void setup() {
     while (!Serial) ;
     
     Serial.println(F("\n=== Edge Impulse Data Forwarder ==="));
-    Serial.println(F("Using FastIMU with calibration"));
-    
-    int err = IMU.init(calib, IMU_ADDRESS);
-    if (err != 0) {
-        Serial.print(F("Error initializing IMU: "));
-        Serial.println(err);
+    Serial.println(F("Using MPU6050_AHRS with calibration"));
+
+    if (!mpu.begin()) {
+        Serial.println(F("Error initializing IMU"));
         while (true) delay(1000);
     }
-    Serial.println(F("✓ IMU initialized"));
-    
-#ifdef PERFORM_CALIBRATION
-    Serial.println(F("\n--- CALIBRATION ---"));
-    Serial.println(F("Keep device LEVEL and STILL..."));
-    delay(2000);
-    
-    // Calibrate accelerometer and gyroscope
-    IMU.calibrateAccelGyro(&calib);
-    
-    Serial.println(F("✓ Calibration done!"));
-    Serial.print(F("Accel bias: "));
-    Serial.print(calib.accelBias[0], 2); Serial.print(", ");
-    Serial.print(calib.accelBias[1], 2); Serial.print(", ");
-    Serial.println(calib.accelBias[2], 2);
-    Serial.print(F("Gyro bias: "));
-    Serial.print(calib.gyroBias[0], 2); Serial.print(", ");
-    Serial.print(calib.gyroBias[1], 2); Serial.print(", ");
-    Serial.println(calib.gyroBias[2], 2);
-    
-    // Re-init with calibration data
-    IMU.init(calib, IMU_ADDRESS);
-    delay(500);
-#endif
+    Serial.println(F("IMU initialized"));
+
+    waitForCalibration();
     
     Serial.println(F("\n=== Starting data output ==="));
     Serial.println(F("Format: gX\\tgY\\tgZ\\taX\\taY\\taZ @ 24Hz"));
@@ -70,24 +63,25 @@ void setup() {
 }
 
 void loop() {
-    IMU.update();
-    
-    IMU.getGyro(&gyroData);
-    IMU.getAccel(&accelData);
+    if (!mpu.update()) {
+        return;
+    }
+
+    const MPU6050Data& d = mpu.getData();
     
     // Output in Edge Impulse data forwarder format (tab-separated)
     // Gyro in °/s, Accel in g
-    Serial.print(gyroData.gyroX, 4);
+    Serial.print(d.gxDps, 4);
     Serial.print('\t');
-    Serial.print(gyroData.gyroY, 4);
+    Serial.print(d.gyDps, 4);
     Serial.print('\t');
-    Serial.print(gyroData.gyroZ, 4);
+    Serial.print(d.gzDps, 4);
     Serial.print('\t');
-    Serial.print(accelData.accelX, 4);
+    Serial.print(d.axG, 4);
     Serial.print('\t');
-    Serial.print(accelData.accelY, 4);
+    Serial.print(d.ayG, 4);
     Serial.print('\t');
-    Serial.println(accelData.accelZ, 4);
+    Serial.println(d.azG, 4);
     
     delay(43);  // 23Hz sample rate (matches Edge Impulse leor model)
 }

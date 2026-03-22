@@ -169,11 +169,11 @@ Leor/
 ```mermaid
 flowchart LR
     subgraph Input
-        IMU(MPU6050) -->|Raw °/s + g| FastIMU[FastIMU Lib]
+        IMU(MPU6050) -->|Raw °/s + g| AHRS[MPU6050_AHRS]
     end
 
     subgraph "Processing (ESP32)"
-        FastIMU -->|Raw data| EI[[Edge Impulse<br>Inference]]
+        AHRS -->|Raw data| EI[[Edge Impulse<br>Inference]]
         EI -->|Gesture Class| Logic{Command Logic}
         BLE{{BLE Receiver}} -->|User Override| Logic
     end
@@ -216,7 +216,6 @@ cd Leor
    * `Adafruit GFX Library`
    * `Adafruit SH110X`
    * `Adafruit SSD1306`
-   * `FastIMU`
    * `NimBLE-Arduino` (v2.1.x+)
    * `ArduinoJson`
 
@@ -337,7 +336,7 @@ See [LICENSE](LICENSE.md) for details.
 
 * *MochiEyes* core logic adapted from FluxGarage RoboEyes.
 * *Edge Impulse* for the ML training platform.
-* *FastIMU* for sensor abstraction.
+* *MPU6050_AHRS* for the IMU backend.
 
 ---
 

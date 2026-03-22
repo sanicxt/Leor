@@ -32,6 +32,7 @@
 #include "ota_manager.h"        // OTA firmware update service
 #include "power_manager.h"      // Deep sleep, touch wake, board-specific GPIO
 #include "imu_manager.h"        // IMU sensor, calibration, gesture processing
+#include "mpu/MPU6050_AHRS.cpp" // MPU6050_AHRS implementation for Arduino build
 #include "shuffle_manager.h"    // Auto-expression shuffle
 #include "ble_manager.h"        // NimBLE BLE stack
 #include "commands.h"           // Command parser
@@ -162,13 +163,14 @@ void setup() {
     setBLELowPowerMode(bleLP);
     setDisplayLowPowerMode(bleLP);
 
+    // Initialize the default eye state before IMU calibration starts.
+    // This avoids overwriting the final calibration screen immediately after initIMU().
+    MOCHI_CALL_VOID(setMood, 0);
+    MOCHI_CALL_VOID(setPosition, 0);
+
     // 8. IMU + Gesture
     initIMU();
     initEIGesture();
-
-    // Ready!
-    MOCHI_CALL_VOID(setMood, 0);
-    MOCHI_CALL_VOID(setPosition, 0);
 
     // Re-arm touch detection now that all init is done
     // (replaces the 30s guard set in initPower so touch works immediately)

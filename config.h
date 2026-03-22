@@ -58,7 +58,7 @@ const char *BLE_DEVICE_NAME = "LeorDevKitTest55";
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
-#define FRAME_RATE 25 // FPS
+#define FRAME_RATE 60 // FPS
 // ==================== MPU6050 Sensor Settings ====================
 #define MPU_SAMPLE_RATE_MS 100 // Read interval in ms (10Hz)
 #define GESTURE_MAG_MIN 2.0f // Min magnitude (rad/s) to start gesture sampling
