@@ -25,6 +25,15 @@ class OtaService {
     uint8_t control_notify_code() const { return control_notify_code_; }
     void consume_control_notify() { control_notify_pending_ = false; }
     bool reboot_pending() const { return reboot_pending_; }
+    bool error_pending() const;
+    const char* error_message() const { return error_message_; }
+    void set_error(const char* msg);
+    int progress_percent() const;
+    uint32_t bytes_received() const { return bytes_rx_; }
+    uint32_t expected_size() const { return transfer_size_hint_ > 0 ? transfer_size_hint_ : expected_size_; }
+    uint32_t packets_received() const { return packets_rx_; }
+    uint16_t packet_size() const { return packet_size_; }
+    bool progress_known() const { return transfer_size_hint_ > 0; }
 
     void reset();
     esp_err_t set_packet_size(uint16_t packet_size);
@@ -40,7 +49,11 @@ class OtaService {
     uint16_t packet_size_ = 0;
     uint32_t packets_rx_ = 0;
     uint32_t bytes_rx_ = 0;
+    uint32_t expected_size_ = 0;
+    uint32_t transfer_size_hint_ = 0;
     uint64_t reboot_at_us_ = 0;
+    uint64_t show_error_until_us_ = 0;
+    const char* error_message_ = nullptr;
     const esp_partition_t* ota_partition_ = nullptr;
     esp_ota_handle_t ota_handle_ = 0;
 };

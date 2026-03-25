@@ -29,6 +29,8 @@ class BleService {
     bool connected() const { return connected_; }
     bool low_power_mode() const { return low_power_mode_; }
     void set_low_power_mode(bool enabled);
+    OtaService& ota() { return ota_; }
+    const OtaService& ota() const { return ota_; }
 
   private:
     CommandHandler command_handler_;

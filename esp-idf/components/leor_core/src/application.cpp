@@ -9,6 +9,7 @@
 #include "freertos/task.h"
 #include "nvs_flash.h"
 
+#include <cstdio>
 #include <cstdlib>
 
 namespace leor {
@@ -17,6 +18,7 @@ namespace {
 
 constexpr const char *kTag = "leor_app";
 constexpr uint32_t kPowerOffMessageMs = 320;
+constexpr uint32_t kOtaUiFrameMs = 33;
 
 bool conflicts_with_display_i2c(int pin, const DisplayConfig &display) {
   return pin == display.sda_pin || pin == display.scl_pin;
@@ -32,6 +34,57 @@ void release_held_pin(int pin) {
 }
 
 } // namespace
+
+void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const char* line2, uint32_t now_ms) {
+  const char* title = line1 != nullptr ? line1 : "OTA UPDATE";
+  display.clear();
+  display.set_font_small();
+
+  const int title_w = display.text_width(title);
+  display.draw_text((display.width() - title_w) / 2, 10, title);
+  display.draw_hline(0, 12, display.width());
+
+  if (line2 != nullptr) {
+    const int sub_w = display.text_width(line2);
+    display.draw_text((display.width() - sub_w) / 2, 22, line2);
+  }
+
+  if (pct >= 0) {
+    constexpr int kBarX = 4;
+    constexpr int kBarY = 28;
+    constexpr int kBarW = 120;
+    constexpr int kBarH = 14;
+    display.draw_frame(kBarX, kBarY, kBarW, kBarH);
+    const int fill = ((kBarW - 4) * pct) / 100;
+    if (fill > 0) {
+      display.fill_rbox(kBarX + 2, kBarY + 2, fill, kBarH - 4, 2);
+    }
+
+    char pct_buf[12];
+    std::snprintf(pct_buf, sizeof(pct_buf), "%d%%", pct);
+    const int pct_w = display.text_width(pct_buf);
+    display.set_color(pct > 40 ? 0 : 1);
+    display.draw_text((display.width() - pct_w) / 2, kBarY + 11, pct_buf);
+    display.set_color(1);
+  }
+
+  if (pct >= 0 && pct < 100) {
+    char dots[5] = "";
+    const int dot_count = static_cast<int>((now_ms / 400U) % 4U);
+    for (int i = 0; i < dot_count; ++i) {
+      dots[i] = '.';
+    }
+    dots[dot_count] = '\0';
+    display.draw_text(4, 50, "Flashing");
+    if (dot_count > 0) {
+      display.draw_text(58, 50, dots);
+    }
+  } else if (pct == 100) {
+    display.draw_text(36, 50, "Rebooting...");
+  }
+
+  display.send_buffer();
+}
 
 Application::Application() = default;
 
@@ -155,8 +208,45 @@ esp_err_t Application::start() {
 }
 
 void Application::tick() {
-  const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
-  
+  uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+  ble_.poll();
+
+  // --- OTA Priority Bypass ---
+  // If an OTA update is active or finished and waiting to reboot, we suspend
+  // all normal rendering and logic (IMU, gestures, splines) to speed up BLE transfer.
+  if (ble_.ota().in_progress() || ble_.ota().reboot_pending() || ble_.ota().error_pending()) {
+    if (display_) {
+      if (ble_.ota().error_pending()) {
+        draw_ota_screen(*display_, 0, "OTA FAILED", ble_.ota().error_message() ? ble_.ota().error_message() : "Unknown", now_ms);
+      } else {
+        int pct = ble_.ota().progress_percent();
+        if (ble_.ota().reboot_pending()) {
+          pct = 100;
+          draw_ota_screen(*display_, pct, "OTA SUCCESS", "Rebooting...", now_ms);
+        } else {
+          char msg[48];
+          const uint32_t kb_done = ble_.ota().bytes_received() / 1024U;
+          const uint32_t pkts = ble_.ota().packets_received();
+          if (ble_.ota().progress_known()) {
+            const uint32_t kb_total = ble_.ota().expected_size() / 1024U;
+            std::snprintf(msg, sizeof(msg), "%lu / %lu KB (%lu)",
+                          static_cast<unsigned long>(kb_done),
+                          static_cast<unsigned long>(kb_total),
+                          static_cast<unsigned long>(pkts));
+          } else {
+            std::snprintf(msg, sizeof(msg), "%lu KB (%lu pkts)",
+                          static_cast<unsigned long>(kb_done),
+                          static_cast<unsigned long>(pkts));
+          }
+          draw_ota_screen(*display_, pct, nullptr, msg, now_ms);
+        }
+      }
+    }
+    vTaskDelay(pdMS_TO_TICKS(kOtaUiFrameMs));
+    return;
+  }
+  // ---------------------------
+
   ButtonEvent btn = power_.poll(now_ms);
   if (btn == ButtonEvent::kShortPress) {
     menu_.on_short_press(now_ms);

@@ -1,6 +1,7 @@
 #include "leor/ble_service.hpp"
 
 #include "esp_log.h"
+#include "host/ble_att.h"
 #include "host/ble_hs.h"
 #include "host/util/util.h"
 #include "nimble/nimble_port.h"
@@ -200,6 +201,7 @@ esp_err_t BleService::start(const std::string& device_name, CommandHandler handl
     command_handler_ = std::move(handler);
     s_service = this;
     ESP_ERROR_CHECK(nimble_port_init());
+    ble_att_set_preferred_mtu(BLE_ATT_MTU_MAX);
     ble_hs_cfg.reset_cb = on_reset;
     ble_hs_cfg.sync_cb = on_sync;
     ble_svc_gap_init();
@@ -216,10 +218,19 @@ void BleService::poll() {
     ota_.poll();
     if (connected_ && ota_.control_notify_pending()) {
         const uint8_t code = ota_.control_notify_code();
-        ota_.consume_control_notify();
         if (s_ota_control_handle != 0) {
-            struct os_mbuf* om = ble_hs_mbuf_from_flat(&code, 1);
-            ble_gatts_notify_custom(s_conn_handle, s_ota_control_handle, om);
+            bool success = false;
+            for (int i = 0; i < 3; i++) {
+                struct os_mbuf* om = ble_hs_mbuf_from_flat(&code, 1);
+                if (ble_gatts_notify_custom(s_conn_handle, s_ota_control_handle, om) == 0) {
+                    success = true;
+                    break;
+                }
+                vTaskDelay(pdMS_TO_TICKS(2));
+            }
+            if (success) {
+                ota_.consume_control_notify();
+            }
         }
     }
 }
@@ -282,6 +293,9 @@ void BleService::on_connected(uint16_t conn_handle) {
 
 void BleService::on_disconnected() {
     connected_ = false;
+    if (ota_.in_progress()) {
+        ota_.set_error("BLE Disconnected");
+    }
 }
 
 uint8_t BleService::ota_handle_control(uint8_t opcode) {

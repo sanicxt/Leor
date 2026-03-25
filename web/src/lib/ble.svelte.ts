@@ -530,6 +530,21 @@ export async function sendOTA(
         await otaDataChar.writeValueWithResponse(
             new Uint8Array([packetSize & 0xFF, (packetSize >> 8) & 0xFF])
         );
+        // Optional metadata for ESP-IDF parity UI/progress:
+        // 'L','R', packet_size_le16, total_size_le32
+        const total = firmware.byteLength;
+        await otaDataChar.writeValueWithResponse(
+            new Uint8Array([
+                0x4c,
+                0x52,
+                packetSize & 0xFF,
+                (packetSize >> 8) & 0xFF,
+                total & 0xFF,
+                (total >> 8) & 0xFF,
+                (total >> 16) & 0xFF,
+                (total >> 24) & 0xFF,
+            ])
+        );
 
         // 3. REQUEST — setup ACK waiter BEFORE writing to avoid race
         onProgress(1, 'Requesting OTA...');
@@ -551,7 +566,6 @@ export async function sendOTA(
         //    This lets BLE send multiple PDUs per connection interval (10-20× faster
         //    than writeValueWithResponse while still preventing NimBLE buffer overrun).
         const data = new Uint8Array(firmware);
-        const total = data.byteLength;
         const totalPackets = Math.ceil(total / packetSize);
         let offset = 0;
         let packet = 0;
