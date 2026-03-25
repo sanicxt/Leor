@@ -96,6 +96,8 @@ struct EyeParams {
   float laughPhase;
   float hFlicker;
   float vFlicker;
+  float sleepIntensity;
+  float sleepPhase;
 
   void reset() {
     openness = 1.0f;
@@ -129,6 +131,8 @@ struct EyeParams {
     laughPhase = 0.0f;
     hFlicker = 0.0f;
     vFlicker = 0.0f;
+    sleepIntensity = 0.0f;
+    sleepPhase = 0.0f;
   }
 };
 
@@ -150,6 +154,7 @@ struct ImpulseTargets {
   float curiousIntensity;
   float uwuIntensity;
   float xdIntensity;
+  float sleepIntensity;
 
   float opennessSpeed;
   float squishSpeed;
@@ -177,6 +182,7 @@ struct ImpulseTargets {
     curiousIntensity = 0.0f;
     uwuIntensity = 0.0f;
     xdIntensity = 0.0f;
+    sleepIntensity = 0.0f;
 
     opennessSpeed = 12.0f;
     squishSpeed = 10.0f;
@@ -296,6 +302,8 @@ public:
   void triggerUwU(float duration = 0);
   void triggerXD(float duration = 0);
   void triggerLaugh(float durationSec = 0);
+  void triggerSleep();
+  bool isSleepDone() const;
   void setKnocked(bool on);
   void setSweat(bool on);
   void setCyclops(bool on);
@@ -394,6 +402,8 @@ public:
   void set_mouth_enabled(bool enabled) { setMouthEnabled(enabled); }
   void set_mouth_type(int type) { setMouthType(type); }
   void reset_emotions() { resetEmotions(); }
+  void trigger_sleep() { triggerSleep(); }
+  bool is_sleep_done() const { return isSleepDone(); }
   void start_mouth_anim(int anim, uint32_t duration) {
     startMouthAnim(anim, duration);
   }
@@ -436,6 +446,7 @@ private:
   void drawSpiral(int16_t cx, int16_t cy, int16_t maxRadius);
   void drawKnockedOverlay();
   void drawSweat();
+  void drawSleepOverlay();
 
   // Graphic helpers
   void fillRoundRect(int x, int y, int w, int h, int r, uint8_t color);

@@ -91,76 +91,92 @@ bool PowerService::pressed() const {
          static_cast<int>(active_level_);
 }
 
-bool PowerService::handle(uint32_t now_ms) {
+ButtonEvent PowerService::poll(uint32_t now_ms) {
   if (now_ms < enable_at_ms_) {
-    return false;
+    return ButtonEvent::kNone;
   }
   const bool current = pressed();
+  ButtonEvent event = ButtonEvent::kNone;
+
   if (!last_state_ && current) {
     press_start_ms_ = now_ms;
   }
+  
   if (last_state_ && !current) {
+    if (press_start_ms_ != 0) {
+      uint32_t duration = now_ms - press_start_ms_;
+      if (duration >= 50 && duration < hold_ms_) { // 50ms denounce
+        event = ButtonEvent::kShortPress;
+      }
+    }
     press_start_ms_ = 0;
   }
-  last_state_ = current;
 
-  if (current && press_start_ms_ != 0 &&
-      (now_ms - press_start_ms_) >= hold_ms_) {
-    if (sleep_prepare_callback_) {
-      sleep_prepare_callback_();
+  if (current && press_start_ms_ != 0) {
+    if (now_ms - press_start_ms_ >= hold_ms_) {
+      event = ButtonEvent::kLongPress;
+      press_start_ms_ = 0; // Consume
     }
-    if (pwr_ctrl_pin_ >= 0) {
-      gpio_num_t pin = static_cast<gpio_num_t>(pwr_ctrl_pin_);
-      release_hold(pin);
-      gpio_set_level(pin, 1);
-      gpio_hold_en(pin);
-    }
-    if (led_pin_ >= 0) {
-      gpio_num_t pin = static_cast<gpio_num_t>(led_pin_);
-      release_hold(pin);
-      gpio_set_level(pin, 1);
-      gpio_hold_en(pin);
-    }
-    const gpio_num_t touch_gpio = static_cast<gpio_num_t>(touch_pin_);
-    configure_touch_inactive_level(touch_gpio, active_level_);
-    gpio_hold_en(touch_gpio);
-
-    const esp_sleep_gpio_wake_up_mode_t wake_mode =
-        active_level_ == 0 ? ESP_GPIO_WAKEUP_GPIO_LOW
-                           : ESP_GPIO_WAKEUP_GPIO_HIGH;
-    esp_sleep_enable_gpio_wakeup_on_hp_periph_powerdown((1ULL << touch_pin_),
-                                                        wake_mode);
-
-    const uint32_t release_start_ms = now_ms;
-    while (pressed()) {
-      const uint32_t loop_now =
-          static_cast<uint32_t>(xTaskGetTickCount() * portTICK_PERIOD_MS);
-      if (loop_now - release_start_ms > 5000U) {
-        gpio_hold_dis(touch_gpio);
-        if (pwr_ctrl_pin_ >= 0) {
-          gpio_num_t pin = static_cast<gpio_num_t>(pwr_ctrl_pin_);
-          release_hold(pin);
-          gpio_set_level(pin, 0);
-          gpio_hold_en(pin);
-        }
-        if (led_pin_ >= 0) {
-          gpio_num_t pin = static_cast<gpio_num_t>(led_pin_);
-          release_hold(pin);
-          gpio_set_level(pin, 1);
-          gpio_hold_en(pin);
-        }
-        press_start_ms_ = 0;
-        return false;
-      }
-      vTaskDelay(pdMS_TO_TICKS(10));
-    }
-    vTaskDelay(pdMS_TO_TICKS(50));
-
-    gpio_deep_sleep_hold_en();
-    esp_deep_sleep_start();
-    return true;
   }
-  return false;
+
+  last_state_ = current;
+  return event;
+}
+
+void PowerService::do_sleep() {
+  if (sleep_prepare_callback_) {
+    sleep_prepare_callback_();
+  }
+  if (pwr_ctrl_pin_ >= 0) {
+    gpio_num_t pin = static_cast<gpio_num_t>(pwr_ctrl_pin_);
+    release_hold(pin);
+    gpio_set_level(pin, 1);
+    gpio_hold_en(pin);
+  }
+  if (led_pin_ >= 0) {
+    gpio_num_t pin = static_cast<gpio_num_t>(led_pin_);
+    release_hold(pin);
+    gpio_set_level(pin, 1);
+    gpio_hold_en(pin);
+  }
+  const gpio_num_t touch_gpio = static_cast<gpio_num_t>(touch_pin_);
+  configure_touch_inactive_level(touch_gpio, active_level_);
+  gpio_hold_en(touch_gpio);
+
+  const esp_sleep_gpio_wake_up_mode_t wake_mode =
+      active_level_ == 0 ? ESP_GPIO_WAKEUP_GPIO_LOW
+                         : ESP_GPIO_WAKEUP_GPIO_HIGH;
+  esp_sleep_enable_gpio_wakeup_on_hp_periph_powerdown((1ULL << touch_pin_),
+                                                      wake_mode);
+
+  const uint32_t release_start_ms =
+      static_cast<uint32_t>(xTaskGetTickCount() * portTICK_PERIOD_MS);
+  while (pressed()) {
+    const uint32_t loop_now =
+        static_cast<uint32_t>(xTaskGetTickCount() * portTICK_PERIOD_MS);
+    if (loop_now - release_start_ms > 5000U) {
+      gpio_hold_dis(touch_gpio);
+      if (pwr_ctrl_pin_ >= 0) {
+        gpio_num_t pin = static_cast<gpio_num_t>(pwr_ctrl_pin_);
+        release_hold(pin);
+        gpio_set_level(pin, 0);
+        gpio_hold_en(pin);
+      }
+      if (led_pin_ >= 0) {
+        gpio_num_t pin = static_cast<gpio_num_t>(led_pin_);
+        release_hold(pin);
+        gpio_set_level(pin, 1);
+        gpio_hold_en(pin);
+      }
+      press_start_ms_ = 0;
+      return;
+    }
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+  vTaskDelay(pdMS_TO_TICKS(50));
+
+  gpio_deep_sleep_hold_en();
+  esp_deep_sleep_start();
 }
 
 } // namespace leor

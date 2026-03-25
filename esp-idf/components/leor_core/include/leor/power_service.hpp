@@ -5,6 +5,8 @@
 
 namespace leor {
 
+enum class ButtonEvent { kNone, kShortPress, kLongPress };
+
 class PowerService {
 public:
   using SleepPrepareCallback = std::function<void()>;
@@ -12,7 +14,8 @@ public:
   void init(uint8_t touch_pin, uint8_t active_level, uint32_t hold_ms,
             int pwr_ctrl_pin = 1, int led_pin = -1);
   void arm(uint32_t delay_ms, uint32_t now_ms);
-  bool handle(uint32_t now_ms);
+  ButtonEvent poll(uint32_t now_ms);
+  void do_sleep();
   uint32_t hold_ms() const { return hold_ms_; }
   void set_hold_ms(uint32_t value_ms);
   void set_sleep_prepare_callback(SleepPrepareCallback callback);

@@ -116,6 +116,7 @@ void MochiEyesEngine::update(uint32_t now_ms) {
   drawXDOverlay();
   drawTears();
   drawKnockedOverlay();
+  drawSleepOverlay();
 
   display_.send_buffer();
 }
@@ -156,6 +157,11 @@ void MochiEyesEngine::updateParams(float dt) {
                                    targets.effectSpeed, dt);
   params.xdIntensity = smoothDamp(params.xdIntensity, targets.xdIntensity,
                                   targets.effectSpeed, dt);
+  params.sleepIntensity = smoothDamp(params.sleepIntensity, targets.sleepIntensity,
+                                     3.0f, dt);
+  if (params.sleepIntensity > 0.1f) {
+    params.sleepPhase += dt;
+  }
 }
 
 void MochiEyesEngine::updateTimers(float dt) {
@@ -1100,6 +1106,7 @@ void MochiEyesEngine::clearAllOverlays() {
   clearTimedOverlays();
   targets.curiousIntensity = 0.0f;
   targets.sweatIntensity = 0.0f;
+  targets.sleepIntensity = 0.0f;
   params.curiousPhase = 0.0f;
   params.confusedIntensity = 0.0f;
   params.confusedPhase = 0.0f;
@@ -1336,6 +1343,54 @@ void MochiEyesEngine::startMouthAnim(int anim, unsigned long duration) {
   clearAllOverlays();
   timers.mouthAnimRemaining = duration / 1000.0f;
   timers.mouthAnimType = anim;
+}
+
+void MochiEyesEngine::triggerSleep() {
+  clearAllOverlays();
+  targets.sleepIntensity = 1.0f;
+  targets.openness = 0.0f;
+  targets.opennessSpeed = 3.0f;
+  params.sleepPhase = 0.0f;
+  setMouthShape(MOUTH_FLAT);
+}
+
+bool MochiEyesEngine::isSleepDone() const {
+  return params.openness < 0.05f && params.sleepIntensity > 0.9f;
+}
+
+void MochiEyesEngine::drawSleepOverlay() {
+  if (params.sleepIntensity < 0.3f)
+    return;
+
+  // Float "Zzz" from bottom-right of right eye upward
+  int16_t baseX = render.rightX + render.rightW - 4;
+  int16_t baseY = render.rightY;
+
+  // Phase controls vertical drift and size cycling
+  float phase = params.sleepPhase;
+  int16_t drift = static_cast<int16_t>(phase * 12.0f);
+  int16_t zY = baseY - drift;
+
+  // Wrap the drift so it loops
+  if (drift > 30) {
+    params.sleepPhase = 0.0f;
+    return;
+  }
+
+  // Fade opacity with height (draw when visible)
+  if (zY > 0 && zY < layout.screenH) {
+    display_.set_color(MAINCOLOR);
+    display_.set_font_small();
+
+    // Small "z" further along, bigger "Zz" near start
+    if (drift < 10) {
+      display_.draw_text(baseX + 2, zY, "z");
+    } else if (drift < 20) {
+      display_.draw_text(baseX, zY, "Zz");
+    } else {
+      display_.draw_text(baseX - 2, zY, "Zzz");
+    }
+  }
 }
 
 } // namespace leor

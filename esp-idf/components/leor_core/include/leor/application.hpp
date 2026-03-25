@@ -6,6 +6,7 @@
 #include "leor/config.hpp"
 #include "leor/display_backend.hpp"
 #include "leor/gesture_service.hpp"
+#include "leor/menu_service.hpp"
 #include "leor/mochi_eyes_engine.hpp"
 #include "leor/power_service.hpp"
 #include "leor/preferences.hpp"
@@ -33,9 +34,11 @@ private:
   ClockService clock_;
   ShuffleService shuffle_;
   PowerService power_;
+  MenuService menu_;
   BleService ble_;
   std::unique_ptr<CommandRouter> commands_;
   bool was_clock_enabled_ = false;
+  bool was_menu_open_ = false;
 };
 
 } // namespace leor

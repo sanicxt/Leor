@@ -6,6 +6,7 @@ idf_component_register(
         "src/command_router.cpp"
         "src/display_backend.cpp"
         "src/gesture_service.cpp"
+        "src/menu_service.cpp"
         "src/mochi_eyes_engine.cpp"
         "src/mpu6050_ahrs_ng.cpp"
         "src/ota_service.cpp"

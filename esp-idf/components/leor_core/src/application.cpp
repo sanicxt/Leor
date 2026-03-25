@@ -91,39 +91,6 @@ esp_err_t Application::start() {
   release_held_pin(config_.display.sda_pin);
   release_held_pin(config_.display.scl_pin);
 
-  power_.set_sleep_prepare_callback([this]() {
-    if (display_ && eyes_) {
-      // Smoothly animate the eyes closing without setting emotions that might
-      // trigger tears
-      eyes_->reset_emotions();
-      eyes_->setOpennessSpeed(3.0f);
-      eyes_->close();
-
-      uint32_t start_time =
-          static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
-      for (int i = 0; i < 40; ++i) { // ~1.3 seconds at 30 fps
-        display_->clear();
-        uint32_t now = start_time + (i * 33);
-        eyes_->update(now);
-
-        // Float a tiny "Zzz" bubble up as they fall asleep
-        if (i > 15) {
-          display_->set_font_small();
-          int z_x = 100 + ((i - 15) / 5);
-          int z_y = 25 - ((i - 15) / 2);
-          display_->draw_text(z_x, z_y, "Zzz");
-        }
-
-        display_->send_buffer();
-        vTaskDelay(pdMS_TO_TICKS(33));
-      }
-      display_->prepare_sleep();
-    } else if (display_) {
-      display_->clear();
-      display_->send_buffer();
-      display_->prepare_sleep();
-    }
-  });
   power_.init(config_.touch_wake_pin, config_.touch_active_level,
               config_.touch_hold_ms, config_.pwr_ctrl_pin, config_.led_pin);
   power_.arm(1000, 0);
@@ -189,8 +156,46 @@ esp_err_t Application::start() {
 
 void Application::tick() {
   const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
-  if (power_.handle(now_ms)) {
+  
+  ButtonEvent btn = power_.poll(now_ms);
+  if (btn == ButtonEvent::kShortPress) {
+    menu_.on_short_press(now_ms);
+  } else if (btn == ButtonEvent::kLongPress) {
+    menu_.on_long_press(now_ms);
+  }
+
+  MenuAction action = menu_.consume_action();
+  switch (action) {
+  case MenuAction::kToggleMode: {
+    bool new_state = !clock_.enabled();
+    clock_.set_enabled(new_state);
+    preferences_.putBool("clk_on", new_state);
+    break;
+  }
+  case MenuAction::kPowerOff:
+    if (display_ && eyes_) {
+      eyes_->trigger_sleep();
+      uint32_t start_ms = now_ms;
+      while (!eyes_->is_sleep_done()) {
+        uint32_t loop_ms =
+            static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+        display_->clear();
+        // update handles all overlay logic and calls display_->send_buffer()
+        eyes_->update(loop_ms);
+        vTaskDelay(pdMS_TO_TICKS(16));
+        if (loop_ms - start_ms > 4000)
+          break; // failsafe
+      }
+      display_->prepare_sleep();
+    } else if (display_) {
+      display_->clear();
+      display_->send_buffer();
+      display_->prepare_sleep();
+    }
+    power_.do_sleep();
     return;
+  default:
+    break;
   }
   const GestureEvent event = gesture_.poll(now_ms);
 
@@ -214,7 +219,7 @@ void Application::tick() {
   }
 
   const char *shuffle_cmd = nullptr;
-  if (shuffle_.should_emit(now_ms, false, false, &shuffle_cmd) &&
+  if (!clock_.enabled() && shuffle_.should_emit(now_ms, false, false, &shuffle_cmd) &&
       shuffle_cmd != nullptr) {
     commands_->handle(shuffle_cmd, now_ms);
   }
@@ -226,10 +231,27 @@ void Application::tick() {
     was_clock_enabled_ = is_clock_enabled;
   }
 
-  if (is_clock_enabled) {
-    clock_.draw(*display_, now_ms, ble_.connected());
+  if (menu_.is_open() != was_menu_open_) {
+    if (menu_.is_open()) {
+      power_.set_hold_ms(1000);
+    } else {
+      power_.set_hold_ms(config_.touch_hold_ms);
+    }
+    display_->clear();
+    display_->send_buffer();
+    was_menu_open_ = menu_.is_open();
+  }
+
+  if (menu_.is_open()) {
+    display_->clear();
+    menu_.draw(*display_, is_clock_enabled, now_ms);
+    display_->send_buffer();
   } else {
-    eyes_->update(now_ms);
+    if (is_clock_enabled) {
+      clock_.draw(*display_, now_ms, ble_.connected());
+    } else {
+      eyes_->update(now_ms);
+    }
   }
 }
 
