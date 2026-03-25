@@ -102,7 +102,7 @@ esp_err_t Application::start() {
 
 #if CONFIG_PM_ENABLE
   esp_pm_config_t pm_config = {
-      .max_freq_mhz = 80, .min_freq_mhz = 40, .light_sleep_enable = false};
+      .max_freq_mhz = 80, .min_freq_mhz = 40, .light_sleep_enable = true};
   ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 #endif
 
