@@ -102,7 +102,7 @@ esp_err_t Application::start() {
 
 #if CONFIG_PM_ENABLE
   esp_pm_config_t pm_config = {
-      .max_freq_mhz = 80, .min_freq_mhz = 40, .light_sleep_enable = true};
+      .max_freq_mhz = 80, .min_freq_mhz = 10, .light_sleep_enable = true};
   ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 #endif
 
@@ -141,11 +141,13 @@ esp_err_t Application::start() {
     config_.pwr_ctrl_pin = -1;
   }
 
+  gpio_deep_sleep_hold_dis();
   release_held_pin(config_.display.sda_pin);
   release_held_pin(config_.display.scl_pin);
 
   power_.init(config_.touch_wake_pin, config_.touch_active_level,
               config_.touch_hold_ms, config_.pwr_ctrl_pin, config_.led_pin);
+  power_.set_i2c_pins(config_.display.sda_pin, config_.display.scl_pin);
   power_.arm(1000, 0);
 
   display_ = std::make_unique<U8g2DisplayBackend>();
@@ -279,7 +281,7 @@ void Application::tick() {
           break; // failsafe
       }
       display_->prepare_sleep();
-      
+      ble_.stop();
       power_.do_sleep();
       
       // If do_sleep returns, the sleep was aborted by user holding button too long!
@@ -290,6 +292,7 @@ void Application::tick() {
       display_->clear();
       display_->send_buffer();
       display_->prepare_sleep();
+      ble_.stop();
       power_.do_sleep();
     }
     return;

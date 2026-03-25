@@ -19,6 +19,7 @@ public:
   uint32_t hold_ms() const { return hold_ms_; }
   void set_hold_ms(uint32_t value_ms);
   void set_sleep_prepare_callback(SleepPrepareCallback callback);
+  void set_i2c_pins(int sda_pin, int scl_pin);
 
 private:
   bool pressed() const;
@@ -32,6 +33,8 @@ private:
   bool last_state_ = false;
   uint32_t enable_at_ms_ = 0;
   SleepPrepareCallback sleep_prepare_callback_;
+  int i2c_sda_pin_ = -1;
+  int i2c_scl_pin_ = -1;
 };
 
 } // namespace leor

@@ -214,6 +214,14 @@ esp_err_t BleService::start(const std::string& device_name, CommandHandler handl
     return ESP_OK;
 }
 
+void BleService::stop() {
+    // Must stop BLE before deep sleep or ESP-IDF will panic & reboot.
+    if (connected_ && s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+        ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+    }
+    ble_gap_adv_stop();
+}
+
 void BleService::poll() {
     ota_.poll();
     if (connected_ && ota_.control_notify_pending()) {

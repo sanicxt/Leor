@@ -5,6 +5,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp32_hw_i2c.h"
+#include "driver/i2c_master.h"
 #include "u8g2.h"
 
 namespace leor {
@@ -47,15 +48,6 @@ bool U8g2DisplayBackend::init(const DisplayConfig& config) {
     ESP_ERROR_CHECK(u8g2_esp32_i2c_set_default_context(&ctx));
     i2c_ctx_ = &ctx;
 
-    if (u8g2_esp32_i2c_probe(&ctx, config.i2c_address) != ESP_OK) {
-        ESP_LOGW(kTag, "I2C probe failed for display at 0x%02x, retrying at 100 kHz", config.i2c_address);
-        ctx.cfg.clk_hz = 100000;
-        if (u8g2_esp32_i2c_probe(&ctx, config.i2c_address) != ESP_OK) {
-            ESP_LOGW(kTag, "I2C probe failed for display at 0x%02x", config.i2c_address);
-            return false;
-        }
-    }
-
     if (config.controller == DisplayController::kSsd1306) {
         u8g2_Setup_ssd1306_i2c_128x64_noname_f(handle_, U8G2_R0, u8x8_byte_esp32_hw_i2c, u8x8_gpio_and_delay_esp32_i2c);
     } else {
@@ -63,6 +55,18 @@ bool U8g2DisplayBackend::init(const DisplayConfig& config) {
     }
     u8x8_SetI2CAddress(u8g2_GetU8x8(handle_), static_cast<uint8_t>(config.i2c_address << 1));
     u8g2_InitDisplay(handle_);
+
+    // Probe after bus init to confirm display is alive.
+    if (ctx.bus_handle != nullptr) {
+        esp_err_t probe_err = i2c_master_probe(
+            static_cast<i2c_master_bus_handle_t>(ctx.bus_handle),
+            config.i2c_address, 50);
+        if (probe_err != ESP_OK) {
+            ESP_LOGW(kTag, "Display not found at 0x%02x (err: %s)", config.i2c_address, esp_err_to_name(probe_err));
+            return false;
+        }
+    }
+
     u8g2_SetPowerSave(handle_, 0);
     u8g2_SetBitmapMode(handle_, 1);
     u8g2_SetDrawColor(handle_, 1);
@@ -74,8 +78,8 @@ bool U8g2DisplayBackend::init(const DisplayConfig& config) {
 }
 
 void U8g2DisplayBackend::prepare_sleep() {
-    if (i2c_ctx_ != nullptr) {
-        u8g2_esp32_i2c_prepare_sleep(i2c_ctx_);
+    if (handle_ != nullptr) {
+        u8g2_SetPowerSave(handle_, 1);  // sends display-off (0xAE)
     }
 }
 
