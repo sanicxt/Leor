@@ -1,3 +1,29 @@
-build/
-.vscode/
+# macOS / editors
 .DS_Store
+.vscode/
+
+# ESP-IDF build artifacts
+build/
+sdkconfig.old
+sdkconfig.ci
+flasher_args.json
+flash_args
+partition_table/
+dependencies.lock.bak
+managed_components/
+
+# Logs / monitor captures
+*.log
+monitor.log
+
+# Python / virtualenv
+.venv/
+venv/
+__pycache__/
+
+# Web frontend artifacts
+web/node_modules/
+web/.svelte-kit/
+web/dist/
+web/.vite/
+web/.cache/

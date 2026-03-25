@@ -9,7 +9,7 @@ SvelteKit dashboard for controlling the Leor ESP32 companion over Web Bluetooth.
 - Control the OLED clock mode
 - Sync the clock from browser time
 - Switch between 12-hour and 24-hour format
-- Send OTA updates when supported by the firmware
+- Send BLE OTA full-image firmware updates (`.bin`)
 
 ## Development
 
@@ -36,4 +36,5 @@ bun run build:pages
 
 - The dashboard talks to the firmware through the BLE command API in [`../API.md`](../API.md).
 - Clock sync uses browser time and timezone offset, and the firmware persists the synced epoch.
-- The repo root README contains the full firmware and hardware overview.
+- OTA flow is chunked + credit-based for faster transfer while preserving reliability.
+- The repo root README contains the current ESP-IDF firmware/hardware overview.
