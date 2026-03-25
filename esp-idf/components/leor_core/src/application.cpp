@@ -1,0 +1,236 @@
+#include "leor/application.hpp"
+
+#include "driver/gpio.h"
+#include "esp_log.h"
+#include "esp_pm.h"
+#include "esp_rom_gpio.h"
+#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "nvs_flash.h"
+
+#include <cstdlib>
+
+namespace leor {
+
+namespace {
+
+constexpr const char *kTag = "leor_app";
+constexpr uint32_t kPowerOffMessageMs = 320;
+
+bool conflicts_with_display_i2c(int pin, const DisplayConfig &display) {
+  return pin == display.sda_pin || pin == display.scl_pin;
+}
+
+void release_held_pin(int pin) {
+  if (pin < 0) {
+    return;
+  }
+  const gpio_num_t gpio = static_cast<gpio_num_t>(pin);
+  esp_rom_gpio_pad_select_gpio(gpio);
+  gpio_hold_dis(gpio);
+}
+
+} // namespace
+
+Application::Application() = default;
+
+esp_err_t Application::start() {
+  esp_err_t err = nvs_flash_init();
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES ||
+      err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    err = nvs_flash_init();
+  }
+  if (err != ESP_OK) {
+    ESP_LOGE(kTag, "nvs init failed: %s", esp_err_to_name(err));
+    return err;
+  }
+
+#if CONFIG_PM_ENABLE
+  esp_pm_config_t pm_config = {
+      .max_freq_mhz = 80, .min_freq_mhz = 40, .light_sleep_enable = false};
+  ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
+#endif
+
+  std::srand(esp_timer_get_time() & 0xffffffff);
+  ESP_ERROR_CHECK(preferences_.begin("leor"));
+
+  config_.display.controller =
+      preferences_.getString("disp_type", "ssd1306") == "sh1106"
+          ? DisplayController::kSh1106
+          : DisplayController::kSsd1306;
+  config_.display.i2c_address =
+      static_cast<uint8_t>(preferences_.getUInt("disp_addr", 0x3c));
+  config_.touch_wake_pin =
+      static_cast<uint8_t>(preferences_.getUInt("wake_pin", 0));
+  config_.touch_active_level = 1;
+  config_.touch_hold_ms = preferences_.getUInt("touch_ms", 3000);
+  config_.pwr_ctrl_pin = static_cast<int>(preferences_.getUInt("pwr_pin", 1));
+
+  if (conflicts_with_display_i2c(static_cast<int>(config_.touch_wake_pin),
+                                 config_.display)) {
+    ESP_LOGW(kTag,
+             "wake pin %d conflicts with display I2C pins (SDA=%d, SCL=%d), "
+             "reverting to 0",
+             static_cast<int>(config_.touch_wake_pin), config_.display.sda_pin,
+             config_.display.scl_pin);
+    config_.touch_wake_pin = 0;
+    preferences_.putUInt("wake_pin", 0);
+  }
+
+  if (conflicts_with_display_i2c(config_.pwr_ctrl_pin, config_.display)) {
+    ESP_LOGW(kTag,
+             "power control pin %d conflicts with display I2C pins (SDA=%d, "
+             "SCL=%d), disabling power pin",
+             config_.pwr_ctrl_pin, config_.display.sda_pin,
+             config_.display.scl_pin);
+    config_.pwr_ctrl_pin = -1;
+  }
+
+  release_held_pin(config_.display.sda_pin);
+  release_held_pin(config_.display.scl_pin);
+
+  power_.set_sleep_prepare_callback([this]() {
+    if (display_ && eyes_) {
+      // Smoothly animate the eyes closing without setting emotions that might
+      // trigger tears
+      eyes_->reset_emotions();
+      eyes_->setOpennessSpeed(3.0f);
+      eyes_->close();
+
+      uint32_t start_time =
+          static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+      for (int i = 0; i < 40; ++i) { // ~1.3 seconds at 30 fps
+        display_->clear();
+        uint32_t now = start_time + (i * 33);
+        eyes_->update(now);
+
+        // Float a tiny "Zzz" bubble up as they fall asleep
+        if (i > 15) {
+          display_->set_font_small();
+          int z_x = 100 + ((i - 15) / 5);
+          int z_y = 25 - ((i - 15) / 2);
+          display_->draw_text(z_x, z_y, "Zzz");
+        }
+
+        display_->send_buffer();
+        vTaskDelay(pdMS_TO_TICKS(33));
+      }
+      display_->prepare_sleep();
+    } else if (display_) {
+      display_->clear();
+      display_->send_buffer();
+      display_->prepare_sleep();
+    }
+  });
+  power_.init(config_.touch_wake_pin, config_.touch_active_level,
+              config_.touch_hold_ms, config_.pwr_ctrl_pin, config_.led_pin);
+  power_.arm(1000, 0);
+
+  display_ = std::make_unique<U8g2DisplayBackend>();
+  if (!display_->init(config_.display)) {
+    ESP_LOGW(kTag,
+             "display init failed, falling back to null backend (%s, SDA=%d, "
+             "SCL=%d, addr=0x%02x)",
+             config_.display.controller == DisplayController::kSsd1306
+                 ? "ssd1306"
+                 : "sh1106",
+             config_.display.sda_pin, config_.display.scl_pin,
+             config_.display.i2c_address);
+    display_ = std::make_unique<NullDisplayBackend>();
+    display_->init(config_.display);
+  }
+
+  eyes_ = std::make_unique<MochiEyesEngine>(*display_);
+  eyes_->begin();
+  eyes_->set_width(preferences_.getInt("ew", 36),
+                   preferences_.getInt("ew", 36));
+  eyes_->set_height(preferences_.getInt("eh", 36),
+                    preferences_.getInt("eh", 36));
+  eyes_->set_space_between(preferences_.getInt("es", 10));
+  eyes_->set_border_radius(preferences_.getInt("er", 8),
+                           preferences_.getInt("er", 8));
+  eyes_->set_mouth_size(preferences_.getInt("mw", 20), 6);
+  eyes_->set_breathing(preferences_.getBool("br_en", true),
+                       preferences_.getFloat("br_int", 0.08f),
+                       preferences_.getFloat("br_spd", 0.3f));
+
+  gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
+                 config_.display.scl_pin, display_.get());
+  shuffle_.restore(preferences_.getBool("shuf_en", true),
+                   preferences_.getUInt("shuf_emin", 2000),
+                   preferences_.getUInt("shuf_emax", 5000),
+                   preferences_.getUInt("shuf_nmin", 2000),
+                   preferences_.getUInt("shuf_nmax", 5000));
+  clock_.restore(preferences_.getBool("clk_on", false),
+                 preferences_.getBool("clk_24", true),
+                 preferences_.getUInt("clk_sec", 0),
+                 static_cast<int16_t>(preferences_.getInt("clk_tz", 0)),
+                 preferences_.getULong64("clk_epoch", 0));
+  was_clock_enabled_ = clock_.enabled();
+
+  commands_ = std::make_unique<CommandRouter>(preferences_, config_.display,
+                                              *display_, *eyes_, gesture_,
+                                              shuffle_, clock_, power_, ble_);
+
+  const std::string ble_name = preferences_.getString("ble_name", "Leor");
+  ESP_ERROR_CHECK(ble_.start(ble_name, [this](const std::string &cmd) {
+    const uint32_t now_ms =
+        static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+    return commands_->handle(cmd, now_ms);
+  }));
+  ble_.set_low_power_mode(preferences_.getBool("ble_lp", false));
+  display_->set_contrast(0x7f);
+
+  ESP_LOGI(kTag, "application started");
+  return ESP_OK;
+}
+
+void Application::tick() {
+  const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+  if (power_.handle(now_ms)) {
+    return;
+  }
+  const GestureEvent event = gesture_.poll(now_ms);
+
+  switch (event) {
+  case GestureEvent::kPat:
+    eyes_->set_mood(HAPPY);
+    break;
+  case GestureEvent::kShake:
+    eyes_->set_mood(ANGRY);
+    break;
+  case GestureEvent::kSwipe:
+    eyes_->set_position(POS_E);
+    break;
+  case GestureEvent::kPickup:
+    eyes_->set_mood(DEFAULT);
+    eyes_->set_position(POS_N);
+    break;
+  case GestureEvent::kNone:
+  default:
+    break;
+  }
+
+  const char *shuffle_cmd = nullptr;
+  if (shuffle_.should_emit(now_ms, false, false, &shuffle_cmd) &&
+      shuffle_cmd != nullptr) {
+    commands_->handle(shuffle_cmd, now_ms);
+  }
+
+  const bool is_clock_enabled = clock_.enabled();
+  if (is_clock_enabled != was_clock_enabled_) {
+    display_->clear();
+    display_->send_buffer();
+    was_clock_enabled_ = is_clock_enabled;
+  }
+
+  if (is_clock_enabled) {
+    clock_.draw(*display_, now_ms, ble_.connected());
+  } else {
+    eyes_->update(now_ms);
+  }
+}
+
+} // namespace leor

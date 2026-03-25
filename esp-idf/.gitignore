@@ -1,0 +1,21 @@
+# ESP-IDF specific
+build/
+managed_components/
+dependencies.lock
+sdkconfig.old
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# OS generated files
+.DS_Store
+.DS_Store?
+
+# Logs and databases
+*.log
+.cache/
