@@ -1347,9 +1347,10 @@ void MochiEyesEngine::startMouthAnim(int anim, unsigned long duration) {
 
 void MochiEyesEngine::triggerSleep() {
   clearAllOverlays();
+  resetEmotions();
+  setOpennessSpeed(3.0f);
+  close();
   targets.sleepIntensity = 1.0f;
-  targets.openness = 0.0f;
-  targets.opennessSpeed = 3.0f;
   params.sleepPhase = 0.0f;
   setMouthShape(MOUTH_FLAT);
 }

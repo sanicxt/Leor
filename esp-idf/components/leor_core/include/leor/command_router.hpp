@@ -26,7 +26,7 @@ class CommandRouter {
                   PowerService& power,
                   BleService& ble);
 
-    std::string handle(std::string cmd, uint32_t now_ms);
+    std::string handle(std::string cmd, uint32_t now_ms, bool is_manual = true);
 
   private:
     std::string handle_settings(const std::string& params, uint32_t now_ms);

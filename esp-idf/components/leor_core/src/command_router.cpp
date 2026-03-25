@@ -306,7 +306,7 @@ std::string CommandRouter::handle_clock(const std::string& params, uint32_t now_
     return "clock: usage - on, off, set=HH:MM[:SS], sync=EPOCH_MS[,TZ], fmt=12|24";
 }
 
-std::string CommandRouter::handle(std::string cmd, uint32_t now_ms) {
+std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manual) {
     cmd = trim(cmd);
     if (cmd.empty()) return "Empty command";
     cmd = lower(cmd);
@@ -316,6 +316,7 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms) {
         eyes_.set_mood(mood);
         eyes_.set_position(gaze);
         eyes_.set_mouth_type(mouth_type);
+        if (is_manual) shuffle_.reset();
     };
 
     if (cmd == "happy") { set_expression(HAPPY, 0, 1); eyes_.anim_laugh(); return "Expression: Happy"; }
@@ -331,16 +332,29 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms) {
     if (cmd == "neutral" || cmd == "normal" || cmd == "reset") { set_expression(DEFAULT, 0, 1); return "Expression: Neutral"; }
     if (cmd == "idle") { set_expression(DEFAULT, 0, 1); eyes_.set_idle_mode(true, 1, 2); return "Mode: Idle"; }
     if (cmd == "raised") { set_expression(DEFAULT, 0, 4); eyes_.set_eyebrows(true); return "Expression: Raised eyebrows"; }
-    if (cmd == "uwu") { set_expression(DEFAULT, 0, 6); eyes_.trigger_uwu(); return "Expression: UwU"; }
-    if (cmd == "xd") { set_expression(DEFAULT, 0, 7); eyes_.trigger_xd(); return "Expression: XD"; }
+    auto set_mouth = [&](int type, const char* name) {
+        eyes_.set_mouth_type(type);
+        if (is_manual) shuffle_.reset();
+        return std::string("Mouth: ") + name;
+    };
+    auto set_pos = [&](int pos, const char* name) {
+        eyes_.set_position(pos);
+        if (is_manual) shuffle_.reset();
+        return std::string("Position: ") + name;
+    };
+    auto do_action = [&](auto func, const char* name) {
+        func();
+        if (is_manual) shuffle_.reset();
+        return std::string("Action: ") + name;
+    };
 
-    if (cmd == "smile") { eyes_.set_mouth_type(1); return "Mouth: Smile"; }
-    if (cmd == "frown") { eyes_.set_mouth_type(2); return "Mouth: Frown"; }
-    if (cmd == "open") { eyes_.set_mouth_type(3); return "Mouth: Open"; }
-    if (cmd == "ooo") { eyes_.set_mouth_type(4); return "Mouth: Ooo"; }
-    if (cmd == "flat") { eyes_.set_mouth_type(5); return "Mouth: Flat"; }
-    if (cmd == "uwum") { eyes_.set_mouth_type(6); return "Mouth: UwU"; }
-    if (cmd == "xdm") { eyes_.set_mouth_type(7); return "Mouth: XD"; }
+    if (cmd == "smile") return set_mouth(1, "Smile");
+    if (cmd == "frown") return set_mouth(2, "Frown");
+    if (cmd == "open") return set_mouth(3, "Open");
+    if (cmd == "ooo") return set_mouth(4, "Ooo");
+    if (cmd == "flat") return set_mouth(5, "Flat");
+    if (cmd == "uwum") return set_mouth(6, "UwU");
+    if (cmd == "xdm") return set_mouth(7, "XD");
     if (starts_with(cmd, "talk")) {
         uint32_t duration = 3000;
         const auto pos = cmd.find(' ');
@@ -363,21 +377,21 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms) {
         return "Mouth: Wobbling";
     }
 
-    if (cmd == "blink") { eyes_.blink(); return "Action: Blink"; }
-    if (cmd == "wink") { eyes_.wink(true); eyes_.set_mouth_type(1); return "Action: Wink"; }
-    if (cmd == "winkr") { eyes_.wink(false); eyes_.set_mouth_type(1); return "Action: Wink Right"; }
-    if (cmd == "laugh") { eyes_.anim_laugh(); return "Action: Laugh"; }
-    if (cmd == "cry") { eyes_.anim_cry(); return "Action: Cry"; }
+    if (cmd == "blink") return do_action([&]{ eyes_.blink(); }, "Blink");
+    if (cmd == "wink") return do_action([&]{ eyes_.wink(true); eyes_.set_mouth_type(1); }, "Wink");
+    if (cmd == "winkr") return do_action([&]{ eyes_.wink(false); eyes_.set_mouth_type(1); }, "Wink Right");
+    if (cmd == "laugh") return do_action([&]{ eyes_.anim_laugh(); }, "Laugh");
+    if (cmd == "cry") return do_action([&]{ eyes_.anim_cry(); }, "Cry");
 
-    if (cmd == "center") { eyes_.set_position(0); return "Position: Center"; }
-    if (cmd == "n" || cmd == "up") { eyes_.set_position(POS_N); return "Position: North"; }
-    if (cmd == "ne") { eyes_.set_position(POS_NE); return "Position: North-East"; }
-    if (cmd == "e" || cmd == "right") { eyes_.set_position(POS_E); return "Position: East"; }
-    if (cmd == "se") { eyes_.set_position(POS_SE); return "Position: South-East"; }
-    if (cmd == "s" || cmd == "down") { eyes_.set_position(POS_S); return "Position: South"; }
-    if (cmd == "sw") { eyes_.set_position(POS_SW); return "Position: South-West"; }
-    if (cmd == "w" || cmd == "left") { eyes_.set_position(POS_W); return "Position: West"; }
-    if (cmd == "nw") { eyes_.set_position(POS_NW); return "Position: North-West"; }
+    if (cmd == "center") return set_pos(0, "Center");
+    if (cmd == "n" || cmd == "up") return set_pos(POS_N, "North");
+    if (cmd == "ne") return set_pos(POS_NE, "North-East");
+    if (cmd == "e" || cmd == "right") return set_pos(POS_E, "East");
+    if (cmd == "se") return set_pos(POS_SE, "South-East");
+    if (cmd == "s" || cmd == "down") return set_pos(POS_S, "South");
+    if (cmd == "sw") return set_pos(POS_SW, "South-West");
+    if (cmd == "w" || cmd == "left") return set_pos(POS_W, "West");
+    if (cmd == "nw") return set_pos(POS_NW, "North-West");
 
     if (cmd == "sweat") { eyes_.set_sweat(true); return "Sweat: ON"; }
     if (cmd == "cyclops") { eyes_.set_cyclops(true); return "Cyclops: ON"; }

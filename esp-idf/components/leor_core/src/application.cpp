@@ -174,25 +174,34 @@ void Application::tick() {
   }
   case MenuAction::kPowerOff:
     if (display_ && eyes_) {
-      eyes_->trigger_sleep();
+      bool was_shuffle = shuffle_.enabled();
+      if (was_shuffle) shuffle_.set_enabled(false);
+
+      eyes_->triggerSleep();
       uint32_t start_ms = now_ms;
       while (!eyes_->is_sleep_done()) {
         uint32_t loop_ms =
             static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
         display_->clear();
-        // update handles all overlay logic and calls display_->send_buffer()
         eyes_->update(loop_ms);
         vTaskDelay(pdMS_TO_TICKS(16));
         if (loop_ms - start_ms > 4000)
           break; // failsafe
       }
       display_->prepare_sleep();
+      
+      power_.do_sleep();
+      
+      // If do_sleep returns, the sleep was aborted by user holding button too long!
+      if (was_shuffle) shuffle_.set_enabled(true);
+      eyes_->reset_emotions();
+      return;
     } else if (display_) {
       display_->clear();
       display_->send_buffer();
       display_->prepare_sleep();
+      power_.do_sleep();
     }
-    power_.do_sleep();
     return;
   default:
     break;
@@ -221,7 +230,7 @@ void Application::tick() {
   const char *shuffle_cmd = nullptr;
   if (!clock_.enabled() && shuffle_.should_emit(now_ms, false, false, &shuffle_cmd) &&
       shuffle_cmd != nullptr) {
-    commands_->handle(shuffle_cmd, now_ms);
+    commands_->handle(shuffle_cmd, now_ms, false);
   }
 
   const bool is_clock_enabled = clock_.enabled();
