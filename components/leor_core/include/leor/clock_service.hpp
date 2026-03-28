@@ -10,13 +10,13 @@ namespace leor {
 
 class ClockService {
   public:
-    void restore(bool enabled, bool use24, uint32_t seconds, int16_t tz_offset, uint64_t epoch_ms);
+    void restore(bool enabled, bool use24, uint32_t seconds, int16_t tz_offset, uint64_t epoch_ms, uint32_t now_ms);
     void set_enabled(bool enabled);
     bool enabled() const { return enabled_; }
     void set_use_24_hour(bool enabled);
     bool use_24_hour() const { return use_24_hour_; }
-    void set_time_of_day(uint8_t hours, uint8_t minutes, uint8_t seconds);
-    void set_from_epoch_ms(uint64_t epoch_ms, int16_t tz_offset_minutes);
+    void set_time_of_day(uint8_t hours, uint8_t minutes, uint8_t seconds, uint32_t now_ms);
+    void set_from_epoch_ms(uint64_t epoch_ms, int16_t tz_offset_minutes, uint32_t now_ms);
     uint32_t seconds_of_day(uint32_t now_ms) const;
     uint64_t epoch_ms(uint32_t now_ms) const;
     int16_t tz_offset() const { return tz_offset_minutes_; }
@@ -31,7 +31,7 @@ class ClockService {
     bool enabled_ = false;
     bool has_time_ = false;
     bool use_24_hour_ = true;
-    uint32_t base_ms_ = 0;
+    uint64_t base_rtc_us_ = 0;
     uint32_t base_seconds_ = 0;
     uint64_t base_epoch_ms_ = 0;
     int16_t tz_offset_minutes_ = 0;

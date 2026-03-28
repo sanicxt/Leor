@@ -285,7 +285,7 @@ std::string CommandRouter::handle_clock(const std::string& params, uint32_t now_
         const auto comma = value.find(',');
         const uint64_t epoch = std::strtoull(value.substr(0, comma).c_str(), nullptr, 10);
         const int16_t tz = comma == std::string::npos ? 0 : static_cast<int16_t>(std::atoi(value.substr(comma + 1).c_str()));
-        clock_.set_from_epoch_ms(epoch, tz);
+        clock_.set_from_epoch_ms(epoch, tz, now_ms);
         preferences_.putULong64("clk_epoch", epoch);
         preferences_.putInt("clk_tz", tz);
         preferences_.putUInt("clk_sec", clock_.seconds_of_day(now_ms));
@@ -298,7 +298,7 @@ std::string CommandRouter::handle_clock(const std::string& params, uint32_t now_
         const int mm = std::atoi(parts[1].c_str());
         const int ss = parts.size() > 2 ? std::atoi(parts[2].c_str()) : 0;
         if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) return "clock:set invalid. Use HH:MM or HH:MM:SS";
-        clock_.set_time_of_day(static_cast<uint8_t>(hh), static_cast<uint8_t>(mm), static_cast<uint8_t>(ss));
+        clock_.set_time_of_day(static_cast<uint8_t>(hh), static_cast<uint8_t>(mm), static_cast<uint8_t>(ss), now_ms);
         preferences_.putUInt("clk_sec", hh * 3600U + mm * 60U + ss);
         preferences_.putULong64("clk_epoch", 0);
         return clock_.status_string(now_ms, ble_.connected());

@@ -3,9 +3,27 @@
 #include <cstdio>
 #include <ctime>
 
+#include "esp_attr.h"
+#include "esp_rtc_time.h"
+
 namespace leor {
 
 namespace {
+
+struct RetainedClockState {
+    uint32_t magic = 0;
+    bool enabled = false;
+    bool has_time = false;
+    bool use_24_hour = true;
+    uint64_t base_rtc_us = 0;
+    uint32_t base_seconds = 0;
+    uint64_t base_epoch_ms = 0;
+    int16_t tz_offset_minutes = 0;
+};
+
+constexpr uint32_t kClockStateMagic = 0x4C434B31U;
+
+RTC_NOINIT_ATTR RetainedClockState s_clock_state;
 
 constexpr int kTopRowBaselineY = 10;
 constexpr int kDateX = 3;
@@ -82,42 +100,59 @@ void ClockService::format_date(char* out, std::size_t out_size, uint32_t now_ms)
     std::snprintf(out, out_size, "%s %02d", weekdays[tm_value.tm_wday], tm_value.tm_mday);
 }
 
-void ClockService::restore(bool enabled, bool use24, uint32_t seconds, int16_t tz_offset, uint64_t epoch_ms_value) {
-    enabled_ = enabled;
-    use_24_hour_ = use24;
-    base_seconds_ = seconds % 86400U;
-    tz_offset_minutes_ = tz_offset;
-    base_epoch_ms_ = epoch_ms_value;
-    has_time_ = true;
-    base_ms_ = 0;
+void ClockService::restore(bool enabled, bool use24, uint32_t seconds, int16_t tz_offset, uint64_t epoch_ms_value, uint32_t /*now_ms*/) {
+    if (s_clock_state.magic == kClockStateMagic && s_clock_state.has_time) {
+        enabled_ = s_clock_state.enabled;
+        use_24_hour_ = s_clock_state.use_24_hour;
+        has_time_ = s_clock_state.has_time;
+        base_rtc_us_ = s_clock_state.base_rtc_us;
+        base_seconds_ = s_clock_state.base_seconds;
+        base_epoch_ms_ = s_clock_state.base_epoch_ms;
+        tz_offset_minutes_ = s_clock_state.tz_offset_minutes;
+    } else {
+        enabled_ = enabled;
+        use_24_hour_ = use24;
+        base_seconds_ = seconds % 86400U;
+        tz_offset_minutes_ = tz_offset;
+        base_epoch_ms_ = epoch_ms_value;
+        has_time_ = true;
+        base_rtc_us_ = esp_rtc_get_time_us();
+    }
+    s_clock_state = {kClockStateMagic, enabled_, has_time_, use_24_hour_, base_rtc_us_, base_seconds_, base_epoch_ms_, tz_offset_minutes_};
     last_draw_key_ = UINT32_MAX;
 }
 
 void ClockService::set_enabled(bool enabled) {
     enabled_ = enabled;
+    s_clock_state.enabled = enabled_;
+    s_clock_state.magic = kClockStateMagic;
     last_draw_key_ = UINT32_MAX;
 }
 
 void ClockService::set_use_24_hour(bool enabled) {
     use_24_hour_ = enabled;
+    s_clock_state.use_24_hour = use_24_hour_;
+    s_clock_state.magic = kClockStateMagic;
     last_draw_key_ = UINT32_MAX;
 }
 
-void ClockService::set_time_of_day(uint8_t hours, uint8_t minutes, uint8_t seconds) {
+void ClockService::set_time_of_day(uint8_t hours, uint8_t minutes, uint8_t seconds, uint32_t /*now_ms*/) {
     base_seconds_ = static_cast<uint32_t>(hours % 24U) * 3600U + static_cast<uint32_t>(minutes % 60U) * 60U + static_cast<uint32_t>(seconds % 60U);
-    base_ms_ = 0;
+    base_rtc_us_ = esp_rtc_get_time_us();
     base_epoch_ms_ = 0;
     has_time_ = true;
+    s_clock_state = {kClockStateMagic, enabled_, has_time_, use_24_hour_, base_rtc_us_, base_seconds_, base_epoch_ms_, tz_offset_minutes_};
     last_draw_key_ = UINT32_MAX;
 }
 
-void ClockService::set_from_epoch_ms(uint64_t epoch_ms_value, int16_t tz_offset_minutes) {
+void ClockService::set_from_epoch_ms(uint64_t epoch_ms_value, int16_t tz_offset_minutes, uint32_t /*now_ms*/) {
     base_epoch_ms_ = epoch_ms_value;
     tz_offset_minutes_ = tz_offset_minutes;
     has_time_ = true;
-    base_ms_ = 0;
+    base_rtc_us_ = esp_rtc_get_time_us();
     const int64_t local_ms = static_cast<int64_t>(epoch_ms_value) - static_cast<int64_t>(tz_offset_minutes) * 60000LL;
     base_seconds_ = static_cast<uint32_t>((local_ms < 0 ? 0 : local_ms) / 1000ULL) % 86400U;
+    s_clock_state = {kClockStateMagic, enabled_, has_time_, use_24_hour_, base_rtc_us_, base_seconds_, base_epoch_ms_, tz_offset_minutes_};
     last_draw_key_ = UINT32_MAX;
 }
 
@@ -125,11 +160,16 @@ uint32_t ClockService::seconds_of_day(uint32_t now_ms) const {
     if (!has_time_) {
         return 0;
     }
-    return (base_seconds_ + ((now_ms - base_ms_) / 1000U)) % 86400U;
+    const uint64_t elapsed_us = esp_rtc_get_time_us() - base_rtc_us_;
+    return (base_seconds_ + static_cast<uint32_t>(elapsed_us / 1000000ULL)) % 86400U;
 }
 
 uint64_t ClockService::epoch_ms(uint32_t now_ms) const {
-    return base_epoch_ms_ == 0 ? 0 : base_epoch_ms_ + (now_ms - base_ms_);
+    if (base_epoch_ms_ == 0) {
+        return 0;
+    }
+    const uint64_t elapsed_us = esp_rtc_get_time_us() - base_rtc_us_;
+    return base_epoch_ms_ + (elapsed_us / 1000ULL);
 }
 
 std::string ClockService::status_string(uint32_t now_ms, bool ble_connected) const {

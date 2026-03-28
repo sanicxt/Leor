@@ -102,7 +102,7 @@ esp_err_t Application::start() {
 
 #if CONFIG_PM_ENABLE
   esp_pm_config_t pm_config = {
-      .max_freq_mhz = 80, .min_freq_mhz = 10, .light_sleep_enable = true};
+      .max_freq_mhz = 80, .min_freq_mhz = 10, .light_sleep_enable = false};
   ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 #endif
 
@@ -189,7 +189,8 @@ esp_err_t Application::start() {
                  preferences_.getBool("clk_24", true),
                  preferences_.getUInt("clk_sec", 0),
                  static_cast<int16_t>(preferences_.getInt("clk_tz", 0)),
-                 preferences_.getULong64("clk_epoch", 0));
+                 preferences_.getULong64("clk_epoch", 0),
+                 static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
   was_clock_enabled_ = clock_.enabled();
 
   commands_ = std::make_unique<CommandRouter>(preferences_, config_.display,
