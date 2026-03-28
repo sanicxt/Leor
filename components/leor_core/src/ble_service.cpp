@@ -63,11 +63,15 @@ int gap_event(struct ble_gap_event* event, void* arg) {
             s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
             s_advertising = false;
             if (s_service) s_service->on_disconnected();
-            advertise();
+            if (s_service && s_service->advertising_enabled()) {
+                advertise();
+            }
             return 0;
         case BLE_GAP_EVENT_ADV_COMPLETE:
             s_advertising = false;
-            advertise();
+            if (s_service && s_service->advertising_enabled()) {
+                advertise();
+            }
             return 0;
         default:
             return 0;
@@ -156,7 +160,9 @@ void on_reset(int reason) {
 
 void on_sync(void) {
     ble_hs_id_infer_auto(0, &s_own_addr_type);
-    advertise();
+    if (s_service && s_service->advertising_enabled()) {
+        advertise();
+    }
 }
 
 void host_task(void* param) {
@@ -224,9 +230,10 @@ esp_err_t BleService::start(const std::string& device_name, CommandHandler handl
     return ESP_OK;
 }
 
-void BleService::stop() {
+void BleService::stop(bool disconnect_connected) {
     // Must stop BLE before deep sleep or ESP-IDF will panic & reboot.
-    if (connected_ && s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+    advertising_enabled_ = false;
+    if (disconnect_connected && connected_ && s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
         ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
     }
     ble_gap_adv_stop();
@@ -234,7 +241,12 @@ void BleService::stop() {
 }
 
 void BleService::start_advertising() {
+    advertising_enabled_ = true;
     advertise();
+}
+
+bool BleService::advertising_enabled() const {
+    return advertising_enabled_;
 }
 
 void BleService::poll() {
@@ -293,24 +305,13 @@ void BleService::notify_gesture(const std::string& gesture) {
     }
 }
 
-void BleService::set_low_power_mode(bool enabled) {
-    low_power_mode_ = enabled;
-}
-
 void BleService::on_connected(uint16_t conn_handle) {
     connected_ = conn_handle != BLE_HS_CONN_HANDLE_NONE;
     struct ble_gap_upd_params params = {};
-    if (low_power_mode_) {
-        params.itvl_min = 80;
-        params.itvl_max = 160;
-        params.latency = 0;
-        params.supervision_timeout = 400;
-    } else {
-        params.itvl_min = 24;
-        params.itvl_max = 48;
-        params.latency = 0;
-        params.supervision_timeout = 180;
-    }
+    params.itvl_min = 24;
+    params.itvl_max = 48;
+    params.latency = 0;
+    params.supervision_timeout = 180;
     ble_gap_update_params(conn_handle, &params);
 }
 

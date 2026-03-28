@@ -19,7 +19,8 @@ namespace {
 constexpr const char *kTag = "leor_app";
 constexpr uint32_t kPowerOffMessageMs = 320;
 constexpr uint32_t kOtaUiFrameMs = 33;
-constexpr uint32_t kBleWindowMs = 60000;
+constexpr uint32_t kBleWindowMinMs = 20000;
+constexpr uint32_t kBleWindowDefaultMs = 60000;
 
 bool conflicts_with_display_i2c(int pin, const DisplayConfig &display) {
   return pin == display.sda_pin || pin == display.scl_pin;
@@ -39,7 +40,9 @@ void release_held_pin(int pin) {
 void Application::open_ble_window(uint32_t now_ms, bool start_advertising) {
   const bool should_start_advertising = !ble_window_open_;
   ble_window_open_ = true;
-  ble_window_deadline_ms_ = now_ms + kBleWindowMs;
+  ble_window_started_ms_ = now_ms;
+  ble_window_duration_ms_ = std::max(kBleWindowMinMs, preferences_.getUInt("ble_win", kBleWindowDefaultMs));
+  ble_window_deadline_ms_ = ble_window_started_ms_ + ble_window_duration_ms_;
   if (start_advertising && should_start_advertising) {
     ble_.start_advertising();
   }
@@ -213,7 +216,6 @@ esp_err_t Application::start() {
         static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
     return commands_->handle(cmd, now_ms);
   }));
-  ble_.set_low_power_mode(preferences_.getBool("ble_lp", false));
   open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
   display_->set_contrast(0x7f);
 
@@ -225,8 +227,16 @@ void Application::tick() {
   uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
   ble_.poll();
 
+  if (ble_window_open_) {
+    const uint32_t desired_duration_ms = std::max(kBleWindowMinMs, preferences_.getUInt("ble_win", kBleWindowDefaultMs));
+    if (desired_duration_ms != ble_window_duration_ms_) {
+      ble_window_duration_ms_ = desired_duration_ms;
+      ble_window_deadline_ms_ = ble_window_started_ms_ + ble_window_duration_ms_;
+    }
+  }
+
   if (ble_window_open_ && now_ms >= ble_window_deadline_ms_) {
-    ble_.stop();
+    ble_.stop(false);
     ble_window_open_ = false;
   }
 

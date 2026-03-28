@@ -8,24 +8,26 @@
         setSettingsWp,
         getSettingsPp,
         setSettingsPp,
+        getBleWindowMs,
+        setBleWindowMs,
     } from "$lib/ble.svelte";
 
     let touchHoldDelay = $derived(getSettingsTd());
     let wakePin = $derived(getSettingsWp());
     let pwrPin = $derived(getSettingsPp());
+    let bleWindowMs = $derived(getBleWindowMs());
 
     // ESP32-C3 RTC-capable GPIO pins (0-5)
     const rtcPins = [0, 1, 2, 3, 4, 5];
 
-    async function toggleLowPowerMode() {
-        const newVal = !bleState.bleLowPowerMode;
-        bleState.bleLowPowerMode = newVal;
-        await sendCommand(`ble:lp=${newVal ? "1" : "0"}`);
-    }
-
     async function updateTouchHoldDelay(value: number) {
         setSettingsTd(value);
         await sendCommand(`s:td=${value}`);
+    }
+
+    async function updateBleWindow(value: number) {
+        setBleWindowMs(value);
+        await sendCommand(`ble:win=${value}`);
     }
 
     async function updateWakePin(value: number) {
@@ -175,8 +177,8 @@
                    [&::-webkit-slider-thumb]:transition-transform
                    [&::-webkit-slider-thumb]:active:scale-125
                    [&::-webkit-slider-thumb]:active:shadow-none
-                   [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                   [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                   [&::-webkit-slider-thumb]:active:translate-y-0.5
+                   [&::-webkit-slider-thumb]:active:translate-x-0.5"
         />
 
         <div class="flex justify-between text-[10px] text-ink/60 font-bold px-1">
@@ -260,51 +262,53 @@
         </button>
     </div>
 
-    <!-- Low Power Toggle -->
-    <div class="flex items-center justify-between p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg border-2 border-bento-border bg-bento-pink flex items-center justify-center">
-                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                </svg>
+    <!-- BLE Active Window -->
+    <div class="mt-3 p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-3">
+        <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg border-2 border-bento-border bg-bento-green flex items-center justify-center">
+                    <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l-5 5m0 0l5 5m-5-5h12" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-ink font-black uppercase text-sm">BLE Active Window</div>
+                    <div class="text-ink/60 font-bold text-xs">Auto-off timer after boot or touch wake</div>
+                </div>
             </div>
-            <div>
-                <div class="text-ink font-black uppercase text-sm">Low Power Mode</div>
-                <div class="text-ink/60 font-bold text-xs">Reduce TX power & slower advertising</div>
-            </div>
+            <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
+                {(bleWindowMs / 1000).toFixed(0)}s
+            </span>
         </div>
 
-        <button
-            class="w-14 h-8 rounded-full border-2 border-bento-border transition-all duration-300 relative focus:outline-none disabled:opacity-50 {bleState.bleLowPowerMode ? 'bg-bento-yellow shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)]'}"
-            onclick={toggleLowPowerMode}
+        <input
+            type="range"
+            min="20000"
+            max="600000"
+            step="5000"
+            value={bleWindowMs}
+            onchange={(e) => updateBleWindow(parseInt(e.currentTarget.value))}
             disabled={!bleState.connected}
-            aria-label="Toggle low power mode"
-        >
-            <span class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-bento-border rounded-full transition-transform duration-300 flex items-center justify-center {bleState.bleLowPowerMode ? 'translate-x-6' : 'translate-x-0'}">
-                {#if bleState.bleLowPowerMode}
-                    <svg class="w-3 h-3 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                    </svg>
-                {:else}
-                    <svg class="w-3 h-3 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                {/if}
-            </span>
-        </button>
-    </div>
+            class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
+                   [&::-webkit-slider-thumb]:appearance-none
+                   [&::-webkit-slider-thumb]:w-4
+                   [&::-webkit-slider-thumb]:h-4
+                   [&::-webkit-slider-thumb]:rounded-sm
+                   [&::-webkit-slider-thumb]:bg-bento-green
+                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
+                   [&::-webkit-slider-thumb]:cursor-pointer
+                   [&::-webkit-slider-thumb]:border-2
+                   [&::-webkit-slider-thumb]:border-bento-border
+                   [&::-webkit-slider-thumb]:transition-transform
+                   [&::-webkit-slider-thumb]:active:scale-125
+                   [&::-webkit-slider-thumb]:active:shadow-none
+                   [&::-webkit-slider-thumb]:active:translate-y-0.5
+                   [&::-webkit-slider-thumb]:active:translate-x-0.5"
+        />
 
-    <!-- Power Info -->
-    <div class="mt-3 text-xs text-ink/60 font-bold flex items-center gap-2">
-        <svg class="w-4 h-4 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span>
-            {#if bleState.bleLowPowerMode}
-                TX Power: -3dBm • Range: ~10m • Slower advertising
-            {:else}
-                TX Power: +9dBm • Range: ~30m • Fast advertising
-            {/if}
-        </span>
+        <div class="flex justify-between text-[10px] text-ink/60 font-bold px-1">
+            <span>20s</span>
+            <span>10m</span>
+        </div>
     </div>
 </div>

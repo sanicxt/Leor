@@ -43,8 +43,8 @@ export const bleState = $state({
     gestureConfidence: 70,
     gestureCooldown: 2000,
     gestureMappings: [] as GestureMapping[],  // synced from ESP32
-    bleLowPowerMode: false,  // BLE power saving mode
     bleDeviceName: '',  // BLE device name (loaded on connect)
+    bleWindowMs: 60000,
     clockEnabled: false,
     clockTimezoneOffset: 0,
     clockSeconds: 0,
@@ -92,6 +92,7 @@ export function getGestureReactionTime() { return bleState.gestureReactionTime; 
 export function getGestureConfidence() { return bleState.gestureConfidence; }
 export function getGestureCooldown() { return bleState.gestureCooldown; }
 export function getGestureMappings() { return bleState.gestureMappings; }
+export function getBleWindowMs() { return bleState.bleWindowMs; }
 export function getClockEnabled() { return bleState.clockEnabled; }
 export function getClockSeconds() { return bleState.clockSeconds; }
 export function getClockTimezoneOffset() { return bleState.clockTimezoneOffset; }
@@ -127,6 +128,7 @@ export function setGestureMatching(val: boolean) { bleState.gestureMatching = va
 export function setGestureReactionTime(val: number) { bleState.gestureReactionTime = val; }
 export function setGestureConfidence(val: number) { bleState.gestureConfidence = val; }
 export function setGestureCooldown(val: number) { bleState.gestureCooldown = val; }
+export function setBleWindowMs(val: number) { bleState.bleWindowMs = val; }
 export function setClockEnabled(val: boolean) { bleState.clockEnabled = val; }
 export function setClockSeconds(val: number) { bleState.clockSeconds = val; }
 export function setClockTimezoneOffset(val: number) { bleState.clockTimezoneOffset = val; }
@@ -210,7 +212,7 @@ export async function connect(): Promise<boolean> {
                                 if ('s' in data.breathing) bleState.breathingSpeed = parseFloat(data.breathing.s);
                             }
                             if (data.ble) {
-                                if ('lp' in data.ble) bleState.bleLowPowerMode = (data.ble.lp === 1);
+                                if ('win' in data.ble) bleState.bleWindowMs = data.ble.win;
                             }
                             if (data.gesture) {
                                 if ('gm' in data.gesture) bleState.gestureMatching = (data.gesture.gm === 1);
@@ -291,11 +293,10 @@ export async function connect(): Promise<boolean> {
                 });
             }
 
-            // Parse BLE low power mode (ble:lp=0 or ble:lp=1)
-            const bleLpMatch = value.match(/ble:lp=(\d)/);
-            if (bleLpMatch) {
-                bleState.bleLowPowerMode = (bleLpMatch[1] === '1');
-                console.log('[BLE] Low power mode:', bleState.bleLowPowerMode ? 'ON' : 'OFF');
+            // Parse BLE window timer (ble:win=60000)
+            const bleWinMatch = value.match(/ble:win=(\d+)/);
+            if (bleWinMatch) {
+                bleState.bleWindowMs = parseInt(bleWinMatch[1]);
             }
 
             // Robust Shuffle Parsing with Regex
@@ -411,17 +412,6 @@ export async function sendOTA(
     if (!otaControlChar || !otaDataChar) {
         onProgress(0, 'OTA service not available — flash firmware first.');
         return false;
-    }
-
-    // Auto-boost BLE power for OTA if in low power mode.
-    // -3dBm can cause packet loss over BLE; switch to +9dBm for the transfer.
-    const wasLowPower = bleState.bleLowPowerMode;
-    if (wasLowPower) {
-        console.log('[OTA] Boosting BLE power for OTA transfer');
-        bleState.bleLowPowerMode = false;
-        await sendCommand('ble:lp=0');
-        // Short delay to let the device apply the new TX power
-        await new Promise(r => setTimeout(r, 200));
     }
 
     // 509 = ATT_MTU(512) - 3 byte ATT header — maximum per-packet payload.
@@ -617,13 +607,6 @@ export async function sendOTA(
 
     } catch (err: any) {
         await cleanup();
-        // Restore low power if we boosted it and the device is still connected
-        if (wasLowPower && !aborted) {
-            try {
-                bleState.bleLowPowerMode = true;
-                await sendCommand('ble:lp=1');
-            } catch (_) { /* device may have disconnected */ }
-        }
         onProgress(0, `OTA error: ${err?.message ?? err}`);
         return false;
     }

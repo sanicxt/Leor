@@ -77,6 +77,7 @@ void CommandRouter::reset_effects() {
 
 std::string CommandRouter::sync_json(uint32_t now_ms) const {
     char buf[2048];
+    const unsigned ble_window_ms = static_cast<unsigned>(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
     std::snprintf(
         buf, sizeof(buf),
         "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"td\":%u,\"wp\":%u,\"pp\":%u},"
@@ -85,7 +86,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
         "\"clock\":{\"on\":%d,\"tz\":%d,\"sec\":%u,\"fmt\":%d},"
         "\"shuffle\":{\"emin\":%u,\"emax\":%u,\"nmin\":%u,\"nmax\":%u},"
         "\"breathing\":{\"on\":%d,\"i\":\"%.2f\",\"s\":\"%.2f\"},"
-        "\"ble\":{\"lp\":%d},"
+        "\"ble\":{\"win\":%u},"
         "\"gesture\":%s}",
         eyes_.eye_width(), eyes_.eye_height(), eyes_.space_between(), eyes_.border_radius(), eyes_.mouth_width(),
         static_cast<int>(preferences_.getInt("bi", 3)), static_cast<int>(preferences_.getInt("gs", 6)), static_cast<int>(preferences_.getInt("os", 12)), static_cast<int>(preferences_.getInt("ss", 10)),
@@ -95,7 +96,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
         clock_.enabled() ? 1 : 0, clock_.tz_offset(), static_cast<unsigned>(clock_.seconds_of_day(now_ms)), clock_.use_24_hour() ? 24 : 12,
         static_cast<unsigned>(shuffle_.expr_min_ms() / 1000U), static_cast<unsigned>(shuffle_.expr_max_ms() / 1000U), static_cast<unsigned>(shuffle_.neutral_min_ms() / 1000U), static_cast<unsigned>(shuffle_.neutral_max_ms() / 1000U),
         eyes_.get_breathing_enabled() ? 1 : 0, eyes_.get_breathing_intensity(), eyes_.get_breathing_speed(),
-        ble_.low_power_mode() ? 1 : 0, gestures_.settings_json().c_str());
+        ble_window_ms, gestures_.settings_json().c_str());
     return buf;
 }
 
@@ -418,8 +419,13 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
     if (starts_with(cmd, "gcf=")) { gestures_.set_confidence(std::atoi(cmd.substr(4).c_str())); return "cf=" + std::to_string(gestures_.confidence_percent()); }
     if (starts_with(cmd, "gcd=")) { gestures_.set_cooldown(std::atoi(cmd.substr(4).c_str())); return "cd=" + std::to_string(gestures_.cooldown_ms()); }
 
-    if (cmd == "ble:") return std::string("ble:lp=") + (ble_.low_power_mode() ? "1" : "0");
-    if (starts_with(cmd, "ble:lp=")) { const bool on = std::atoi(cmd.substr(7).c_str()) == 1; ble_.set_low_power_mode(on); display_.set_contrast(on ? 1 : 0x7f); preferences_.putBool("ble_lp", on); return on ? "ble:lp=1" : "ble:lp=0"; }
+    if (cmd == "ble:") return std::string("ble:win=") + std::to_string(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
+    if (starts_with(cmd, "ble:win=")) {
+        const int window_ms = std::atoi(cmd.substr(8).c_str());
+        const int clamped_ms = std::max(20000, std::min(window_ms, 600000));
+        preferences_.putUInt("ble_win", static_cast<uint32_t>(clamped_ms));
+        return "ble:win=" + std::to_string(clamped_ms);
+    }
     if (cmd == "ble:name") return "ble:name=" + preferences_.getString("ble_name", "Leor");
     if (starts_with(cmd, "ble:name=")) {
         const auto name = trim(cmd.substr(9));

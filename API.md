@@ -71,8 +71,8 @@ Common keys:
 
 ## BLE Commands
 
-- `ble:` -> low-power status
-- `ble:lp=1|0`
+- `ble:` -> BLE window status
+- `ble:win=<ms>`
 - `ble:name`
 - `ble:name=<new_name>`
 

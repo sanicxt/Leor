@@ -36,5 +36,6 @@ bun run build:pages
 
 - The dashboard talks to the firmware through the BLE command API in [`../API.md`](../API.md).
 - Clock sync uses browser time and timezone offset, and the firmware persists the synced epoch.
+- BLE is only advertised in a configurable active window after boot or touch wake.
 - OTA flow is chunked + credit-based for faster transfer while preserving reliability.
 - The repo root README contains the current ESP-IDF firmware/hardware overview.
