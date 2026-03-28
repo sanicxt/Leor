@@ -19,6 +19,7 @@ namespace {
 constexpr const char *kTag = "leor_app";
 constexpr uint32_t kPowerOffMessageMs = 320;
 constexpr uint32_t kOtaUiFrameMs = 33;
+constexpr uint32_t kBleWindowMs = 60000;
 
 bool conflicts_with_display_i2c(int pin, const DisplayConfig &display) {
   return pin == display.sda_pin || pin == display.scl_pin;
@@ -34,6 +35,15 @@ void release_held_pin(int pin) {
 }
 
 } // namespace
+
+void Application::open_ble_window(uint32_t now_ms, bool start_advertising) {
+  const bool should_start_advertising = !ble_window_open_;
+  ble_window_open_ = true;
+  ble_window_deadline_ms_ = now_ms + kBleWindowMs;
+  if (start_advertising && should_start_advertising) {
+    ble_.start_advertising();
+  }
+}
 
 void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const char* line2, uint32_t now_ms) {
   const char* title = line1 != nullptr ? line1 : "OTA UPDATE";
@@ -102,7 +112,7 @@ esp_err_t Application::start() {
 
 #if CONFIG_PM_ENABLE
   esp_pm_config_t pm_config = {
-      .max_freq_mhz = 80, .min_freq_mhz = 40, .light_sleep_enable = true};
+      .max_freq_mhz = 80, .min_freq_mhz = 40, .light_sleep_enable = false};
   ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 #endif
 
@@ -204,6 +214,7 @@ esp_err_t Application::start() {
     return commands_->handle(cmd, now_ms);
   }));
   ble_.set_low_power_mode(preferences_.getBool("ble_lp", false));
+  open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
   display_->set_contrast(0x7f);
 
   ESP_LOGI(kTag, "application started");
@@ -213,6 +224,11 @@ esp_err_t Application::start() {
 void Application::tick() {
   uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
   ble_.poll();
+
+  if (ble_window_open_ && now_ms >= ble_window_deadline_ms_) {
+    ble_.stop();
+    ble_window_open_ = false;
+  }
 
   // --- OTA Priority Bypass ---
   // If an OTA update is active or finished and waiting to reboot, we suspend
@@ -252,6 +268,7 @@ void Application::tick() {
 
   ButtonEvent btn = power_.poll(now_ms);
   if (btn == ButtonEvent::kShortPress) {
+    open_ble_window(now_ms, true);
     menu_.on_short_press(now_ms);
   } else if (btn == ButtonEvent::kLongPress) {
     menu_.on_long_press(now_ms);

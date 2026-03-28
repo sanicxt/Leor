@@ -267,7 +267,7 @@ void PowerService::do_sleep() {
   // Do NOT release the PM lock — esp_deep_sleep_start() never returns.
   esp_pm_config_t pm_off = {
       .max_freq_mhz = 80,
-      .min_freq_mhz = 10,
+      .min_freq_mhz = 40,
       .light_sleep_enable = false,
   };
   esp_pm_configure(&pm_off);

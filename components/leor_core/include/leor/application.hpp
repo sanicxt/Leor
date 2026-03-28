@@ -26,6 +26,8 @@ public:
   void tick();
 
 private:
+  void open_ble_window(uint32_t now_ms, bool start_advertising);
+
   RuntimeConfig config_{};
   Preferences preferences_{};
   std::unique_ptr<DisplayBackend> display_;
@@ -39,6 +41,8 @@ private:
   std::unique_ptr<CommandRouter> commands_;
   bool was_clock_enabled_ = false;
   bool was_menu_open_ = false;
+  bool ble_window_open_ = false;
+  uint32_t ble_window_deadline_ms_ = 0;
 };
 
 } // namespace leor

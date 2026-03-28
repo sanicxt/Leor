@@ -16,6 +16,7 @@ class BleService {
 
     esp_err_t start(const std::string& device_name, CommandHandler handler);
     void stop();
+    void start_advertising();
     void poll();
     void notify_status(const std::string& status);
     void notify_gesture(const std::string& gesture);

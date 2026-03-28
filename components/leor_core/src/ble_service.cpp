@@ -30,6 +30,7 @@ static uint16_t s_gesture_handle = 0;
 static uint16_t s_ota_control_handle = 0;
 static uint16_t s_ota_data_handle = 0;
 static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+static bool s_advertising = false;
 static std::string s_last_status = "ready";
 static std::string s_last_gesture = "idle";
 
@@ -48,20 +49,24 @@ int gap_event(struct ble_gap_event* event, void* arg) {
         case BLE_GAP_EVENT_CONNECT:
             if (event->connect.status == 0) {
                 s_conn_handle = event->connect.conn_handle;
+                s_advertising = false;
                 if (s_service) {
                     s_service->on_connected(s_conn_handle);
                     s_service->notify_status("connected");
                 }
             } else {
+                s_advertising = false;
                 advertise();
             }
             return 0;
         case BLE_GAP_EVENT_DISCONNECT:
             s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+            s_advertising = false;
             if (s_service) s_service->on_disconnected();
             advertise();
             return 0;
         case BLE_GAP_EVENT_ADV_COMPLETE:
+            s_advertising = false;
             advertise();
             return 0;
         default:
@@ -160,6 +165,9 @@ void host_task(void* param) {
 }
 
 void advertise() {
+    if (s_advertising) {
+        return;
+    }
     struct ble_hs_adv_fields adv_fields = {};
     adv_fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
     adv_fields.uuids128 = const_cast<ble_uuid128_t*>(&kServiceUuid);
@@ -192,7 +200,9 @@ void advertise() {
     rc = ble_gap_adv_start(s_own_addr_type, nullptr, BLE_HS_FOREVER, &adv, gap_event, nullptr);
     if (rc != 0) {
         ESP_LOGW(kTag, "adv start failed rc=%d", rc);
+        return;
     }
+    s_advertising = true;
 }
 
 }  // namespace
@@ -220,6 +230,11 @@ void BleService::stop() {
         ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
     }
     ble_gap_adv_stop();
+    s_advertising = false;
+}
+
+void BleService::start_advertising() {
+    advertise();
 }
 
 void BleService::poll() {
