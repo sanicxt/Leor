@@ -115,7 +115,7 @@ esp_err_t Application::start() {
 
 #if CONFIG_PM_ENABLE
   esp_pm_config_t pm_config = {
-      .max_freq_mhz = 80, .min_freq_mhz = 40, .light_sleep_enable = false};
+      .max_freq_mhz = 80, .min_freq_mhz = 40, .light_sleep_enable = true};
   ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 #endif
 
@@ -226,6 +226,7 @@ esp_err_t Application::start() {
 void Application::tick() {
   uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
   ble_.poll();
+  const bool ota_active = ble_.ota().in_progress() || ble_.ota().reboot_pending() || ble_.ota().error_pending();
 
   if (ble_window_open_) {
     const uint32_t desired_duration_ms = std::max(kBleWindowMinMs, preferences_.getUInt("ble_win", kBleWindowDefaultMs));
@@ -235,7 +236,7 @@ void Application::tick() {
     }
   }
 
-  if (ble_window_open_ && now_ms >= ble_window_deadline_ms_) {
+  if (ble_window_open_ && !ota_active && now_ms >= ble_window_deadline_ms_) {
     ble_.stop(false);
     ble_window_open_ = false;
   }
@@ -243,7 +244,7 @@ void Application::tick() {
   // --- OTA Priority Bypass ---
   // If an OTA update is active or finished and waiting to reboot, we suspend
   // all normal rendering and logic (IMU, gestures, splines) to speed up BLE transfer.
-  if (ble_.ota().in_progress() || ble_.ota().reboot_pending() || ble_.ota().error_pending()) {
+  if (ota_active) {
     if (display_) {
       if (ble_.ota().error_pending()) {
         draw_ota_screen(*display_, 0, "OTA FAILED", ble_.ota().error_message() ? ble_.ota().error_message() : "Unknown", now_ms);
