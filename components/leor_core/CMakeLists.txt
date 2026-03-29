@@ -18,6 +18,7 @@ idf_component_register(
     REQUIRES
         bt
         driver
+        esp_hw_support
         esp_timer
         app_update
         log

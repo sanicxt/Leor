@@ -35,6 +35,7 @@ class ClockService {
     uint32_t base_seconds_ = 0;
     uint64_t base_epoch_ms_ = 0;
     int16_t tz_offset_minutes_ = 0;
+    uint32_t slowclk_cal_ = 0;
     uint32_t last_draw_key_ = UINT32_MAX;
 };
 
