@@ -81,6 +81,8 @@ bool GestureService::init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* 
         display->send_buffer();
     }
 
+    mpu_.sleep();
+
     return true;
 }
 
