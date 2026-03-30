@@ -44,9 +44,8 @@ bool ShuffleService::should_emit(uint32_t now_ms, bool reacting, bool training, 
     if (needs_init_) {
         needs_init_ = false;
         expression_phase_ = false;
-        next_change_ms_ = now_ms + 2000U;
-        *command_out = "neutral";
-        return true;
+        next_change_ms_ = now_ms + neutral_min_ms_ + (std::rand() % (neutral_max_ms_ - neutral_min_ms_ + 1U));
+        return false;
     }
     if (next_change_ms_ != 0 && now_ms < next_change_ms_) {
         return false;
@@ -58,7 +57,13 @@ bool ShuffleService::should_emit(uint32_t now_ms, bool reacting, bool training, 
         return true;
     }
 
-    static const char* expressions[] = {"happy", "sad", "angry", "love", "surprised", "confused", "sleepy", "curious", "nervous", "knocked"};
+    static const char* expressions[] = {
+        "happy", "sad", "angry", "love", "surprised", "confused",
+        "sleepy", "curious", "nervous", "knocked",
+        "glee", "worried", "focused", "annoyed", "skeptic",
+        "frustrated", "unimpressed", "suspicious", "squint",
+        "furious", "scared", "awe"
+    };
     const int count = static_cast<int>(sizeof(expressions) / sizeof(expressions[0]));
     int idx = std::rand() % count;
     if (idx == last_shuffle_index_) {

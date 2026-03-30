@@ -5,6 +5,54 @@
 
 namespace leor {
 
+// ---------------------------------------------------------------------------
+// Expression presets – ported from esp32-eyes EyePresets.h
+// [0] = right eye (or both if symmetric), [1] = left eye (or alternate)
+// ---------------------------------------------------------------------------
+struct ExpressionPreset {
+    EyeShapeConfig right;
+    EyeShapeConfig left;
+};
+
+static const ExpressionPreset kPresets[EXPR_COUNT] = {
+    // EXPR_NORMAL
+    { {0,0,40,40, 0,0, 8,8}, {0,0,40,40, 0,0, 8,8} },
+    // EXPR_ANGRY
+    { {-3,0,34,40, 0.3f,0, 2,14}, {-3,0,34,40, 0.3f,0, 2,14} },
+    // EXPR_GLEE
+    { {0,0,18,40, 0,0, 8,0}, {0,0,18,40, 0,0, 8,0} },
+    // EXPR_HAPPY
+    { {0,0,22,40, 0,0, 10,0}, {0,0,22,40, 0,0, 10,0} },
+    // EXPR_SAD
+    { {0,0,34,40, -0.4f,0, 2,12}, {0,0,34,40, -0.4f,0, 2,12} },
+    // EXPR_WORRIED
+    { {0,0,32,40, -0.1f,0, 8,10}, {0,0,38,40, -0.2f,0, 8,10} },
+    // EXPR_FOCUSED
+    { {0,0,28,40, 0.2f,0, 4,2}, {0,0,28,40, 0.2f,0, 4,2} },
+    // EXPR_ANNOYED
+    { {0,0,24,40, 0,0, 2,10}, {0,0,14,40, 0,0, 2,6} },
+    // EXPR_SURPRISED
+    { {-2,0,45,45, 0,0, 16,16}, {-2,0,45,45, 0,0, 16,16} },
+    // EXPR_SKEPTIC
+    { {0,0,40,40, 0,0, 10,10}, {0,-4,30,40, 0.3f,0, 2,10} },
+    // EXPR_FRUSTRATED
+    { {3,-4,26,40, 0,0, 2,10}, {3,-4,26,40, 0,0, 2,10} },
+    // EXPR_UNIMPRESSED
+    { {3,0,24,40, 0,0, 2,10}, {3,-2,32,40, 0,0, 2,12} },
+    // EXPR_SLEEPY — pure horizontal slits
+    { {0,0,14,35, 0,0, 6,6}, {0,0,14,35, 0,0, 6,6} },
+    // EXPR_SUSPICIOUS
+    { {0,0,30,40, 0,0, 8,4}, {0,-2,22,40, 0.2f,0, 6,4} },
+    // EXPR_SQUINT
+    { {-6,-2,35,35, 0,0, 8,8}, {4,0,26,26, 0,0, 6,6} },
+    // EXPR_FURIOUS
+    { {-2,0,36,40, 0.4f,0, 2,10}, {-2,0,36,40, 0.4f,0, 2,10} },
+    // EXPR_SCARED
+    { {-3,0,40,40, -0.1f,0, 12,8}, {-3,0,40,40, -0.1f,0, 12,8} },
+    // EXPR_AWE
+    { {2,0,35,45, -0.1f,0.1f, 12,12}, {2,0,35,45, -0.1f,0.1f, 12,12} },
+};
+
 float MochiEyesEngine::lerp(float current, float target, float speed,
                             float dt) {
   float diff = target - current;
@@ -82,33 +130,10 @@ void MochiEyesEngine::update(uint32_t now_ms) {
   updateParams(dt);
   computeRenderState();
 
-  int16_t clearX = std::min(render.minX, render.oldMinX);
-  int16_t clearY = std::min(render.minY, render.oldMinY);
-  int16_t clearMaxX = std::max(render.maxX, render.oldMaxX);
-  int16_t clearMaxY = std::max(render.maxY, render.oldMaxY);
-
-  int16_t clearW = clearMaxX - clearX;
-  int16_t clearH = clearMaxY - clearY;
-
-  if (clearX < 0) {
-    clearW += clearX;
-    clearX = 0;
-  }
-  if (clearY < 0) {
-    clearH += clearY;
-    clearY = 0;
-  }
-  if (clearW > layout.screenW - clearX)
-    clearW = layout.screenW - clearX;
-  if (clearH > layout.screenH - clearY)
-    clearH = layout.screenH - clearY;
-
-  if (clearW > 0 && clearH > 0) {
-    fillRect(clearX, clearY, clearW, clearH, BGCOLOR);
-  }
+  // Always clear full screen to prevent parametric shape artifacts
+  display_.clear();
 
   drawEyes();
-  drawEyelids();
   drawMouth();
   drawSweat();
   drawLoveOverlay();
@@ -119,6 +144,33 @@ void MochiEyesEngine::update(uint32_t now_ms) {
   drawSleepOverlay();
 
   display_.send_buffer();
+}
+
+void MochiEyesEngine::lerpShape(EyeShapeConfig& current, const EyeShapeConfig& target, float speed, float dt) {
+    if (speed <= 0.0f) return;
+    float t = 1.0f - std::exp(-speed * dt);
+    
+    auto lerpInt = [t](int16_t c, int16_t tgt) -> int16_t {
+        if (c == tgt) return c;
+        float diff = static_cast<float>(tgt - c);
+        float step = diff * t;
+        int16_t int_step = static_cast<int16_t>(step);
+        if (int_step == 0) {
+            return c + (diff > 0.0f ? 1 : -1);
+        }
+        return c + int_step;
+    };
+
+    current.OffsetX = lerpInt(current.OffsetX, target.OffsetX);
+    current.OffsetY = lerpInt(current.OffsetY, target.OffsetY);
+    current.Height  = lerpInt(current.Height, target.Height);
+    current.Width   = lerpInt(current.Width, target.Width);
+    
+    current.Slope_Top    += (target.Slope_Top    - current.Slope_Top)    * t;
+    current.Slope_Bottom += (target.Slope_Bottom - current.Slope_Bottom) * t;
+    
+    current.Radius_Top    = lerpInt(current.Radius_Top, target.Radius_Top);
+    current.Radius_Bottom = lerpInt(current.Radius_Bottom, target.Radius_Bottom);
 }
 
 void MochiEyesEngine::updateParams(float dt) {
@@ -162,6 +214,11 @@ void MochiEyesEngine::updateParams(float dt) {
   if (params.sleepIntensity > 0.1f) {
     params.sleepPhase += dt;
   }
+
+  // Interpolate parametric eye shapes toward targets
+  float shapeSpeed = 5.0f;
+  lerpShape(params.leftShape, params.leftShapeTarget, shapeSpeed, dt);
+  lerpShape(params.rightShape, params.rightShapeTarget, shapeSpeed, dt);
 }
 
 void MochiEyesEngine::updateTimers(float dt) {
@@ -314,11 +371,20 @@ void MochiEyesEngine::updateTimers(float dt) {
     targets.squish = 1.0f + (breathCycle * timers.breathingIntensity);
   }
 
-  if (params.curiousIntensity > 0.1f) {
+  if (params.curiousIntensity > 0.01f) {
     params.curiousPhase += dt * 1.5f;
     targets.gazeX =
-        std::sin(params.curiousPhase) * 0.8f * params.curiousIntensity;
+        std::sin(params.curiousPhase) * 1.0f * params.curiousIntensity;
     targets.gazeY = 0.0f;
+    // Visually squint the eyes and make them wider left/right during curious/nervous gaze
+    float squintFactor = 1.0f - (std::fabs(targets.gazeX) * 0.15f * params.curiousIntensity);
+    if (!timers.breathingEnabled) {
+      targets.squish = squintFactor; 
+    } else {
+      targets.squish *= squintFactor; 
+    }
+  } else if (!timers.breathingEnabled) {
+    targets.squish = 1.0f;
   }
 }
 
@@ -420,6 +486,7 @@ void MochiEyesEngine::drawLine(int x0, int y0, int x1, int y1, uint8_t color) {
 }
 
 void MochiEyesEngine::fillRect(int x, int y, int w, int h, uint8_t color) {
+  if (w <= 0 || h <= 0) return;
   display_.set_color(color);
   display_.fill_box(x, y, w, h);
 }
@@ -429,83 +496,228 @@ void MochiEyesEngine::fillCircle(int x, int y, int r, uint8_t color) {
   display_.fill_circle(x, y, r);
 }
 
-void MochiEyesEngine::drawEyes() {
-  int16_t topSquish = 0;
-  int16_t bottomBulge = (int16_t)(2.0f * params.squish);
+// ---------------------------------------------------------------------------
+// Parametric eye renderer (ported from esp32-eyes EyeDrawer)
+// ---------------------------------------------------------------------------
+void MochiEyesEngine::fillEllipseCorner(CornerType corner, int16_t x0, int16_t y0, int32_t rx, int32_t ry, uint8_t color) {
+    if (rx < 1 || ry < 1) return;
+    int32_t rx2 = rx * rx;
+    int32_t ry2 = ry * ry;
+    int32_t fx2 = 4 * rx2;
+    int32_t fy2 = 4 * ry2;
+    int32_t x, y, s;
 
-  float parallaxScale = 1.0f + std::fabs(params.gazeX) * 0.05f;
-  float leftScale = 1.0f;
-  float rightScale = 1.0f;
+    display_.set_color(color);
 
-  if (params.curiousIntensity > 0.01f) {
-    float curiousAmount = 0.25f * params.curiousIntensity;
-    leftScale = 1.0f - params.gazeX * curiousAmount;
-    rightScale = 1.0f + params.gazeX * curiousAmount;
-  }
-
-  int16_t lw = (int16_t)(render.leftW * parallaxScale * leftScale);
-  int16_t lh = (int16_t)((render.leftH + bottomBulge) * leftScale);
-  int16_t lx = render.leftX - (lw - render.leftW) / 2;
-  int16_t ly = render.leftY - topSquish + (render.leftH - lh) / 2;
-
-  fillRoundRect(lx, ly, lw, lh, render.borderRadius, MAINCOLOR);
-
-  if (!params.cyclops) {
-    int16_t rw = (int16_t)(render.rightW * parallaxScale * rightScale);
-    int16_t rh = (int16_t)((render.rightH + bottomBulge) * rightScale);
-    int16_t rx = render.rightX - (rw - render.rightW) / 2;
-    int16_t ry = render.rightY - topSquish + (render.rightH - rh) / 2;
-
-    fillRoundRect(rx, ry, rw, rh, render.borderRadius, MAINCOLOR);
-  }
-
-  render.leftW = lw;
-  render.leftH = lh;
-  render.leftX = lx;
-  render.leftY = ly;
-  if (!params.cyclops) {
-    render.rightW = (int16_t)(render.rightW * parallaxScale * rightScale);
-    render.rightH = (int16_t)((render.rightH + bottomBulge) * rightScale);
-  }
+    if (corner == T_R) {
+        for (x = 0, y = ry, s = 2*ry2 + rx2*(1 - 2*ry); ry2*x <= rx2*y; x++) {
+            display_.draw_hline(x0, y0 - y, x);
+            if (s >= 0) { s += fx2*(1-y); y--; }
+            s += ry2*((4*x)+6);
+        }
+        for (x = rx, y = 0, s = 2*rx2 + ry2*(1 - 2*rx); rx2*y <= ry2*x; y++) {
+            display_.draw_hline(x0, y0 - y, x);
+            if (s >= 0) { s += fy2*(1-x); x--; }
+            s += rx2*((4*y)+6);
+        }
+    } else if (corner == B_R) {
+        for (x = 0, y = ry, s = 2*ry2 + rx2*(1 - 2*ry); ry2*x <= rx2*y; x++) {
+            display_.draw_hline(x0, y0 + y - 1, x);
+            if (s >= 0) { s += fx2*(1-y); y--; }
+            s += ry2*((4*x)+6);
+        }
+        for (x = rx, y = 0, s = 2*rx2 + ry2*(1 - 2*rx); rx2*y <= ry2*x; y++) {
+            display_.draw_hline(x0, y0 + y - 1, x);
+            if (s >= 0) { s += fy2*(1-x); x--; }
+            s += rx2*((4*y)+6);
+        }
+    } else if (corner == T_L) {
+        for (x = 0, y = ry, s = 2*ry2 + rx2*(1 - 2*ry); ry2*x <= rx2*y; x++) {
+            display_.draw_hline(x0 - x, y0 - y, x);
+            if (s >= 0) { s += fx2*(1-y); y--; }
+            s += ry2*((4*x)+6);
+        }
+        for (x = rx, y = 0, s = 2*rx2 + ry2*(1 - 2*rx); rx2*y <= ry2*x; y++) {
+            display_.draw_hline(x0 - x, y0 - y, x);
+            if (s >= 0) { s += fy2*(1-x); x--; }
+            s += rx2*((4*y)+6);
+        }
+    } else if (corner == B_L) {
+        for (x = 0, y = ry, s = 2*ry2 + rx2*(1 - 2*ry); ry2*x <= rx2*y; x++) {
+            display_.draw_hline(x0 - x, y0 + y - 1, x);
+            if (s >= 0) { s += fx2*(1-y); y--; }
+            s += ry2*((4*x)+6);
+        }
+        for (x = rx, y = 0, s = 2*rx2 + ry2*(1 - 2*rx); rx2*y <= ry2*x; y++) {
+            display_.draw_hline(x0 - x, y0 + y - 1, x);
+            if (s >= 0) { s += fy2*(1-x); x--; }
+            s += rx2*((4*y)+6);
+        }
+    }
+    display_.set_color(1);
 }
 
-void MochiEyesEngine::drawEyelids() {
-  if (params.fatigue > 0.1f) {
-    int16_t droopH = (int16_t)(render.leftH * 0.4f * params.fatigue);
-    fillTriangle(render.leftX, render.leftY - 1, render.leftX + render.leftW,
-                 render.leftY - 1, render.leftX, render.leftY + droopH,
-                 BGCOLOR);
-    if (!params.cyclops) {
-      fillTriangle(render.rightX, render.rightY - 1,
-                   render.rightX + render.rightW, render.rightY - 1,
-                   render.rightX + render.rightW, render.rightY + droopH,
-                   BGCOLOR);
-    }
-  }
+void MochiEyesEngine::drawEyeShape(int16_t centerX, int16_t centerY, EyeShapeConfig* config) {
+    if (config->Height < 1 || config->Width < 2) return;
 
-  if (params.anger > 0.1f) {
-    int16_t droopH = (int16_t)(render.leftH * 0.4f * params.anger);
-    fillTriangle(render.leftX, render.leftY - 1, render.leftX + render.leftW,
-                 render.leftY - 1, render.leftX + render.leftW,
-                 render.leftY + droopH, BGCOLOR);
-    if (!params.cyclops) {
-      fillTriangle(render.rightX, render.rightY - 1,
-                   render.rightX + render.rightW, render.rightY - 1,
-                   render.rightX, render.rightY + droopH, BGCOLOR);
+    // For very small or zero-radius shapes, fall back to simple filled rect
+    if (config->Radius_Top < 1 && config->Radius_Bottom < 1 &&
+        std::fabs(config->Slope_Top) < 0.01f && std::fabs(config->Slope_Bottom) < 0.01f) {
+        int16_t x = centerX + config->OffsetX - config->Width / 2;
+        int16_t y = centerY + config->OffsetY - config->Height / 2;
+        fillRect(x, y, config->Width, config->Height, MAINCOLOR);
+        return;
     }
-  }
 
-  if (params.joy > 0.1f) {
-    int16_t happyOffset = (int16_t)(render.leftH * 0.5f * params.joy);
-    fillRoundRect(
-        render.leftX - 1, render.leftY + render.leftH - happyOffset + 1,
-        render.leftW + 2, layout.baseHeight, render.borderRadius, BGCOLOR);
-    if (!params.cyclops) {
-      fillRoundRect(
-          render.rightX - 1, render.rightY + render.rightH - happyOffset + 1,
-          render.rightW + 2, layout.baseHeight, render.borderRadius, BGCOLOR);
+    int32_t delta_y_top = static_cast<int32_t>(config->Height * config->Slope_Top / 2.0f);
+    int32_t delta_y_bottom = static_cast<int32_t>(config->Height * config->Slope_Bottom / 2.0f);
+    auto totalHeight = config->Height + delta_y_top - delta_y_bottom;
+
+    int16_t rTop = config->Radius_Top;
+    int16_t rBot = config->Radius_Bottom;
+    if (rBot > 0 && rTop > 0 && totalHeight - 1 < rBot + rTop) {
+        int32_t corrTop = static_cast<int32_t>(static_cast<float>(rTop) * (totalHeight - 1) / (rBot + rTop));
+        int32_t corrBot = static_cast<int32_t>(static_cast<float>(rBot) * (totalHeight - 1) / (rBot + rTop));
+        rTop = static_cast<int16_t>(corrTop);
+        rBot = static_cast<int16_t>(corrBot);
     }
-  }
+
+    int32_t TLc_y = centerY + config->OffsetY - config->Height/2 + rTop - delta_y_top;
+    int32_t TLc_x = centerX + config->OffsetX - config->Width/2 + rTop;
+    int32_t TRc_y = centerY + config->OffsetY - config->Height/2 + rTop + delta_y_top;
+    int32_t TRc_x = centerX + config->OffsetX + config->Width/2 - rTop;
+    int32_t BLc_y = centerY + config->OffsetY + config->Height/2 - rBot - delta_y_bottom;
+    int32_t BLc_x = centerX + config->OffsetX - config->Width/2 + rBot;
+    int32_t BRc_y = centerY + config->OffsetY + config->Height/2 - rBot + delta_y_bottom;
+    int32_t BRc_x = centerX + config->OffsetX + config->Width/2 - rBot;
+
+    int32_t min_c_x = std::min(TLc_x, BLc_x);
+    int32_t max_c_x = std::max(TRc_x, BRc_x);
+    int32_t min_c_y = std::min(TLc_y, TRc_y);
+    int32_t max_c_y = std::max(BLc_y, BRc_y);
+
+    // Helper: fill rect from two corner coords (like original FillRectangle)
+    auto fillRect2 = [&](int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint8_t color) {
+        int32_t l = std::min(x0, x1);
+        int32_t r = std::max(x0, x1);
+        int32_t t = std::min(y0, y1);
+        int32_t b = std::max(y0, y1);
+        int32_t w = r - l;
+        int32_t h = b - t;
+        if (w > 0 && h > 0) fillRect(l, t, w, h, color);
+    };
+
+    // Fill eye centre
+    fillRect2(min_c_x, min_c_y, max_c_x, max_c_y, MAINCOLOR);
+    // Fill outward to meet edges of rounded corners
+    fillRect2(TRc_x, TRc_y, BRc_x + rBot, BRc_y, MAINCOLOR);  // Right
+    fillRect2(TLc_x - rTop, TLc_y, BLc_x, BLc_y, MAINCOLOR);  // Left
+    fillRect2(TLc_x, TLc_y - rTop, TRc_x, TRc_y, MAINCOLOR);  // Top
+    fillRect2(BLc_x, BLc_y, BRc_x, BRc_y + rBot, MAINCOLOR);  // Bottom
+
+    // Draw slanted edges at top (erase the rect overshoot, fill the correct triangle)
+    if (config->Slope_Top > 0) {
+        fillTriangle(TLc_x, TLc_y - rTop, TRc_x, TRc_y - rTop, TRc_x, TLc_y - rTop, BGCOLOR);
+        fillTriangle(TRc_x, TRc_y - rTop, TLc_x, TLc_y - rTop, TLc_x, TRc_y - rTop, MAINCOLOR);
+    } else if (config->Slope_Top < 0) {
+        fillTriangle(TRc_x, TRc_y - rTop, TLc_x, TLc_y - rTop, TLc_x, TRc_y - rTop, BGCOLOR);
+        fillTriangle(TLc_x, TLc_y - rTop, TRc_x, TRc_y - rTop, TRc_x, TLc_y - rTop, MAINCOLOR);
+    }
+
+    // Draw rounded corners
+    if (rTop > 0) {
+        fillEllipseCorner(T_L, TLc_x, TLc_y, rTop, rTop, MAINCOLOR);
+        fillEllipseCorner(T_R, TRc_x, TRc_y, rTop, rTop, MAINCOLOR);
+    }
+    if (rBot > 0) {
+        fillEllipseCorner(B_L, BLc_x, BLc_y, rBot, rBot, MAINCOLOR);
+        fillEllipseCorner(B_R, BRc_x, BRc_y, rBot, rBot, MAINCOLOR);
+    }
+
+    // Draw slanted edges at bottom MUST happen after corners so the corners get properly masked!
+    if (config->Slope_Bottom > 0) {
+        fillTriangle(BRc_x + rBot - 1, BRc_y + rBot - 1, BLc_x - rBot, BLc_y + rBot - 1, BLc_x - rBot, BRc_y + rBot - 1, BGCOLOR);
+    } else if (config->Slope_Bottom < 0) {
+        fillTriangle(BLc_x - rBot, BLc_y + rBot - 1, BRc_x + rBot - 1, BRc_y + rBot - 1, BRc_x + rBot - 1, BLc_y + rBot - 1, BGCOLOR);
+    }
+}
+
+void MochiEyesEngine::drawEyes() {
+    // Scale shapes relative to baseWidth/baseHeight (presets assume 40x40 base)
+    float scaleX = layout.baseWidth / 40.0f;
+    float scaleY = (layout.baseHeight / 40.0f) * params.squish;
+    float openLeft = params.openness * params.leftOpenness;
+    float openRight = params.openness * params.rightOpenness;
+
+    // Compute gaze offset
+    int16_t maxGazeX = (layout.screenW - layout.baseWidth * 2 - layout.spacing) / 2;
+    int16_t maxGazeY = (layout.screenH - layout.baseHeight) / 2;
+    int16_t gazeOffsetX = static_cast<int16_t>(params.gazeX * maxGazeX) + static_cast<int16_t>(params.hFlicker);
+    int16_t gazeOffsetY = static_cast<int16_t>(params.gazeY * maxGazeY) + static_cast<int16_t>(params.vFlicker);
+
+    int16_t leftCX = layout.leftEyeBaseX + layout.baseWidth / 2 + gazeOffsetX;
+    int16_t leftCY = layout.eyeBaseY + layout.baseHeight / 2 + gazeOffsetY;
+    int16_t rightCX = layout.rightEyeBaseX + layout.baseWidth / 2 + gazeOffsetX;
+    int16_t rightCY = layout.eyeBaseY + layout.baseHeight / 2 + gazeOffsetY;
+
+    // Build scaled + openness-modulated shape configs
+    EyeShapeConfig leftCfg = params.leftShape;
+    leftCfg.Width   = static_cast<int16_t>(leftCfg.Width   * scaleX);
+    leftCfg.Height  = static_cast<int16_t>(leftCfg.Height  * scaleY * openLeft);
+    leftCfg.OffsetX = static_cast<int16_t>(leftCfg.OffsetX * scaleX);
+    leftCfg.OffsetY = static_cast<int16_t>(leftCfg.OffsetY * scaleY);
+    leftCfg.Radius_Top    = static_cast<int16_t>(leftCfg.Radius_Top    * std::min(scaleX, scaleY));
+    leftCfg.Radius_Bottom = static_cast<int16_t>(leftCfg.Radius_Bottom * std::min(scaleX, scaleY));
+    if (leftCfg.Height < 1) leftCfg.Height = 1;
+
+    // Left eye uses preset slopes as-is (no mirroring)
+    drawEyeShape(leftCX, leftCY, &leftCfg);
+
+    // Track render bounds for overlays
+    render.leftX = leftCX - leftCfg.Width / 2;
+    render.leftY = leftCY - leftCfg.Height / 2;
+    render.leftW = leftCfg.Width;
+    render.leftH = leftCfg.Height;
+    if (render.leftH < 1) render.leftH = 1;
+
+    if (!params.cyclops) {
+        EyeShapeConfig rightCfg = params.rightShape;
+        rightCfg.Width   = static_cast<int16_t>(rightCfg.Width   * scaleX);
+        rightCfg.Height  = static_cast<int16_t>(rightCfg.Height  * scaleY * openRight);
+        rightCfg.OffsetX = static_cast<int16_t>(rightCfg.OffsetX * scaleX);
+        rightCfg.OffsetY = static_cast<int16_t>(rightCfg.OffsetY * scaleY);
+        rightCfg.Radius_Top    = static_cast<int16_t>(rightCfg.Radius_Top    * std::min(scaleX, scaleY));
+        rightCfg.Radius_Bottom = static_cast<int16_t>(rightCfg.Radius_Bottom * std::min(scaleX, scaleY));
+        if (rightCfg.Height < 1) rightCfg.Height = 1;
+
+        // RIGHT eye is mirrored (matching esp32-eyes IsMirrored on RightEye)
+        EyeShapeConfig rightMirrored = rightCfg;
+        rightMirrored.Slope_Top = -rightCfg.Slope_Top;
+        rightMirrored.Slope_Bottom = -rightCfg.Slope_Bottom;
+        rightMirrored.OffsetX = -rightCfg.OffsetX;
+
+        drawEyeShape(rightCX, rightCY, &rightMirrored);
+
+        render.rightX = rightCX - rightCfg.Width / 2;
+        render.rightY = rightCY - rightCfg.Height / 2;
+        render.rightW = rightCfg.Width;
+        render.rightH = rightCfg.Height;
+        if (render.rightH < 1) render.rightH = 1;
+    } else {
+        render.rightW = 0;
+        render.rightH = 0;
+    }
+
+    render.borderRadius = static_cast<uint8_t>(std::min(leftCfg.Radius_Top, leftCfg.Radius_Bottom));
+    if (render.borderRadius < 2) render.borderRadius = 2;
+
+    // Recompute mouth position now that render bounds are final
+    int16_t eyeBottom = std::max(render.leftY + render.leftH, render.rightY + render.rightH);
+    render.mouthX = (layout.screenW - layout.mouthWidth) / 2 + gazeOffsetX;
+    render.mouthY = eyeBottom + 4;
+    render.mouthW = layout.mouthWidth;
+    int16_t openAdd = static_cast<int16_t>(params.mouthOpenness * 8);
+    render.mouthH = layout.mouthHeight + openAdd + 6;
 }
 
 void MochiEyesEngine::drawMouth() {
@@ -613,6 +825,39 @@ void MochiEyesEngine::drawMouth() {
                  my + dHeight, MAINCOLOR);
     break;
   }
+
+  case MOUTH_SMIRK: {
+    int16_t shiftY = 2;
+    // Tilted flat line, slightly longer
+    for (int16_t i=0; i<3; i++) {
+        drawLine(mx, my + 3 + i, mx + mw, my - 1 + i, MAINCOLOR);
+    }
+    // Small hook at the right corner
+    fillCircle(mx + mw, my - 2, 2, MAINCOLOR);
+    break;
+  }
+
+  case MOUTH_ZIGZAG: {
+    int16_t segs = 5;
+    int16_t segW = mw / segs;
+    int16_t px = mx;
+    for (int16_t i=0; i<segs; i++) {
+        int16_t nextX = (i == segs - 1) ? mx + mw : px + segW;
+        int16_t sy = my + ((i % 2 == 0) ? 0 : 4);
+        int16_t ny = my + (((i + 1) % 2 == 0) ? 0 : 4);
+        for (int16_t thick=0; thick<3; thick++) {
+            drawLine(px, sy + thick, nextX, ny + thick, MAINCOLOR);
+        }
+        px = nextX;
+    }
+    break;
+  }
+
+  case MOUTH_O: {
+    fillCircle(centerX, my + 4, 8, MAINCOLOR);
+    fillCircle(centerX, my + 4, 5, BGCOLOR);
+    break;
+  }
   }
 }
 
@@ -655,11 +900,12 @@ void MochiEyesEngine::drawLoveOverlay() {
   int16_t rightCY = render.rightY + render.rightH / 2;
 
   if (params.heartScale >= 0.9f) {
-    fillRoundRect(render.leftX - 2, render.leftY - 2, render.leftW + 4,
-                  render.leftH + 4, render.borderRadius, BGCOLOR);
+    int16_t pad = 6;
+    fillRect(render.leftX - pad, render.leftY - pad, render.leftW + pad*2,
+                  render.leftH + pad*2, BGCOLOR);
     if (!params.cyclops) {
-      fillRoundRect(render.rightX - 2, render.rightY - 2, render.rightW + 4,
-                    render.rightH + 4, render.borderRadius, BGCOLOR);
+      fillRect(render.rightX - pad, render.rightY - pad, render.rightW + pad*2,
+                    render.rightH + pad*2, BGCOLOR);
     }
   }
 
@@ -692,11 +938,12 @@ void MochiEyesEngine::drawUwUOverlay() {
   int16_t rightCY = render.rightY + render.rightH / 2;
 
   if (intensity > 0.5f) {
-    fillRoundRect(render.leftX - 2, render.leftY - 2, render.leftW + 4,
-                  render.leftH + 4, render.borderRadius, BGCOLOR);
+    int16_t pad = 6;
+    fillRect(render.leftX - pad, render.leftY - pad, render.leftW + pad*2,
+                  render.leftH + pad*2, BGCOLOR);
     if (!params.cyclops) {
-      fillRoundRect(render.rightX - 2, render.rightY - 2, render.rightW + 4,
-                    render.rightH + 4, render.borderRadius, BGCOLOR);
+      fillRect(render.rightX - pad, render.rightY - pad, render.rightW + pad*2,
+                    render.rightH + pad*2, BGCOLOR);
     }
     fillRect(render.mouthX - 2, render.mouthY - 2, render.mouthW + 4,
              render.mouthH + 6, BGCOLOR);
@@ -822,11 +1069,12 @@ void MochiEyesEngine::drawXDOverlay() {
   int16_t rightCY = render.rightY + render.rightH / 2;
 
   if (intensity > 0.5f) {
-    fillRoundRect(render.leftX - 2, render.leftY - 2, render.leftW + 4,
-                  render.leftH + 4, render.borderRadius, BGCOLOR);
+    int16_t pad = 6;
+    fillRect(render.leftX - pad, render.leftY - pad, render.leftW + pad*2,
+                  render.leftH + pad*2, BGCOLOR);
     if (!params.cyclops) {
-      fillRoundRect(render.rightX - 2, render.rightY - 2, render.rightW + 4,
-                    render.rightH + 4, render.borderRadius, BGCOLOR);
+      fillRect(render.rightX - pad, render.rightY - pad, render.rightW + pad*2,
+                    render.rightH + pad*2, BGCOLOR);
     }
     fillRect(render.mouthX - 4, render.mouthY - 2, render.mouthW + 8,
              render.mouthH + 8, BGCOLOR);
@@ -1011,7 +1259,7 @@ void MochiEyesEngine::setGaze(float x, float y, float speed) {
 }
 
 void MochiEyesEngine::setMouthShape(MouthShape shape) {
-  if (params.mouthShape != shape) {
+  if (params.targetMouthShape != shape) {
     params.targetMouthShape = shape;
     params.mouthTransition = 0.0f;
   }
@@ -1052,9 +1300,11 @@ void MochiEyesEngine::resetEmotions() {
   targets.openness = 1.0f;
   targets.leftOpenness = 1.0f;
   targets.rightOpenness = 1.0f;
+  targets.squish = 1.0f;
   targets.mouthOpenness = 0.0f;
   timers.mouthAnimRemaining = 0.0f;
   timers.mouthAnimType = 0;
+  setExpression(EXPR_NORMAL);
 }
 
 void MochiEyesEngine::blink() {
@@ -1087,10 +1337,15 @@ void MochiEyesEngine::open() { targets.openness = 1.0f; }
 
 void MochiEyesEngine::clearTimedOverlays() {
   targets.knockedIntensity = 0.0f;
+  params.knockedIntensity = 0.0f;
   targets.uwuIntensity = 0.0f;
+  params.uwuIntensity = 0.0f;
   targets.xdIntensity = 0.0f;
+  params.xdIntensity = 0.0f;
   targets.love = 0.0f;
+  params.love = 0.0f;
   targets.fatigue = 0.0f;
+  params.fatigue = 0.0f;
   params.tearProgress = 0.0f;
   params.laughIntensity = 0.0f;
   params.hFlicker = 0.0f;
@@ -1105,14 +1360,16 @@ void MochiEyesEngine::clearCuriousGaze() {
 void MochiEyesEngine::clearAllOverlays() {
   clearTimedOverlays();
   targets.curiousIntensity = 0.0f;
+  params.curiousIntensity = 0.0f;
   targets.sweatIntensity = 0.0f;
+  params.sweatIntensity = 0.0f;
   targets.sleepIntensity = 0.0f;
+  params.sleepIntensity = 0.0f;
   params.curiousPhase = 0.0f;
   params.confusedIntensity = 0.0f;
   params.confusedPhase = 0.0f;
   params.laughIntensity = 0.0f;
   params.laughPhase = 0.0f;
-  targets.fatigue = 0.0f;
   targets.gazeX = 0.0f;
   targets.gazeY = 0.0f;
   targets.mouthOpenness = 0.0f;
@@ -1127,6 +1384,7 @@ void MochiEyesEngine::triggerLove(float durationSec) {
 
 void MochiEyesEngine::triggerCry(float durationSec) {
   clearAllOverlays();
+  setExpression(EXPR_SAD);
   targets.fatigue = 0.5f;
   params.tearProgress = 0.0f;
 }
@@ -1233,6 +1491,18 @@ void MochiEyesEngine::setDisplayColors(uint8_t bg, uint8_t main) {
   MAINCOLOR = main;
 }
 
+void MochiEyesEngine::setExpression(Expression expr) {
+  if (expr >= EXPR_COUNT) expr = EXPR_NORMAL;
+  params.currentExpression = expr;
+  params.leftShapeTarget  = kPresets[expr].left;
+  params.rightShapeTarget = kPresets[expr].right;
+}
+
+void MochiEyesEngine::set_expression(int expr) {
+  if (expr >= 0 && expr < EXPR_COUNT)
+    setExpression(static_cast<Expression>(expr));
+}
+
 void MochiEyesEngine::setMood(uint8_t mood) {
   resetEmotions();
   targets.mouthOpenness = 0.0f;
@@ -1241,16 +1511,17 @@ void MochiEyesEngine::setMood(uint8_t mood) {
   timers.mouthAnimRemaining = 0.0f;
   setMouthShape(MOUTH_SMILE);
   switch (mood) {
-  case 1:
-    setFatigue(1.0f);
+  case 1: // TIRED
+    setExpression(EXPR_SLEEPY);
     break;
-  case 2:
-    setAnger(1.0f);
+  case 2: // ANGRY
+    setExpression(EXPR_ANGRY);
     break;
-  case 3:
-    setJoy(1.0f);
+  case 3: // HAPPY
+    setExpression(EXPR_HAPPY);
     break;
-  default:
+  default: // DEFAULT
+    setExpression(EXPR_NORMAL);
     break;
   }
 }
@@ -1311,6 +1582,15 @@ void MochiEyesEngine::setMouthType(int type) {
     break;
   case 7:
     shape = MOUTH_D;
+    break;
+  case 8:
+    shape = MOUTH_SMIRK;
+    break;
+  case 9:
+    shape = MOUTH_ZIGZAG;
+    break;
+  case 10:
+    shape = MOUTH_O;
     break;
   default:
     shape = MOUTH_SMILE;

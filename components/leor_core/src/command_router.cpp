@@ -320,19 +320,32 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         if (is_manual) shuffle_.reset();
     };
 
-    if (cmd == "happy") { set_expression(HAPPY, 0, 1); eyes_.anim_laugh(); return "Expression: Happy"; }
-    if (cmd == "sad") { set_expression(TIRED, 0, 2); return "Expression: Sad"; }
-    if (cmd == "angry") { set_expression(ANGRY, 0, 5); return "Expression: Angry"; }
-    if (cmd == "love") { set_expression(DEFAULT, 0, 3); eyes_.anim_love(); return "Expression: Love"; }
-    if (cmd == "surprised") { set_expression(DEFAULT, 0, 3); eyes_.set_curiosity(true); eyes_.blink(); return "Expression: Surprised"; }
-    if (cmd == "confused") { set_expression(DEFAULT, 0, 4); eyes_.anim_confused(); return "Expression: Confused"; }
-    if (cmd == "sleepy") { set_expression(TIRED, POS_SW, 5); return "Expression: Sleepy"; }
-    if (cmd == "curious") { set_expression(DEFAULT, 0, 4); eyes_.set_curiosity(true); return "Expression: Curious"; }
-    if (cmd == "nervous") { set_expression(DEFAULT, 0, 2); eyes_.set_sweat(true); eyes_.set_curiosity(true); return "Expression: Nervous"; }
+    if (cmd == "happy") { set_expression(HAPPY, 0, 1); eyes_.setExpression(EXPR_HAPPY); return "Expression: Happy"; }
+    if (cmd == "sad") { set_expression(TIRED, 0, 2); eyes_.setExpression(EXPR_SAD); return "Expression: Sad"; }
+    if (cmd == "angry") { set_expression(ANGRY, 0, 5); eyes_.setExpression(EXPR_ANGRY); return "Expression: Angry"; }
+    if (cmd == "love") { set_expression(DEFAULT, 0, 3); eyes_.setExpression(EXPR_NORMAL); eyes_.anim_love(); return "Expression: Love"; }
+    if (cmd == "surprised") { set_expression(DEFAULT, 0, 4); eyes_.setExpression(EXPR_SURPRISED); eyes_.blink(); return "Expression: Surprised"; }
+    if (cmd == "confused") { set_expression(DEFAULT, 0, 4); eyes_.setExpression(EXPR_NORMAL); eyes_.anim_confused(); return "Expression: Confused"; }
+    if (cmd == "sleepy") { set_expression(TIRED, POS_SW, 5); eyes_.setExpression(EXPR_SLEEPY); return "Expression: Sleepy"; }
+    if (cmd == "curious") { set_expression(DEFAULT, 0, 4); eyes_.setExpression(EXPR_NORMAL); eyes_.set_curiosity(true); return "Expression: Curious"; }
+    if (cmd == "nervous") { set_expression(DEFAULT, 0, 9); eyes_.setExpression(EXPR_WORRIED); eyes_.set_sweat(true); eyes_.set_curiosity(true); return "Expression: Nervous"; }
     if (cmd == "knocked" || cmd == "dizzy") { reset_effects(); eyes_.set_knocked(true); return "Expression: Knocked"; }
-    if (cmd == "neutral" || cmd == "normal" || cmd == "reset") { set_expression(DEFAULT, 0, 1); return "Expression: Neutral"; }
-    if (cmd == "idle") { set_expression(DEFAULT, 0, 1); eyes_.set_idle_mode(true, 1, 2); return "Mode: Idle"; }
-    if (cmd == "raised") { set_expression(DEFAULT, 0, 4); eyes_.set_eyebrows(true); return "Expression: Raised eyebrows"; }
+    if (cmd == "neutral" || cmd == "normal" || cmd == "reset") { set_expression(DEFAULT, 0, 1); eyes_.setExpression(EXPR_NORMAL); return "Expression: Neutral"; }
+    if (cmd == "idle") { set_expression(DEFAULT, 0, 1); eyes_.setExpression(EXPR_NORMAL); eyes_.set_idle_mode(true, 1, 2); return "Mode: Idle"; }
+    if (cmd == "raised") { set_expression(DEFAULT, 0, 4); eyes_.setExpression(EXPR_NORMAL); eyes_.set_eyebrows(true); return "Expression: Raised eyebrows"; }
+    // New esp32-eyes expressions
+    if (cmd == "glee") { set_expression(HAPPY, 0, 1); eyes_.setExpression(EXPR_GLEE); return "Expression: Glee"; }
+    if (cmd == "worried") { set_expression(DEFAULT, 0, 9); eyes_.setExpression(EXPR_WORRIED); return "Expression: Worried"; }
+    if (cmd == "focused") { set_expression(DEFAULT, 0, 5); eyes_.setExpression(EXPR_FOCUSED); return "Expression: Focused"; }
+    if (cmd == "annoyed") { set_expression(DEFAULT, 0, 9); eyes_.setExpression(EXPR_ANNOYED); return "Expression: Annoyed"; }
+    if (cmd == "skeptic") { set_expression(DEFAULT, 0, 8); eyes_.setExpression(EXPR_SKEPTIC); return "Expression: Skeptic"; }
+    if (cmd == "frustrated") { set_expression(DEFAULT, 0, 9); eyes_.setExpression(EXPR_FRUSTRATED); return "Expression: Frustrated"; }
+    if (cmd == "unimpressed") { set_expression(DEFAULT, 0, 2); eyes_.setExpression(EXPR_UNIMPRESSED); return "Expression: Unimpressed"; }
+    if (cmd == "suspicious") { set_expression(DEFAULT, 0, 8); eyes_.setExpression(EXPR_SUSPICIOUS); return "Expression: Suspicious"; }
+    if (cmd == "squint") { set_expression(DEFAULT, 0, 8); eyes_.setExpression(EXPR_SQUINT); return "Expression: Squint"; }
+    if (cmd == "furious") { set_expression(ANGRY, 0, 9); eyes_.setExpression(EXPR_FURIOUS); return "Expression: Furious"; }
+    if (cmd == "scared") { set_expression(DEFAULT, 0, 10); eyes_.setExpression(EXPR_SCARED); return "Expression: Scared"; }
+    if (cmd == "awe") { set_expression(DEFAULT, 0, 10); eyes_.setExpression(EXPR_AWE); return "Expression: Awe"; }
     auto set_mouth = [&](int type, const char* name) {
         eyes_.set_mouth_type(type);
         if (is_manual) shuffle_.reset();
@@ -354,8 +367,13 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
     if (cmd == "open") return set_mouth(3, "Open");
     if (cmd == "ooo") return set_mouth(4, "Ooo");
     if (cmd == "flat") return set_mouth(5, "Flat");
+    if (cmd == "uwu") return do_action([&]{ eyes_.trigger_uwu(); }, "UwU");
+    if (cmd == "xd") return do_action([&]{ eyes_.trigger_xd(); }, "XD");
     if (cmd == "uwum") return set_mouth(6, "UwU");
     if (cmd == "xdm") return set_mouth(7, "XD");
+    if (cmd == "smirk") return set_mouth(8, "Smirk");
+    if (cmd == "zigzag") return set_mouth(9, "Zigzag");
+    if (cmd == "bigo") return set_mouth(10, "Big O");
     if (starts_with(cmd, "talk")) {
         uint32_t duration = 3000;
         const auto pos = cmd.find(' ');

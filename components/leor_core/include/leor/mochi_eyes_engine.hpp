@@ -7,6 +7,45 @@
 
 namespace leor {
 
+// ---------------------------------------------------------------------------
+// Parametric eye shape (ported from esp32-eyes EyeConfig)
+// ---------------------------------------------------------------------------
+struct EyeShapeConfig {
+    int16_t OffsetX = 0;
+    int16_t OffsetY = 0;
+    int16_t Height  = 40;
+    int16_t Width   = 40;
+    float   Slope_Top    = 0.0f;
+    float   Slope_Bottom = 0.0f;
+    int16_t Radius_Top    = 8;
+    int16_t Radius_Bottom = 8;
+};
+
+// ---------------------------------------------------------------------------
+// Expression enum – all 18 esp32-eyes emotions
+// ---------------------------------------------------------------------------
+enum Expression : uint8_t {
+    EXPR_NORMAL = 0,
+    EXPR_ANGRY,
+    EXPR_GLEE,
+    EXPR_HAPPY,
+    EXPR_SAD,
+    EXPR_WORRIED,
+    EXPR_FOCUSED,
+    EXPR_ANNOYED,
+    EXPR_SURPRISED,
+    EXPR_SKEPTIC,
+    EXPR_FRUSTRATED,
+    EXPR_UNIMPRESSED,
+    EXPR_SLEEPY,
+    EXPR_SUSPICIOUS,
+    EXPR_SQUINT,
+    EXPR_FURIOUS,
+    EXPR_SCARED,
+    EXPR_AWE,
+    EXPR_COUNT
+};
+
 // On/Off
 #define ON 1
 #define OFF 0
@@ -34,7 +73,10 @@ enum MouthShape : int8_t {
   MOUTH_OOO = 3,
   MOUTH_FLAT = 4,
   MOUTH_W = 5, // UwU cat mouth
-  MOUTH_D = 6  // XD open mouth
+  MOUTH_D = 6, // XD open mouth
+  MOUTH_SMIRK = 7,  // 8: Tilted smirk
+  MOUTH_ZIGZAG = 8, // 9: Jagged frustrated mouth
+  MOUTH_O = 9       // 10: Large open circle
 };
 
 struct EyeLayout {
@@ -99,6 +141,14 @@ struct EyeParams {
   float sleepIntensity;
   float sleepPhase;
 
+  // Parametric eye shape state
+  EyeShapeConfig leftShape;
+  EyeShapeConfig rightShape;
+  EyeShapeConfig leftShapeTarget;
+  EyeShapeConfig rightShapeTarget;
+  float shapeBlend;
+  Expression currentExpression;
+
   void reset() {
     openness = 1.0f;
     leftOpenness = 1.0f;
@@ -133,6 +183,12 @@ struct EyeParams {
     vFlicker = 0.0f;
     sleepIntensity = 0.0f;
     sleepPhase = 0.0f;
+    leftShape = {};
+    rightShape = {};
+    leftShapeTarget = {};
+    rightShapeTarget = {};
+    shapeBlend = 1.0f;
+    currentExpression = EXPR_NORMAL;
   }
 };
 
@@ -287,6 +343,10 @@ public:
   void setLove(float weight, float speed = 3.0f);
   void resetEmotions();
 
+  // Parametric expression system (18 esp32-eyes emotions)
+  void setExpression(Expression expr);
+  void set_expression(int expr);
+
   void blink();
   void wink(bool left);
   void close();
@@ -434,9 +494,12 @@ private:
   void updateParams(float dt);
   void updateTimers(float dt);
   void computeRenderState();
+  void lerpShape(EyeShapeConfig& current, const EyeShapeConfig& target, float speed, float dt);
 
   void drawEyes();
-  void drawEyelids();
+  void drawEyeShape(int16_t centerX, int16_t centerY, EyeShapeConfig* config);
+  enum CornerType { T_R, T_L, B_L, B_R };
+  void fillEllipseCorner(CornerType corner, int16_t x0, int16_t y0, int32_t rx, int32_t ry, uint8_t color);
   void drawMouth();
   void drawHeart(int16_t cx, int16_t cy, float scale);
   void drawLoveOverlay();
