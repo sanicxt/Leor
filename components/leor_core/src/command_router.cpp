@@ -338,11 +338,11 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
     if (cmd == "worried") { set_expression(DEFAULT, 0, 9); eyes_.setExpression(EXPR_WORRIED); return "Expression: Worried"; }
     if (cmd == "focused") { set_expression(DEFAULT, 0, 5); eyes_.setExpression(EXPR_FOCUSED); return "Expression: Focused"; }
     if (cmd == "annoyed") { set_expression(DEFAULT, 0, 9); eyes_.setExpression(EXPR_ANNOYED); return "Expression: Annoyed"; }
-    if (cmd == "skeptic") { set_expression(DEFAULT, 0, 8); eyes_.setExpression(EXPR_SKEPTIC); return "Expression: Skeptic"; }
+    if (cmd == "skeptic") { set_expression(DEFAULT, 0, 2); eyes_.setExpression(EXPR_SKEPTIC); return "Expression: Skeptic"; }
     if (cmd == "frustrated") { set_expression(DEFAULT, 0, 9); eyes_.setExpression(EXPR_FRUSTRATED); return "Expression: Frustrated"; }
     if (cmd == "unimpressed") { set_expression(DEFAULT, 0, 2); eyes_.setExpression(EXPR_UNIMPRESSED); return "Expression: Unimpressed"; }
-    if (cmd == "suspicious") { set_expression(DEFAULT, 0, 8); eyes_.setExpression(EXPR_SUSPICIOUS); return "Expression: Suspicious"; }
-    if (cmd == "squint") { set_expression(DEFAULT, 0, 8); eyes_.setExpression(EXPR_SQUINT); return "Expression: Squint"; }
+    if (cmd == "suspicious") { set_expression(DEFAULT, 0, 4); eyes_.setExpression(EXPR_SUSPICIOUS); return "Expression: Suspicious"; }
+    if (cmd == "squint") { set_expression(DEFAULT, 0, 4); eyes_.setExpression(EXPR_SQUINT); return "Expression: Squint"; }
     if (cmd == "furious") { set_expression(ANGRY, 0, 9); eyes_.setExpression(EXPR_FURIOUS); return "Expression: Furious"; }
     if (cmd == "scared") { set_expression(DEFAULT, 0, 10); eyes_.setExpression(EXPR_SCARED); return "Expression: Scared"; }
     if (cmd == "awe") { set_expression(DEFAULT, 0, 10); eyes_.setExpression(EXPR_AWE); return "Expression: Awe"; }

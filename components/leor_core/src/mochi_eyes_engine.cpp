@@ -12,45 +12,43 @@ namespace leor {
 struct ExpressionPreset {
     EyeShapeConfig right;
     EyeShapeConfig left;
-};
-
-static const ExpressionPreset kPresets[EXPR_COUNT] = {
+};static const ExpressionPreset kPresets[EXPR_COUNT] = {
     // EXPR_NORMAL
     { {0,0,40,40, 0,0, 8,8}, {0,0,40,40, 0,0, 8,8} },
     // EXPR_ANGRY
-    { {-3,0,34,40, 0.3f,0, 2,14}, {-3,0,34,40, 0.3f,0, 2,14} },
+    { {-3,0,24,40, 0.3f,0, 4,10}, {-3,0,24,40, 0.3f,0, 4,10} },
     // EXPR_GLEE
-    { {0,0,18,40, 0,0, 8,0}, {0,0,18,40, 0,0, 8,0} },
+    { {0,0,14,40, 0,0, 8,0}, {0,0,14,40, 0,0, 8,0} },
     // EXPR_HAPPY
-    { {0,0,22,40, 0,0, 10,0}, {0,0,22,40, 0,0, 10,0} },
+    { {0,-2,18,40, 0,0, 10,0}, {0,-2,18,40, 0,0, 10,0} },
     // EXPR_SAD
-    { {0,0,34,40, -0.4f,0, 2,12}, {0,0,34,40, -0.4f,0, 2,12} },
+    { {0,0,22,40, -0.4f,0, 2,10}, {0,0,22,40, -0.4f,0, 2,10} },
     // EXPR_WORRIED
-    { {0,0,32,40, -0.1f,0, 8,10}, {0,0,38,40, -0.2f,0, 8,10} },
+    { {-1,0,30,40, -0.2f,0, 8,8}, {-1,0,24,40, -0.1f,0, 8,8} },
     // EXPR_FOCUSED
-    { {0,0,28,40, 0.2f,0, 4,2}, {0,0,28,40, 0.2f,0, 4,2} },
+    { {0,1,16,40, 0.2f,0, 4,4}, {0,1,16,40, 0.2f,0, 4,4} },
     // EXPR_ANNOYED
-    { {0,0,24,40, 0,0, 2,10}, {0,0,14,40, 0,0, 2,6} },
+    { {0,-1,10,40, 0,0, 2,4}, {0,0,16,40, 0,0, 4,6} },
     // EXPR_SURPRISED
     { {-2,0,45,45, 0,0, 16,16}, {-2,0,45,45, 0,0, 16,16} },
     // EXPR_SKEPTIC
-    { {0,0,40,40, 0,0, 10,10}, {0,-4,30,40, 0.3f,0, 2,10} },
+    { {0,-4,22,40, 0.3f,0, 2,8}, {0,0,30,40, 0,0, 8,8} },
     // EXPR_FRUSTRATED
-    { {3,-4,26,40, 0,0, 2,10}, {3,-4,26,40, 0,0, 2,10} },
+    { {3,-4,14,40, 0,0, 2,6}, {3,-4,14,40, 0,0, 2,6} },
     // EXPR_UNIMPRESSED
-    { {3,0,24,40, 0,0, 2,10}, {3,-2,32,40, 0,0, 2,12} },
+    { {3,-2,24,40, 0,0, 2,8}, {3,0,18,40, 0,0, 2,6} },
     // EXPR_SLEEPY — pure horizontal slits
-    { {0,0,14,35, 0,0, 6,6}, {0,0,14,35, 0,0, 6,6} },
+    { {0,-2,10,35, -0.1f,-0.1f, 4,4}, {0,-2,10,35, -0.1f,-0.1f, 4,4} },
     // EXPR_SUSPICIOUS
-    { {0,0,30,40, 0,0, 8,4}, {0,-2,22,40, 0.2f,0, 6,4} },
+    { {0,-2,16,40, 0.2f,0, 4,4}, {0,0,22,40, 0,0, 6,4} },
     // EXPR_SQUINT
-    { {-6,-2,35,35, 0,0, 8,8}, {4,0,26,26, 0,0, 6,6} },
+    { {4,0,16,26, 0,0, 4,4}, {-4,-2,24,35, 0,0, 6,6} },
     // EXPR_FURIOUS
-    { {-2,0,36,40, 0.4f,0, 2,10}, {-2,0,36,40, 0.4f,0, 2,10} },
+    { {-2,0,26,40, 0.4f,0, 2,8}, {-2,0,26,40, 0.4f,0, 2,8} },
     // EXPR_SCARED
-    { {-3,0,40,40, -0.1f,0, 12,8}, {-3,0,40,40, -0.1f,0, 12,8} },
+    { {-3,0,36,40, -0.2f,0, 10,8}, {-3,0,36,40, -0.2f,0, 10,8} },
     // EXPR_AWE
-    { {2,0,35,45, -0.1f,0.1f, 12,12}, {2,0,35,45, -0.1f,0.1f, 12,12} },
+    { {2,-3,40,48, -0.1f,0.1f, 12,12}, {2,-3,40,48, -0.1f,0.1f, 12,12} }
 };
 
 float MochiEyesEngine::lerp(float current, float target, float speed,
@@ -616,10 +614,10 @@ void MochiEyesEngine::drawEyeShape(int16_t centerX, int16_t centerY, EyeShapeCon
     fillRect2(BLc_x, BLc_y, BRc_x, BRc_y + rBot, MAINCOLOR);  // Bottom
 
     // Draw slanted edges at top (erase the rect overshoot, fill the correct triangle)
-    if (config->Slope_Top > 0) {
+    if (config->Slope_Top > 0.02f) {
         fillTriangle(TLc_x, TLc_y - rTop, TRc_x, TRc_y - rTop, TRc_x, TLc_y - rTop, BGCOLOR);
         fillTriangle(TRc_x, TRc_y - rTop, TLc_x, TLc_y - rTop, TLc_x, TRc_y - rTop, MAINCOLOR);
-    } else if (config->Slope_Top < 0) {
+    } else if (config->Slope_Top < -0.02f) {
         fillTriangle(TRc_x, TRc_y - rTop, TLc_x, TLc_y - rTop, TLc_x, TRc_y - rTop, BGCOLOR);
         fillTriangle(TLc_x, TLc_y - rTop, TRc_x, TRc_y - rTop, TRc_x, TLc_y - rTop, MAINCOLOR);
     }
@@ -635,9 +633,10 @@ void MochiEyesEngine::drawEyeShape(int16_t centerX, int16_t centerY, EyeShapeCon
     }
 
     // Draw slanted edges at bottom MUST happen after corners so the corners get properly masked!
-    if (config->Slope_Bottom > 0) {
+    // Use a deadzone to avoid ghost cuts during animation interpolation
+    if (config->Slope_Bottom > 0.02f) {
         fillTriangle(BRc_x + rBot - 1, BRc_y + rBot - 1, BLc_x - rBot, BLc_y + rBot - 1, BLc_x - rBot, BRc_y + rBot - 1, BGCOLOR);
-    } else if (config->Slope_Bottom < 0) {
+    } else if (config->Slope_Bottom < -0.02f) {
         fillTriangle(BLc_x - rBot, BLc_y + rBot - 1, BRc_x + rBot - 1, BRc_y + rBot - 1, BRc_x + rBot - 1, BLc_y + rBot - 1, BGCOLOR);
     }
 }
