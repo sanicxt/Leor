@@ -34,6 +34,7 @@ class ClockService {
     uint64_t base_rtc_us_ = 0;
     uint32_t base_seconds_ = 0;
     uint64_t base_epoch_ms_ = 0;
+    uint32_t last_now_ms_ = 0;   // last now_ms seen (for awake-delta tracking)
     int16_t tz_offset_minutes_ = 0;
     uint32_t slowclk_cal_ = 0;
     uint32_t last_draw_key_ = UINT32_MAX;

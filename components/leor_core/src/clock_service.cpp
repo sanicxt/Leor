@@ -130,7 +130,7 @@ void ClockService::format_date(char* out, std::size_t out_size, uint32_t now_ms)
     std::snprintf(out, out_size, "%s %02d", weekdays[tm_value.tm_wday], tm_value.tm_mday);
 }
 
-void ClockService::restore(bool enabled, bool use24, uint32_t seconds, int16_t tz_offset, uint64_t epoch_ms_value, uint32_t /*now_ms*/) {
+void ClockService::restore(bool enabled, bool use24, uint32_t seconds, int16_t tz_offset, uint64_t epoch_ms_value, uint32_t now_ms) {
     if (s_clock_state.magic == kClockStateMagic && s_clock_state.has_time) {
         enabled_ = s_clock_state.enabled;
         use_24_hour_ = s_clock_state.use_24_hour;
@@ -140,7 +140,38 @@ void ClockService::restore(bool enabled, bool use24, uint32_t seconds, int16_t t
         base_epoch_ms_ = s_clock_state.base_epoch_ms;
         tz_offset_minutes_ = s_clock_state.tz_offset_minutes;
         slowclk_cal_ = s_clock_state.slowclk_cal;
-        apply_slowclk_calibration(s_clock_state.slowclk_cal);
+
+        if (esp_reset_reason() == ESP_RST_DEEPSLEEP) {
+            // ── Deep-sleep elapsed time recovery ─────────────────────
+            // CRITICAL: base_rtc_us_ was captured using the pre-sleep
+            // calibration. We MUST use that same calibration when
+            // calling esp_rtc_get_time_us() so the subtraction is
+            // consistent. Mixing old and new calibrations introduces
+            // error proportional to: base_ticks × (cal_new − cal_old).
+            
+            // Step 1: Apply the OLD calibration (same one used for base_rtc_us_)
+            apply_slowclk_calibration(s_clock_state.slowclk_cal);
+            
+            // Step 2: Compute elapsed time with consistent calibration
+            const uint64_t now_rtc_us_old = esp_rtc_get_time_us();
+            const uint64_t elapsed_us = now_rtc_us_old - base_rtc_us_;
+            const uint32_t elapsed_s = static_cast<uint32_t>(elapsed_us / 1000000ULL);
+            
+            // Step 3: Advance the clock by the sleep duration
+            base_seconds_ = (base_seconds_ + elapsed_s) % 86400U;
+            if (base_epoch_ms_ != 0) {
+                base_epoch_ms_ += elapsed_us / 1000ULL;
+                sync_system_time(base_epoch_ms_);
+            }
+            
+            // Step 4: Now switch to fresh calibration for ongoing use
+            const uint32_t fresh_cal = read_slowclk_calibration();
+            apply_slowclk_calibration(fresh_cal);
+            base_rtc_us_ = esp_rtc_get_time_us();  // re-anchor with fresh cal
+            slowclk_cal_ = fresh_cal;
+        } else {
+            apply_slowclk_calibration(s_clock_state.slowclk_cal);
+        }
     } else {
         enabled_ = enabled;
         use_24_hour_ = use24;
@@ -151,6 +182,8 @@ void ClockService::restore(bool enabled, bool use24, uint32_t seconds, int16_t t
         base_rtc_us_ = esp_rtc_get_time_us();
         slowclk_cal_ = read_slowclk_calibration();
     }
+    // Anchor the now_ms tracker so the clock starts advancing immediately.
+    last_now_ms_ = now_ms;
     if (slowclk_cal_ == 0U) {
         slowclk_cal_ = read_slowclk_calibration();
     }
@@ -175,9 +208,10 @@ void ClockService::set_use_24_hour(bool enabled) {
     last_draw_key_ = UINT32_MAX;
 }
 
-void ClockService::set_time_of_day(uint8_t hours, uint8_t minutes, uint8_t seconds, uint32_t /*now_ms*/) {
+void ClockService::set_time_of_day(uint8_t hours, uint8_t minutes, uint8_t seconds, uint32_t now_ms) {
     base_seconds_ = static_cast<uint32_t>(hours % 24U) * 3600U + static_cast<uint32_t>(minutes % 60U) * 60U + static_cast<uint32_t>(seconds % 60U);
     base_rtc_us_ = esp_rtc_get_time_us();
+    last_now_ms_ = now_ms;
     base_epoch_ms_ = 0;
     has_time_ = true;
     slowclk_cal_ = read_slowclk_calibration();
@@ -185,11 +219,12 @@ void ClockService::set_time_of_day(uint8_t hours, uint8_t minutes, uint8_t secon
     last_draw_key_ = UINT32_MAX;
 }
 
-void ClockService::set_from_epoch_ms(uint64_t epoch_ms_value, int16_t tz_offset_minutes, uint32_t /*now_ms*/) {
+void ClockService::set_from_epoch_ms(uint64_t epoch_ms_value, int16_t tz_offset_minutes, uint32_t now_ms) {
     base_epoch_ms_ = epoch_ms_value;
     tz_offset_minutes_ = tz_offset_minutes;
     has_time_ = true;
     base_rtc_us_ = esp_rtc_get_time_us();
+    last_now_ms_ = now_ms;
     slowclk_cal_ = read_slowclk_calibration();
     const int64_t local_ms = static_cast<int64_t>(epoch_ms_value) - static_cast<int64_t>(tz_offset_minutes) * 60000LL;
     base_seconds_ = static_cast<uint32_t>((local_ms < 0 ? 0 : local_ms) / 1000ULL) % 86400U;
@@ -202,20 +237,29 @@ uint32_t ClockService::seconds_of_day(uint32_t now_ms) const {
     if (!has_time_) {
         return 0;
     }
-    if (base_epoch_ms_ != 0) {
-        const int64_t epoch_s = static_cast<int64_t>(epoch_ms(now_ms) / 1000ULL) - static_cast<int64_t>(tz_offset_minutes_) * 60LL;
-        const int64_t local_s = epoch_s < 0 ? 0 : epoch_s;
-        return static_cast<uint32_t>(local_s % 86400LL);
+    // Compute elapsed milliseconds using now_ms delta.
+    // now_ms comes from esp_timer_get_time()/1000 in Application::tick().
+    // Between two awake tick() calls, this is driven by the 80 MHz crystal
+    // (±10 ppm) and does NOT include RTC-compensated light-sleep gaps,
+    // so it won't drift from the drifty RTC slow clock.
+    //
+    // Handle uint32_t wraparound (~49 days) and first-call initialization.
+    uint32_t elapsed_ms = 0;
+    if (last_now_ms_ != 0) {
+        elapsed_ms = now_ms - last_now_ms_;  // wrapping-safe subtraction
     }
-    const uint64_t elapsed_us = esp_rtc_get_time_us() - base_rtc_us_;
-    return (base_seconds_ + static_cast<uint32_t>(elapsed_us / 1000000ULL)) % 86400U;
+    return (base_seconds_ + elapsed_ms / 1000U) % 86400U;
 }
 
 uint64_t ClockService::epoch_ms(uint32_t now_ms) const {
     if (base_epoch_ms_ == 0) {
         return 0;
     }
-    return read_system_time_ms();
+    uint32_t elapsed_ms = 0;
+    if (last_now_ms_ != 0) {
+        elapsed_ms = now_ms - last_now_ms_;
+    }
+    return base_epoch_ms_ + elapsed_ms;
 }
 
 std::string ClockService::status_string(uint32_t now_ms, bool ble_connected) const {
