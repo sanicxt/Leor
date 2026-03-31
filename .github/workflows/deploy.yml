@@ -3,8 +3,6 @@ name: Build Firmware and Deploy Web
 on:
   push:
     branches: [main]
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -53,11 +51,12 @@ jobs:
         with:
           submodules: 'recursive'
 
-      - name: Install ESP-IDF and Build project
-        uses: rmshub/esp-idf-action@v6
-        with: 
-            esp_idf_version: v6.0
-            esp_idf_target: esp32c3
+      - name: Build with ESP-IDF
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0
+          target: esp32c3
+          path: '.'
 
       - name: Archive build output artifacts
         uses: actions/upload-artifact@v4
