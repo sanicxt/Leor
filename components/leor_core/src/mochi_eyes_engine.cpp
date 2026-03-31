@@ -1627,7 +1627,16 @@ void MochiEyesEngine::startMouthAnim(int anim, unsigned long duration) {
 void MochiEyesEngine::triggerSleep() {
   clearAllOverlays();
   resetEmotions();
-  setOpennessSpeed(3.0f);
+  // Disable auto-blink and idle mode — they set targets.openness = 1.0
+  // which fights the closing animation and re-opens the eyes.
+  timers.autoBlink = false;
+  timers.idleMode = false;
+  // Ensure eyes are fully open before the closing animation starts,
+  // otherwise isSleepDone() may fire immediately if eyes were mid-blink.
+  params.openness = 1.0f;
+  params.leftOpenness = 1.0f;
+  params.rightOpenness = 1.0f;
+  setOpennessSpeed(1.5f);  // slow, graceful close
   close();
   targets.sleepIntensity = 1.0f;
   params.sleepPhase = 0.0f;
