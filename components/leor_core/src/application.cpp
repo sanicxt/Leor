@@ -200,10 +200,8 @@ esp_err_t Application::start() {
                    preferences_.getUInt("shuf_nmax", 5000));
   clock_.restore(preferences_.getBool("clk_on", false),
                  preferences_.getBool("clk_24", true),
-                 preferences_.getUInt("clk_sec", 0),
                  static_cast<int16_t>(preferences_.getInt("clk_tz", 0)),
-                 preferences_.getULong64("clk_epoch", 0),
-                 static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+                 preferences_.getULong64("clk_epoch", 0));
   was_clock_enabled_ = clock_.enabled();
 
   commands_ = std::make_unique<CommandRouter>(preferences_, config_.display,
@@ -379,7 +377,7 @@ void Application::tick() {
     display_->send_buffer();
   } else {
     if (is_clock_enabled) {
-      clock_.draw(*display_, now_ms, ble_.connected());
+      clock_.draw(*display_, ble_.connected());
     } else {
       eyes_->update(now_ms);
     }

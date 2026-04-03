@@ -93,7 +93,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
         static_cast<unsigned>(power_.hold_ms()), static_cast<unsigned>(preferences_.getUInt("wake_pin", 0)), static_cast<unsigned>(preferences_.getUInt("pwr_pin", 1)),
         display_config_.controller == DisplayController::kSsd1306 ? "ssd1306" : "sh1106", display_config_.i2c_address,
         shuffle_.enabled() ? 1 : 0, mpu_verbose_ ? 1 : 0, clock_.enabled() ? 1 : 0,
-        clock_.enabled() ? 1 : 0, clock_.tz_offset(), static_cast<unsigned>(clock_.seconds_of_day(now_ms)), clock_.use_24_hour() ? 24 : 12,
+        clock_.enabled() ? 1 : 0, clock_.tz_offset(), static_cast<unsigned>(clock_.seconds_of_day()), clock_.use_24_hour() ? 24 : 12,
         static_cast<unsigned>(shuffle_.expr_min_ms() / 1000U), static_cast<unsigned>(shuffle_.expr_max_ms() / 1000U), static_cast<unsigned>(shuffle_.neutral_min_ms() / 1000U), static_cast<unsigned>(shuffle_.neutral_max_ms() / 1000U),
         eyes_.get_breathing_enabled() ? 1 : 0, eyes_.get_breathing_intensity(), eyes_.get_breathing_speed(),
         ble_window_ms, gestures_.settings_json().c_str());
@@ -261,23 +261,23 @@ std::string CommandRouter::handle_display(const std::string& params) {
 }
 
 std::string CommandRouter::handle_clock(const std::string& params, uint32_t now_ms) {
-    if (params.empty()) return clock_.status_string(now_ms, ble_.connected());
+    if (params.empty()) return clock_.status_string(ble_.connected());
     if (params == "on") {
         clock_.set_enabled(true);
         preferences_.putBool("clk_on", true);
-        return clock_.status_string(now_ms, ble_.connected());
+        return clock_.status_string(ble_.connected());
     }
     if (params == "off") {
         clock_.set_enabled(false);
         preferences_.putBool("clk_on", false);
-        return clock_.status_string(now_ms, ble_.connected());
+        return clock_.status_string(ble_.connected());
     }
     if (starts_with(params, "fmt=")) {
         const int fmt = std::atoi(params.substr(4).c_str());
         if (fmt == 12 || fmt == 24) {
             clock_.set_use_24_hour(fmt == 24);
             preferences_.putBool("clk_24", fmt == 24);
-            return clock_.status_string(now_ms, ble_.connected());
+            return clock_.status_string(ble_.connected());
         }
         return "clock:fmt invalid. Use 12 or 24";
     }
@@ -286,11 +286,11 @@ std::string CommandRouter::handle_clock(const std::string& params, uint32_t now_
         const auto comma = value.find(',');
         const uint64_t epoch = std::strtoull(value.substr(0, comma).c_str(), nullptr, 10);
         const int16_t tz = comma == std::string::npos ? 0 : static_cast<int16_t>(std::atoi(value.substr(comma + 1).c_str()));
-        clock_.set_from_epoch_ms(epoch, tz, now_ms);
+        clock_.set_from_epoch_ms(epoch, tz);
         preferences_.putULong64("clk_epoch", epoch);
         preferences_.putInt("clk_tz", tz);
-        preferences_.putUInt("clk_sec", clock_.seconds_of_day(now_ms));
-        return clock_.status_string(now_ms, ble_.connected());
+        preferences_.putUInt("clk_sec", clock_.seconds_of_day());
+        return clock_.status_string(ble_.connected());
     }
     if (starts_with(params, "set=")) {
         const auto parts = split(params.substr(4), ':');
@@ -299,10 +299,10 @@ std::string CommandRouter::handle_clock(const std::string& params, uint32_t now_
         const int mm = std::atoi(parts[1].c_str());
         const int ss = parts.size() > 2 ? std::atoi(parts[2].c_str()) : 0;
         if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) return "clock:set invalid. Use HH:MM or HH:MM:SS";
-        clock_.set_time_of_day(static_cast<uint8_t>(hh), static_cast<uint8_t>(mm), static_cast<uint8_t>(ss), now_ms);
+        clock_.set_time_of_day(static_cast<uint8_t>(hh), static_cast<uint8_t>(mm), static_cast<uint8_t>(ss));
         preferences_.putUInt("clk_sec", hh * 3600U + mm * 60U + ss);
         preferences_.putULong64("clk_epoch", 0);
-        return clock_.status_string(now_ms, ble_.connected());
+        return clock_.status_string(ble_.connected());
     }
     return "clock: usage - on, off, set=HH:MM[:SS], sync=EPOCH_MS[,TZ], fmt=12|24";
 }
