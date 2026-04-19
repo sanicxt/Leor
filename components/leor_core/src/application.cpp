@@ -286,10 +286,26 @@ void Application::tick() {
 
   ButtonEvent btn = power_.poll(now_ms);
   if (btn == ButtonEvent::kShortPress) {
-    open_ble_window(now_ms, true);
-    menu_.on_short_press(now_ms);
+    if (now_ms - last_short_press_ms_ < kDoubleTapThresholdMs) {
+      // Double tap detected
+      if (menu_.is_open()) {
+        menu_.close();
+      }
+      last_short_press_ms_ = 0; // Reset
+    } else {
+      last_short_press_ms_ = now_ms;
+      open_ble_window(now_ms, true);
+      if (menu_.is_open()) {
+        menu_.on_short_press(now_ms);
+      }
+    }
   } else if (btn == ButtonEvent::kLongPress) {
     menu_.on_long_press(now_ms);
+    last_short_press_ms_ = 0;
+  }
+
+  if (menu_.is_open() && (now_ms - menu_.last_activity_ms() > MenuService::kTimeoutMs)) {
+    menu_.close();
   }
 
   MenuAction action = menu_.consume_action();

@@ -3,12 +3,16 @@
 #include <cstdio>
 #include <ctime>
 #include <sys/time.h>
+#include <cstdlib>
 
 #include "esp_attr.h"
+#include "esp_log.h"
 
 namespace leor {
 
 namespace {
+
+static const char* kTag = "leor_clk";
 
 struct RetainedClockState {
     uint32_t magic = 0;
@@ -19,7 +23,8 @@ struct RetainedClockState {
     int16_t tz_offset_minutes = 0;
 };
 
-constexpr uint32_t kClockStateMagic = 0x4C434B31U;
+constexpr uint32_t kClockStateMagic = 0x4C434B32U;
+constexpr uint32_t kSaneTimeMinSec = 1704067200U; // 2024-01-01
 
 RTC_NOINIT_ATTR RetainedClockState s_clock_state;
 
@@ -101,16 +106,14 @@ void ClockService::format_date(char* out, std::size_t out_size) const {
     if (out == nullptr || out_size == 0U) {
         return;
     }
-    if (!has_epoch_) {
+    if (!has_time_) {
         std::snprintf(out, out_size, "--- --");
         return;
     }
     static const char* const weekdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    struct timeval tv {};
-    gettimeofday(&tv, nullptr);
-    const time_t local_s = tv.tv_sec - static_cast<time_t>(tz_offset_minutes_) * 60;
+    time_t now = time(nullptr);
     struct tm tm_value;
-    gmtime_r(&local_s, &tm_value);
+    localtime_r(&now, &tm_value);
     std::snprintf(out, out_size, "%s %02d", weekdays[tm_value.tm_wday], tm_value.tm_mday);
 }
 
@@ -119,8 +122,25 @@ void ClockService::save_retained_state() {
                      use_24_hour_, tz_offset_minutes_};
 }
 
+void ClockService::update_tz_env() const {
+    char tz_buf[32];
+    int hours = tz_offset_minutes_ / 60;
+    int mins = std::abs(tz_offset_minutes_ % 60);
+    if (mins == 0) {
+        std::snprintf(tz_buf, sizeof(tz_buf), "GMT%d", hours);
+    } else {
+        std::snprintf(tz_buf, sizeof(tz_buf), "GMT%d:%02d", hours, mins);
+    }
+    setenv("TZ", tz_buf, 1);
+    tzset();
+    ESP_LOGD(kTag, "TZ set to %s", tz_buf);
+}
+
 void ClockService::restore(bool enabled, bool use24, int16_t tz_offset, uint64_t epoch_ms_value, uint32_t manual_sec) {
-    if (s_clock_state.magic == kClockStateMagic && s_clock_state.has_time) {
+    time_t now = time(nullptr);
+    bool is_sane = now > kSaneTimeMinSec;
+
+    if (s_clock_state.magic == kClockStateMagic && s_clock_state.has_time && is_sane) {
         // Deep sleep or soft reset — ESP-IDF maintains gettimeofday() via RTC.
         // Just restore our preference flags.
         enabled_ = s_clock_state.enabled;
@@ -141,10 +161,11 @@ void ClockService::restore(bool enabled, bool use24, int16_t tz_offset, uint64_t
         } else if (manual_sec != 0) {
             set_time_of_day(manual_sec / 3600, (manual_sec % 3600) / 60, manual_sec % 60);
         } else {
-            has_time_ = false;
-            has_epoch_ = false;
+            has_time_ = is_sane;
+            has_epoch_ = is_sane;
         }
     }
+    update_tz_env();
     save_retained_state();
     last_draw_key_ = UINT32_MAX;
 }
@@ -188,6 +209,7 @@ void ClockService::set_from_epoch_ms(uint64_t epoch_ms_value, int16_t tz_offset_
     has_epoch_ = true;
 
     set_system_time(epoch_ms_value);
+    update_tz_env();
 
     save_retained_state();
     last_draw_key_ = UINT32_MAX;
@@ -197,12 +219,10 @@ uint32_t ClockService::seconds_of_day() const {
     if (!has_time_) {
         return 0;
     }
-    struct timeval tv {};
-    gettimeofday(&tv, nullptr);
-    // tz_offset_minutes_ follows JS getTimezoneOffset() sign (negated UTC offset).
-    // local = utc − offset
-    time_t local_s = tv.tv_sec - static_cast<time_t>(tz_offset_minutes_) * 60;
-    return static_cast<uint32_t>(((local_s % 86400) + 86400) % 86400);
+    time_t now = time(nullptr);
+    struct tm tm_value;
+    localtime_r(&now, &tm_value);
+    return static_cast<uint32_t>(tm_value.tm_hour * 3600 + tm_value.tm_min * 60 + tm_value.tm_sec);
 }
 
 uint64_t ClockService::epoch_ms() const {

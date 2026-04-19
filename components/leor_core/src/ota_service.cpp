@@ -116,9 +116,16 @@ uint8_t OtaService::handle_data_write(const uint8_t* data, size_t len) {
         return kCtrlDoneNak;
     }
 
-    if (packets_rx_ == 0 && data[0] != 0xE9) {
-        ESP_LOGW(kTag, "invalid image header byte: 0x%02x", data[0]);
-        set_error("Wrong file type!");
+    if (packets_rx_ == 0 && (data[0] != 0xE9 || len < 16)) {
+        ESP_LOGW(kTag, "invalid image header: 0x%02x, len=%zu", data[0], len);
+        set_error("Invalid ESP32 bin!");
+        return kCtrlDoneNak;
+    }
+
+    if (ota_partition_ != nullptr && bytes_rx_ + len > ota_partition_->size) {
+        ESP_LOGW(kTag, "OTA data exceeds partition size! rx=%u, len=%zu, max=%u",
+                 (unsigned)bytes_rx_, len, (unsigned)ota_partition_->size);
+        set_error("File too large!");
         return kCtrlDoneNak;
     }
 

@@ -28,6 +28,7 @@ class ClockService {
     uint32_t make_draw_key(uint32_t minute_of_day, bool colon_on, bool ble_connected) const;
     void format_date(char* out, std::size_t out_size) const;
     void save_retained_state();
+    void update_tz_env() const;
 
     bool enabled_ = false;
     bool has_time_ = false;

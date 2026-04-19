@@ -45,6 +45,8 @@ private:
   uint32_t ble_window_started_ms_ = 0;
   uint32_t ble_window_duration_ms_ = 60000;
   uint32_t ble_window_deadline_ms_ = 0;
+  uint32_t last_short_press_ms_ = 0;
+  static constexpr uint32_t kDoubleTapThresholdMs = 400;
 };
 
 } // namespace leor

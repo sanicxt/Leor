@@ -7,6 +7,8 @@
 
 #include "esp_err.h"
 #include "leor/ota_service.hpp"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 namespace leor {
 
@@ -38,6 +40,7 @@ class BleService {
     OtaService ota_{};
     bool connected_ = false;
     bool advertising_enabled_ = true;
+    SemaphoreHandle_t notify_mutex_ = nullptr;
 };
 
 }  // namespace leor
