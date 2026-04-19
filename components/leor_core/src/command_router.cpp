@@ -480,6 +480,30 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         preferences_.putUInt("gcd", val);
         return "cd=" + std::to_string(gestures_.cooldown_ms());
     }
+    if (starts_with(cmd, "gst=")) {
+        const float val = std::atof(cmd.substr(4).c_str());
+        gestures_.set_shake_threshold(val);
+        preferences_.putFloat("gst", val);
+        return "gst=" + std::to_string(val);
+    }
+    if (starts_with(cmd, "gpt=")) {
+        const float val = std::atof(cmd.substr(4).c_str());
+        gestures_.set_pat_threshold(val);
+        preferences_.putFloat("gpt", val);
+        return "gpt=" + std::to_string(val);
+    }
+    if (starts_with(cmd, "gvt=")) {
+        const float val = std::atof(cmd.substr(4).c_str());
+        gestures_.set_swipe_threshold(val);
+        preferences_.putFloat("gvt", val);
+        return "gvt=" + std::to_string(val);
+    }
+    if (starts_with(cmd, "gtt=")) {
+        const float val = std::atof(cmd.substr(4).c_str());
+        gestures_.set_touch_threshold(val);
+        preferences_.putFloat("gtt", val);
+        return "gtt=" + std::to_string(val);
+    }
 
     if (cmd == "ble:") return std::string("ble:win=") + std::to_string(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
     if (starts_with(cmd, "ble:win=")) {

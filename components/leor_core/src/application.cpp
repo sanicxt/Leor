@@ -217,6 +217,11 @@ esp_err_t Application::start() {
                    preferences_.getUInt("gcf", 70),
                    preferences_.getUInt("gcd", 1500),
                    preferences_.getString("ga", "happy,angry,curious,neutral,love"));
+  gesture_.set_shake_threshold(preferences_.getFloat("gst", 200.0f));
+  gesture_.set_pat_threshold(preferences_.getFloat("gpt", 0.32f));
+  gesture_.set_swipe_threshold(preferences_.getFloat("gvt", 0.45f));
+  gesture_.set_touch_threshold(preferences_.getFloat("gtt", 0.05f));
+
   shuffle_.restore(preferences_.getBool("shuf_en", true),
                    preferences_.getUInt("shuf_emin", 2000),
                    preferences_.getUInt("shuf_emax", 5000),

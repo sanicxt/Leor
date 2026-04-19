@@ -29,6 +29,18 @@ class GestureService {
     uint32_t confidence_percent() const { return confidence_percent_; }
     void set_cooldown(uint32_t value) { cooldown_ms_ = value; }
     uint32_t cooldown_ms() const { return cooldown_ms_; }
+
+    // --- Threshold Tuning ---
+    void set_shake_threshold(float val) { shake_threshold_ = val; }
+    float shake_threshold() const { return shake_threshold_; }
+    void set_pat_threshold(float val) { pat_threshold_ = val; }
+    float pat_threshold() const { return pat_threshold_; }
+    void set_swipe_threshold(float val) { swipe_threshold_ = val; }
+    float swipe_threshold() const { return swipe_threshold_; }
+    void set_touch_threshold(float val) { touch_ratio_threshold_ = val; }
+    float touch_threshold() const { return touch_ratio_threshold_; }
+    // ------------------------
+
     void set_action(int index, const std::string& action);
     std::string action(int index) const;
     std::string list_json() const;
@@ -70,6 +82,12 @@ class GestureService {
     uint32_t reaction_time_ms_ = 1500;
     uint32_t confidence_percent_ = 70;
     uint32_t cooldown_ms_ = 1500;
+
+    float shake_threshold_ = 200.0f;
+    float pat_threshold_ = 0.32f;
+    float swipe_threshold_ = 0.45f;
+    float touch_ratio_threshold_ = 0.05f;
+
     static constexpr int kLabelCount = 5;
     const char* labels_[kLabelCount] = {"pat", "shake", "swipe", "pickup", "pet"};
     std::string actions_[kLabelCount] = {"happy", "angry", "curious", "neutral", "love"};

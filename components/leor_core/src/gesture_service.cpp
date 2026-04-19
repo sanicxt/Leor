@@ -90,7 +90,7 @@ std::string GestureService::poll(uint32_t now_ms, bool touch_active) {
 
     // 3. Sampling Window Management
     // Trigger window on any significant impulse or tilt
-    bool impulse = (gyro_mag > 150.0f || std::abs(az_delta) > 0.35f || axy_delta > 0.4f || (currently_tilted != was_tilted_));
+    bool impulse = (gyro_mag > (shake_threshold_ * 0.75f) || std::abs(az_delta) > (pat_threshold_ * 0.8f) || axy_delta > (swipe_threshold_ * 0.8f) || (currently_tilted != was_tilted_));
     
     if (impulse && sampling_start_ms_ == 0 && (now_ms - last_emit_ms_ > cooldown_ms_)) {
         sampling_start_ms_ = now_ms;
@@ -130,13 +130,12 @@ std::string GestureService::classify() {
              window_stats_.max_axy_delta, touch_ratio, window_stats_.tilt_triggered);
 
     // Rule 1: Shake (Violent energy)
-    if (window_stats_.max_gyro > 200.0f) {
+    if (window_stats_.max_gyro > shake_threshold_) {
         return actions_[1]; // shake
     }
 
     // Rule 2: Pat (Vertical impulse + ANY touch contact)
-    // Lowered impulse to 0.32 and ratio to 0.05 (handles fast taps)
-    if (window_stats_.max_az_delta > 0.32f && touch_ratio > 0.05f) {
+    if (window_stats_.max_az_delta > pat_threshold_ && touch_ratio > touch_ratio_threshold_) {
         return actions_[0]; // pat
     }
 
@@ -146,7 +145,7 @@ std::string GestureService::classify() {
     }
 
     // Rule 4: Nudge/Swipe (Horizontal impulse)
-    if (window_stats_.max_axy_delta > 0.45f) {
+    if (window_stats_.max_axy_delta > swipe_threshold_) {
         return actions_[2]; // swipe
     }
 
@@ -238,16 +237,20 @@ std::string GestureService::list_json() const {
                   "[{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"}]",
                   labels_[0], actions_[0].c_str(), labels_[1], actions_[1].c_str(), labels_[2], actions_[2].c_str(), labels_[3], actions_[3].c_str(), labels_[4], actions_[4].c_str());
     return buf;
-}
-
 std::string GestureService::settings_json() const {
-    char buf[768];
+    char buf[1024];
     std::snprintf(buf, sizeof(buf),
-                  "{\"gm\":%d,\"rt\":%u,\"cf\":%u,\"cd\":%u,\"map\":%s}",
+                  "{\"gm\":%d,\"rt\":%u,\"cf\":%u,\"cd\":%u,\"gst\":%.1f,\"gpt\":%.2f,\"gvt\":%.2f,\"gtt\":%.2f}",
                   matching_enabled_ ? 1 : 0,
                   static_cast<unsigned>(reaction_time_ms_),
                   static_cast<unsigned>(confidence_percent_),
                   static_cast<unsigned>(cooldown_ms_),
+                  shake_threshold_,
+                  pat_threshold_,
+                  swipe_threshold_,
+                  touch_ratio_threshold_);
+    return buf;
+}
                   list_json().c_str());
     return buf;
 }
