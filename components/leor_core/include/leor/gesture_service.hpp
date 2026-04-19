@@ -19,7 +19,8 @@ enum class GestureEvent : uint8_t {
 class GestureService {
   public:
     void start(bool dummy_enabled, int i2c_sda_pin = 10, int i2c_scl_pin = 7, DisplayBackend* display = nullptr);
-    GestureEvent poll(uint32_t now_ms);
+    void restore(bool matching, uint32_t rt, uint32_t cf, uint32_t cd, const std::string& actions_csv);
+    std::string poll(uint32_t now_ms);
     void set_matching_enabled(bool enabled) { matching_enabled_ = enabled; }
     bool matching_enabled() const { return matching_enabled_; }
     void set_reaction_time(uint32_t value) { reaction_time_ms_ = value; }

@@ -119,7 +119,7 @@ void ClockService::save_retained_state() {
                      use_24_hour_, tz_offset_minutes_};
 }
 
-void ClockService::restore(bool enabled, bool use24, int16_t tz_offset, uint64_t epoch_ms_value) {
+void ClockService::restore(bool enabled, bool use24, int16_t tz_offset, uint64_t epoch_ms_value, uint32_t manual_sec) {
     if (s_clock_state.magic == kClockStateMagic && s_clock_state.has_time) {
         // Deep sleep or soft reset — ESP-IDF maintains gettimeofday() via RTC.
         // Just restore our preference flags.
@@ -138,6 +138,8 @@ void ClockService::restore(bool enabled, bool use24, int16_t tz_offset, uint64_t
             has_time_ = true;
             has_epoch_ = true;
             set_system_time(epoch_ms_value);
+        } else if (manual_sec != 0) {
+            set_time_of_day(manual_sec / 3600, (manual_sec % 3600) / 60, manual_sec % 60);
         } else {
             has_time_ = false;
             has_epoch_ = false;

@@ -10,7 +10,7 @@ namespace leor {
 
 class ClockService {
   public:
-    void restore(bool enabled, bool use24, int16_t tz_offset, uint64_t epoch_ms);
+    void restore(bool enabled, bool use24, int16_t tz_offset, uint64_t epoch_ms, uint32_t manual_sec);
     void set_enabled(bool enabled);
     bool enabled() const { return enabled_; }
     void set_use_24_hour(bool enabled);

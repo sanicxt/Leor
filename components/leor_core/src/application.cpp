@@ -187,12 +187,20 @@ esp_err_t Application::start() {
   eyes_->set_border_radius(preferences_.getInt("er", 8),
                            preferences_.getInt("er", 8));
   eyes_->set_mouth_size(preferences_.getInt("mw", 20), 6);
+  eyes_->setGazeSpeed(static_cast<float>(preferences_.getInt("gs", 6)));
+  eyes_->setOpennessSpeed(static_cast<float>(preferences_.getInt("os", 12)));
+  eyes_->setSquishSpeed(static_cast<float>(preferences_.getInt("ss", 10)));
   eyes_->set_breathing(preferences_.getBool("br_en", true),
                        preferences_.getFloat("br_int", 0.08f),
                        preferences_.getFloat("br_spd", 0.3f));
 
   gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
                  config_.display.scl_pin, display_.get());
+  gesture_.restore(preferences_.getBool("gm", true),
+                   preferences_.getUInt("grt", 1500),
+                   preferences_.getUInt("gcf", 70),
+                   preferences_.getUInt("gcd", 1500),
+                   preferences_.getString("ga", "happy,angry,curious,neutral"));
   shuffle_.restore(preferences_.getBool("shuf_en", true),
                    preferences_.getUInt("shuf_emin", 2000),
                    preferences_.getUInt("shuf_emax", 5000),
@@ -201,7 +209,8 @@ esp_err_t Application::start() {
   clock_.restore(preferences_.getBool("clk_on", false),
                  preferences_.getBool("clk_24", true),
                  static_cast<int16_t>(preferences_.getInt("clk_tz", 0)),
-                 preferences_.getULong64("clk_epoch", 0));
+                 preferences_.getULong64("clk_epoch", 0),
+                 preferences_.getUInt("clk_sec", 0));
   was_clock_enabled_ = clock_.enabled();
 
   commands_ = std::make_unique<CommandRouter>(preferences_, config_.display,
@@ -215,7 +224,7 @@ esp_err_t Application::start() {
     return commands_->handle(cmd, now_ms);
   }));
   open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
-  display_->set_contrast(0x7f);
+  display_->set_contrast(static_cast<uint8_t>(preferences_.getUInt("disp_con", 0x7f)));
 
   ESP_LOGI(kTag, "application started");
   return ESP_OK;
@@ -326,25 +335,9 @@ void Application::tick() {
   default:
     break;
   }
-  const GestureEvent event = gesture_.poll(now_ms);
-
-  switch (event) {
-  case GestureEvent::kPat:
-    eyes_->set_mood(HAPPY);
-    break;
-  case GestureEvent::kShake:
-    eyes_->set_mood(ANGRY);
-    break;
-  case GestureEvent::kSwipe:
-    eyes_->set_position(POS_E);
-    break;
-  case GestureEvent::kPickup:
-    eyes_->set_mood(DEFAULT);
-    eyes_->set_position(POS_N);
-    break;
-  case GestureEvent::kNone:
-  default:
-    break;
+  const std::string gesture_cmd = gesture_.poll(now_ms);
+  if (!gesture_cmd.empty()) {
+    commands_->handle(gesture_cmd, now_ms);
   }
 
   const char *shuffle_cmd = nullptr;

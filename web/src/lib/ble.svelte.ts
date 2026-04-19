@@ -32,7 +32,7 @@ export const bleState = $state({
         ew: 36, eh: 36, es: 10, er: 8,
         mw: 20, lt: 1000, vt: 2000, bi: 3,
         gs: 6, os: 12, ss: 10, td: 3000, // gaze speed, openness speed, squish speed, touch hold delay (ms)
-        wp: 0, pp: 1  // wake GPIO pin, power-control GPIO pin (RTC-capable, 0-5 on ESP32-C3)
+        wp: 0, pp: 1, ct: 127 // wake GPIO pin, power-control GPIO pin, contrast (0-255)
     },
     display: {
         type: 'sh1106',  // sh1106 or ssd1306
@@ -86,6 +86,7 @@ export function getSettingsSs() { return bleState.settings.ss; }
 export function getSettingsTd() { return bleState.settings.td; }
 export function getSettingsWp() { return bleState.settings.wp; }
 export function getSettingsPp() { return bleState.settings.pp; }
+export function getSettingsCt() { return bleState.settings.ct; }
 
 export function getGestureMatching() { return bleState.gestureMatching; }
 export function getGestureReactionTime() { return bleState.gestureReactionTime; }
@@ -123,6 +124,7 @@ export function setSettingsSs(val: number) { bleState.settings.ss = val; }
 export function setSettingsTd(val: number) { bleState.settings.td = val; }
 export function setSettingsWp(val: number) { bleState.settings.wp = val; }
 export function setSettingsPp(val: number) { bleState.settings.pp = val; }
+export function setSettingsCt(val: number) { bleState.settings.ct = val; }
 
 export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
 export function setGestureReactionTime(val: number) { bleState.gestureReactionTime = val; }

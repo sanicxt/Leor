@@ -27,25 +27,60 @@ void GestureService::start(bool dummy_enabled, int i2c_sda_pin, int i2c_scl_pin,
     }
 }
 
-GestureEvent GestureService::poll(uint32_t now_ms) {
+void GestureService::restore(bool matching, uint32_t rt, uint32_t cf, uint32_t cd, const std::string& actions_csv) {
+    matching_enabled_ = matching;
+    reaction_time_ms_ = rt;
+    confidence_percent_ = cf;
+    cooldown_ms_ = cd;
+
+    if (!actions_csv.empty()) {
+        std::size_t start = 0;
+        std::size_t end = actions_csv.find(',');
+        int i = 0;
+        while (i < kLabelCount) {
+            if (end != std::string::npos) {
+                actions_[i] = actions_csv.substr(start, end - start);
+                start = end + 1;
+                end = actions_csv.find(',', start);
+            } else {
+                actions_[i] = actions_csv.substr(start);
+                break;
+            }
+            i++;
+        }
+    }
+}
+
+std::string GestureService::poll(uint32_t now_ms) {
+    if (!matching_enabled_) {
+        return "";
+    }
+
+    GestureEvent event = GestureEvent::kNone;
+
     if (!dummy_enabled_) {
         if (!mpu_available_ || !mpu_calibrated_) {
-            return GestureEvent::kNone;
+            return "";
         }
         if (now_ms - last_mpu_read_ms_ < 20) {
-            return GestureEvent::kNone;
+            return "";
         }
         last_mpu_read_ms_ = now_ms;
         read_mpu_sample();
-        return GestureEvent::kNone;
+        
+        // (IMU matching logic would go here if implemented)
+        // For now, it returns kNone
     }
 
-    if (last_emit_ms_ == 0) {
+    if (event != GestureEvent::kNone && (now_ms - last_emit_ms_ > cooldown_ms_)) {
         last_emit_ms_ = now_ms;
-        return GestureEvent::kNone;
+        int idx = static_cast<int>(event) - 1;
+        if (idx >= 0 && idx < kLabelCount) {
+            return actions_[idx];
+        }
     }
 
-    return GestureEvent::kNone;
+    return "";
 }
 
 bool GestureService::init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* display) {
