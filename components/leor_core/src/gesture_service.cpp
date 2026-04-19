@@ -1,6 +1,7 @@
 #include "leor/gesture_service.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -51,35 +52,105 @@ void GestureService::restore(bool matching, uint32_t rt, uint32_t cf, uint32_t c
     }
 }
 
-std::string GestureService::poll(uint32_t now_ms) {
-    if (!matching_enabled_) {
+std::string GestureService::poll(uint32_t now_ms, bool touch_active) {
+    if (!matching_enabled_ || !mpu_available_ || !mpu_calibrated_) {
         return "";
     }
 
-    GestureEvent event = GestureEvent::kNone;
-
-    if (!dummy_enabled_) {
-        if (!mpu_available_ || !mpu_calibrated_) {
-            return "";
-        }
-        if (now_ms - last_mpu_read_ms_ < 20) {
-            return "";
-        }
-        last_mpu_read_ms_ = now_ms;
-        read_mpu_sample();
-        
-        // (IMU matching logic would go here if implemented)
-        // For now, it returns kNone
+    if (now_ms - last_mpu_read_ms_ < 20) {
+        return "";
+    }
+    last_mpu_read_ms_ = now_ms;
+    if (!read_mpu_sample()) {
+        return "";
     }
 
-    if (event != GestureEvent::kNone && (now_ms - last_emit_ms_ > cooldown_ms_)) {
-        last_emit_ms_ = now_ms;
-        int idx = static_cast<int>(event) - 1;
-        if (idx >= 0 && idx < kLabelCount) {
-            return actions_[idx];
+    const auto& d = mpu_.data();
+    
+    // 1. Maintain Baselines
+    az_lp_ = az_lp_ * 0.95f + d.azG * 0.05f; 
+    ax_lp_ = ax_lp_ * 0.95f + d.axG * 0.05f;
+    ay_lp_ = ay_lp_ * 0.95f + d.ayG * 0.05f;
+
+    const bool currently_tilted = (std::abs(d.pitch) > 30.0f || std::abs(d.roll) > 30.0f);
+    const float gyro_mag = std::sqrt(d.gxDps * d.gxDps + d.gyDps * d.gyDps + d.gzDps * d.gzDps);
+    const float az_delta = d.azG - az_lp_;
+    const float axy_delta = std::max(std::abs(d.axG - ax_lp_), std::abs(d.ayG - ay_lp_));
+
+    // 2. Continuous State Detection (Pet)
+    if (touch_active) {
+        if (!was_touching_) touch_start_ms_ = now_ms;
+        if (now_ms - touch_start_ms_ > 1500 && (now_ms - last_emit_ms_ > cooldown_ms_)) {
+            last_emit_ms_ = now_ms;
+            sampling_start_ms_ = 0; // Pet overrides window
+            ESP_LOGI("leor_gest", "ALGO: PET DETECTED (Long Hold)");
+            return actions_[4];
         }
     }
 
+    // 3. Sampling Window Management
+    // Trigger window on any significant impulse or tilt
+    bool impulse = (gyro_mag > 150.0f || std::abs(az_delta) > 0.35f || axy_delta > 0.4f || (currently_tilted != was_tilted_));
+    
+    if (impulse && sampling_start_ms_ == 0 && (now_ms - last_emit_ms_ > cooldown_ms_)) {
+        sampling_start_ms_ = now_ms;
+        window_stats_.reset();
+        ESP_LOGI("leor_gest", "ALGO: WINDOW START");
+    }
+
+    if (sampling_start_ms_ > 0) {
+        // Feature Accumulation
+        window_stats_.total_samples++;
+        if (touch_active) window_stats_.touch_samples++;
+        if (gyro_mag > window_stats_.max_gyro) window_stats_.max_gyro = gyro_mag;
+        if (az_delta > window_stats_.max_az_delta) window_stats_.max_az_delta = az_delta;
+        if (axy_delta > window_stats_.max_axy_delta) window_stats_.max_axy_delta = axy_delta;
+        if (currently_tilted && !was_tilted_) window_stats_.tilt_triggered = true;
+
+        if (now_ms - sampling_start_ms_ >= 1000) { // 1 second window
+            std::string result = classify();
+            sampling_start_ms_ = 0;
+            if (!result.empty()) {
+                last_emit_ms_ = now_ms;
+                return result;
+            }
+        }
+    }
+
+    was_touching_ = touch_active;
+    was_tilted_ = currently_tilted;
+    return "";
+}
+
+std::string GestureService::classify() {
+    float touch_ratio = (float)window_stats_.touch_samples / (float)window_stats_.total_samples;
+    
+    ESP_LOGI("leor_gest", "ALGO EVAL: G=%.1f, AZ=%.2f, AXY=%.2f, T=%.2f, Tilt=%d", 
+             window_stats_.max_gyro, window_stats_.max_az_delta, 
+             window_stats_.max_axy_delta, touch_ratio, window_stats_.tilt_triggered);
+
+    // Rule 1: Shake (Violent energy)
+    if (window_stats_.max_gyro > 200.0f) {
+        return actions_[1]; // shake
+    }
+
+    // Rule 2: Pat (Vertical impulse + ANY touch contact)
+    // Lowered impulse to 0.32 and ratio to 0.05 (handles fast taps)
+    if (window_stats_.max_az_delta > 0.32f && touch_ratio > 0.05f) {
+        return actions_[0]; // pat
+    }
+
+    // Rule 3: Pickup (Priority 3, after Pat)
+    if (window_stats_.tilt_triggered) {
+        return actions_[3]; // pickup
+    }
+
+    // Rule 4: Nudge/Swipe (Horizontal impulse)
+    if (window_stats_.max_axy_delta > 0.45f) {
+        return actions_[2]; // swipe
+    }
+
+    ESP_LOGI("leor_gest", "ALGO: DISCARDED (Below Confidence)");
     return "";
 }
 
@@ -90,7 +161,7 @@ bool GestureService::init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* 
 
     int guard = 0;
     int last_drawn_pct = -1;
-    while (!mpu_.is_calibrated() && guard < 1200) {
+    while (!mpu_.is_calibrated() && guard < 5000) {
         const bool updated = mpu_.update();
         if (display != nullptr) {
             const int pct = (static_cast<int>(mpu_.calibration_progress()) * 100) / 500;
@@ -100,12 +171,13 @@ bool GestureService::init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* 
             }
         }
         if (!updated) {
-            vTaskDelay(pdMS_TO_TICKS(1));
+            vTaskDelay(pdMS_TO_TICKS(2));
         }
         ++guard;
     }
 
     if (!mpu_.is_calibrated()) {
+        ESP_LOGE("leor_gest", "MPU calibration timed out! check I2C / sensor orientation");
         return false;
     }
 
@@ -115,8 +187,6 @@ bool GestureService::init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* 
         display->clear();
         display->send_buffer();
     }
-
-    mpu_.sleep();
 
     return true;
 }
@@ -163,10 +233,10 @@ std::string GestureService::action(int index) const {
 }
 
 std::string GestureService::list_json() const {
-    char buf[512];
+    char buf[768];
     std::snprintf(buf, sizeof(buf),
-                  "[{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"}]",
-                  labels_[0], actions_[0].c_str(), labels_[1], actions_[1].c_str(), labels_[2], actions_[2].c_str(), labels_[3], actions_[3].c_str());
+                  "[{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"}]",
+                  labels_[0], actions_[0].c_str(), labels_[1], actions_[1].c_str(), labels_[2], actions_[2].c_str(), labels_[3], actions_[3].c_str(), labels_[4], actions_[4].c_str());
     return buf;
 }
 

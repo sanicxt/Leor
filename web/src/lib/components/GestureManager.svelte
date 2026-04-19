@@ -32,42 +32,42 @@
         "xd",
     ];
 
-    // Edge Impulse model gestures (5 classes @ 23Hz)
+    // Firmware gesture slots (Matched by label name)
     let gestures = $state([
         {
-            name: "neutral",
-            action: "",
-            icon: "⏸️",
-            description: "Device at rest",
-            color: "zinc",
-        },
-        {
-            name: "patpat",
+            name: "pat",
             action: "happy",
             icon: "👋",
-            description: "Gentle pats",
+            description: "Quick tap & lift",
             color: "amber",
         },
         {
-            name: "pickup",
-            action: "curious",
-            icon: "🤲",
-            description: "Lift up device",
-            color: "sky",
-        },
-        {
             name: "shake",
-            action: "confused",
+            action: "angry",
             icon: "🔄",
-            description: "Shake motion",
+            description: "Violent shaking",
             color: "violet",
         },
         {
             name: "swipe",
-            action: "surprised",
+            action: "curious",
             icon: "👉",
-            description: "Swipe gesture",
+            description: "Horizontal nudge",
             color: "rose",
+        },
+        {
+            name: "pickup",
+            action: "neutral",
+            icon: "🤲",
+            description: "Lift or tilt device",
+            color: "sky",
+        },
+        {
+            name: "pet",
+            action: "love",
+            icon: "💗",
+            description: "Gently held touch",
+            color: "pink",
         },
     ]);
 
@@ -185,7 +185,7 @@
     <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between flex-wrap gap-3">
         <div>
             <h2 class="text-xl font-black uppercase">Gesture Recognition</h2>
-            <p class="text-sm font-bold opacity-80">Edge Impulse • 5 gestures @ 23Hz</p>
+            <p class="text-sm font-bold opacity-80">TTP223 + MPU6050 • Hybrid Logic</p>
         </div>
 
         <div class="flex items-center gap-3">

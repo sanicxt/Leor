@@ -216,7 +216,7 @@ esp_err_t Application::start() {
                    preferences_.getUInt("grt", 1500),
                    preferences_.getUInt("gcf", 70),
                    preferences_.getUInt("gcd", 1500),
-                   preferences_.getString("ga", "happy,angry,curious,neutral"));
+                   preferences_.getString("ga", "happy,angry,curious,neutral,love"));
   shuffle_.restore(preferences_.getBool("shuf_en", true),
                    preferences_.getUInt("shuf_emin", 2000),
                    preferences_.getUInt("shuf_emax", 5000),
@@ -364,10 +364,26 @@ void Application::tick() {
   default:
     break;
   }
-  const std::string gesture_cmd = gesture_.poll(now_ms);
+  const std::string gesture_cmd = gesture_.poll(now_ms, power_.is_pressed());
   if (!gesture_cmd.empty()) {
     commands_->handle(gesture_cmd, now_ms);
   }
+
+  // --- Tilt Compensation (Passive) ---
+  if (!clock_.enabled() && !menu_.is_open() && eyes_) {
+    float p = gesture_.pitch();
+    float r = gesture_.roll();
+    if (std::abs(p) > 10.0f || std::abs(r) > 10.0f) {
+        // Simple mapping: 45 deg tilt = 0.5 gaze offset
+        float gx = std::clamp(-r / 45.0f, -0.6f, 0.6f);
+        float gy = std::clamp(-p / 45.0f, -0.6f, 0.6f);
+        eyes_->set_gaze_manual(gx, gy);
+    } else {
+        // Return to neutral if not tilted
+        // eyes_->set_gaze_manual(0, 0); 
+    }
+  }
+  // -----------------------------------
 
   const char *shuffle_cmd = nullptr;
   if (!clock_.enabled() && shuffle_.should_emit(now_ms, false, false, &shuffle_cmd) &&
