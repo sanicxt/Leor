@@ -370,7 +370,7 @@ void Application::tick() {
     break;
   }
   const std::string gesture_cmd = gesture_.poll(now_ms, power_.is_pressed());
-  if (!gesture_cmd.empty()) {
+  if (!gesture_cmd.empty() && !clock_.enabled() && !menu_.is_open()) {
     commands_->handle(gesture_cmd, now_ms);
   }
 
@@ -397,6 +397,9 @@ void Application::tick() {
   }
 
   const bool is_clock_enabled = clock_.enabled();
+  const bool is_suspended = is_clock_enabled || menu_.is_open();
+  gesture_.set_suspended(is_suspended);
+
   if (is_clock_enabled != was_clock_enabled_) {
     display_->clear();
     display_->send_buffer();

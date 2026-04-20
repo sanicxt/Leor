@@ -21,8 +21,10 @@ class GestureService {
     void start(bool dummy_enabled, int i2c_sda_pin = 10, int i2c_scl_pin = 7, DisplayBackend* display = nullptr);
     void restore(bool matching, uint32_t rt, uint32_t cf, uint32_t cd, const std::string& actions_csv);
     std::string poll(uint32_t now_ms, bool touch_active);
-    void set_matching_enabled(bool enabled) { matching_enabled_ = enabled; }
+    void set_matching_enabled(bool enabled);
     bool matching_enabled() const { return matching_enabled_; }
+    void set_suspended(bool suspended);
+    bool suspended() const { return suspended_; }
     void set_reaction_time(uint32_t value) { reaction_time_ms_ = value; }
     uint32_t reaction_time_ms() const { return reaction_time_ms_; }
     void set_confidence(uint32_t value) { confidence_percent_ = value; }
@@ -72,12 +74,15 @@ class GestureService {
     };
 
     GestureFeatures window_stats_{};
-    uint32_t sampling_start_ms_ = 0;
-    
+    enum class State { kReady, kSampling, kActive, kCooldown };
+    State state_ = State::kReady;
+    uint32_t state_start_ms_ = 0;
+
     std::string classify();
 
     bool dummy_enabled_ = true;
     bool matching_enabled_ = true;
+    bool suspended_ = false;
     uint32_t last_emit_ms_ = 0;
     uint32_t reaction_time_ms_ = 1500;
     uint32_t confidence_percent_ = 70;

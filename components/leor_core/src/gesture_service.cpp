@@ -29,7 +29,6 @@ void GestureService::start(bool dummy_enabled, int i2c_sda_pin, int i2c_scl_pin,
 }
 
 void GestureService::restore(bool matching, uint32_t rt, uint32_t cf, uint32_t cd, const std::string& actions_csv) {
-    matching_enabled_ = matching;
     reaction_time_ms_ = rt;
     confidence_percent_ = cf;
     cooldown_ms_ = cd;
@@ -50,10 +49,49 @@ void GestureService::restore(bool matching, uint32_t rt, uint32_t cf, uint32_t c
             i++;
         }
     }
+    
+    // Set matching state last to handle MPU sleep/wake correctly
+    set_matching_enabled(matching);
+}
+
+void GestureService::set_matching_enabled(bool enabled) {
+    if (matching_enabled_ == enabled) return;
+    
+    matching_enabled_ = enabled;
+    if (mpu_available_) {
+        // Only wake if we are NOT suspended
+        if (enabled && !suspended_) {
+            ESP_LOGI("leor_gest", "Gestures enabled: Waking MPU");
+            mpu_.wake();
+        } else if (!enabled) {
+            ESP_LOGI("leor_gest", "Gestures disabled: Sleeping MPU");
+            mpu_.sleep();
+            state_ = State::kReady;
+        }
+    }
+}
+
+void GestureService::set_suspended(bool suspended) {
+    if (suspended_ == suspended) return;
+    suspended_ = suspended;
+
+    if (mpu_available_) {
+        // If we are suspending, always sleep
+        if (suspended) {
+            ESP_LOGI("leor_gest", "System suspended: Sleeping MPU");
+            mpu_.sleep();
+            state_ = State::kReady;
+        } 
+        // If we are resuming, only wake if user enabled gestures
+        else if (matching_enabled_) {
+            ESP_LOGI("leor_gest", "System resumed: Waking MPU");
+            mpu_.wake();
+        }
+    }
 }
 
 std::string GestureService::poll(uint32_t now_ms, bool touch_active) {
-    if (!matching_enabled_ || !mpu_available_ || !mpu_calibrated_) {
+    if (!matching_enabled_ || suspended_ || !mpu_available_ || !mpu_calibrated_) {
         return "";
     }
 
@@ -67,7 +105,7 @@ std::string GestureService::poll(uint32_t now_ms, bool touch_active) {
 
     const auto& d = mpu_.data();
     
-    // 1. Maintain Baselines
+    // Baselines
     az_lp_ = az_lp_ * 0.95f + d.azG * 0.05f; 
     ax_lp_ = ax_lp_ * 0.95f + d.axG * 0.05f;
     ay_lp_ = ay_lp_ * 0.95f + d.ayG * 0.05f;
@@ -77,43 +115,72 @@ std::string GestureService::poll(uint32_t now_ms, bool touch_active) {
     const float az_delta = d.azG - az_lp_;
     const float axy_delta = std::max(std::abs(d.axG - ax_lp_), std::abs(d.ayG - ay_lp_));
 
-    // 2. Continuous State Detection (Pet)
+    // --- State Machine ---
+
+    // 1. PET Override (Priority)
     if (touch_active) {
         if (!was_touching_) touch_start_ms_ = now_ms;
-        if (now_ms - touch_start_ms_ > 1500 && (now_ms - last_emit_ms_ > cooldown_ms_)) {
-            last_emit_ms_ = now_ms;
-            sampling_start_ms_ = 0; // Pet overrides window
-            ESP_LOGI("leor_gest", "ALGO: PET DETECTED (Long Hold)");
-            return actions_[4];
+        if (now_ms - touch_start_ms_ > 1500 && state_ != State::kActive) {
+            state_ = State::kActive;
+            state_start_ms_ = now_ms;
+            ESP_LOGI("leor_gest", "LIFE: PET DETECTED -> Entering ACTIVE");
+            return actions_[4]; // love
         }
     }
 
-    // 3. Sampling Window Management
-    // Trigger window on any significant impulse or tilt
-    bool impulse = (gyro_mag > (shake_threshold_ * 0.75f) || std::abs(az_delta) > (pat_threshold_ * 0.8f) || axy_delta > (swipe_threshold_ * 0.8f) || (currently_tilted != was_tilted_));
-    
-    if (impulse && sampling_start_ms_ == 0 && (now_ms - last_emit_ms_ > cooldown_ms_)) {
-        sampling_start_ms_ = now_ms;
-        window_stats_.reset();
-        ESP_LOGI("leor_gest", "ALGO: WINDOW START");
-    }
-
-    if (sampling_start_ms_ > 0) {
-        // Feature Accumulation
-        window_stats_.total_samples++;
-        if (touch_active) window_stats_.touch_samples++;
-        if (gyro_mag > window_stats_.max_gyro) window_stats_.max_gyro = gyro_mag;
-        if (az_delta > window_stats_.max_az_delta) window_stats_.max_az_delta = az_delta;
-        if (axy_delta > window_stats_.max_axy_delta) window_stats_.max_axy_delta = axy_delta;
-        if (currently_tilted && !was_tilted_) window_stats_.tilt_triggered = true;
-
-        if (now_ms - sampling_start_ms_ >= 1000) { // 1 second window
-            std::string result = classify();
-            sampling_start_ms_ = 0;
-            if (!result.empty()) {
-                last_emit_ms_ = now_ms;
-                return result;
+    switch (state_) {
+        case State::kReady: {
+            bool impulse = (gyro_mag > (shake_threshold_ * 0.75f) || std::abs(az_delta) > (pat_threshold_ * 0.8f) || axy_delta > (swipe_threshold_ * 0.8f) || (currently_tilted != was_tilted_));
+            if (impulse) {
+                state_ = State::kSampling;
+                state_start_ms_ = now_ms;
+                window_stats_.reset();
+                ESP_LOGI("leor_gest", "LIFE: READY -> SAMPLING (800ms)");
             }
+            break;
+        }
+
+        case State::kSampling: {
+            window_stats_.total_samples++;
+            if (touch_active) window_stats_.touch_samples++;
+            if (gyro_mag > window_stats_.max_gyro) window_stats_.max_gyro = gyro_mag;
+            if (az_delta > window_stats_.max_az_delta) window_stats_.max_az_delta = az_delta;
+            if (axy_delta > window_stats_.max_axy_delta) window_stats_.max_axy_delta = axy_delta;
+            if (currently_tilted && !was_tilted_) window_stats_.tilt_triggered = true;
+
+            if (now_ms - state_start_ms_ >= 800) {
+                std::string result = classify();
+                if (!result.empty()) {
+                    state_ = State::kActive;
+                    state_start_ms_ = now_ms;
+                    ESP_LOGI("leor_gest", "LIFE: SAMPLING -> ACTIVE (Duration: %ums)", (unsigned)reaction_time_ms_);
+                    return result;
+                } else {
+                    state_ = State::kReady;
+                    ESP_LOGI("leor_gest", "LIFE: SAMPLING -> READY (No match)");
+                }
+            }
+            break;
+        }
+
+        case State::kActive: {
+            // Wait for Expression Duration (rt)
+            if (now_ms - state_start_ms_ >= reaction_time_ms_) {
+                state_ = State::kCooldown;
+                state_start_ms_ = now_ms;
+                ESP_LOGI("leor_gest", "LIFE: ACTIVE -> COOLDOWN (Lockout: %ums)", (unsigned)cooldown_ms_);
+                return "neutral"; // Return to neutral automatically
+            }
+            break;
+        }
+
+        case State::kCooldown: {
+            // Wait for Cooldown (cd)
+            if (now_ms - state_start_ms_ >= cooldown_ms_) {
+                state_ = State::kReady;
+                ESP_LOGI("leor_gest", "LIFE: COOLDOWN -> READY");
+            }
+            break;
         }
     }
 
@@ -237,6 +304,8 @@ std::string GestureService::list_json() const {
                   "[{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"}]",
                   labels_[0], actions_[0].c_str(), labels_[1], actions_[1].c_str(), labels_[2], actions_[2].c_str(), labels_[3], actions_[3].c_str(), labels_[4], actions_[4].c_str());
     return buf;
+}
+
 std::string GestureService::settings_json() const {
     char buf[1024];
     std::snprintf(buf, sizeof(buf),
@@ -249,9 +318,6 @@ std::string GestureService::settings_json() const {
                   pat_threshold_,
                   swipe_threshold_,
                   touch_ratio_threshold_);
-    return buf;
-}
-                  list_json().c_str());
     return buf;
 }
 
