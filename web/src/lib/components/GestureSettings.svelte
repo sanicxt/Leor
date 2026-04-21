@@ -16,7 +16,14 @@
         setGestureSwipeThreshold,
         getGestureTouchThreshold,
         setGestureTouchThreshold,
+        getGestureInverted,
+        setGestureInverted,
     } from "$lib/ble.svelte";
+
+    async function updateInversion(val: boolean) {
+        setGestureInverted(val);
+        await sendCommand(`ginv=${val ? 1 : 0}`);
+    }
 
     async function updateReactionTime(val: number) {
         setGestureReactionTime(val);
@@ -97,6 +104,16 @@
         </button>
         <button onclick={applyStrict} disabled={!bleState.connected} class="bento-button py-2 bg-paper text-ink text-[10px] font-black uppercase tracking-tight flex items-center justify-center gap-1.5">
             <span class="text-base">🔒</span> STRICT
+        </button>
+    </div>
+    <div class="flex items-center justify-between p-3 rounded-2xl bg-paper/30 border-2 border-bento-border/10">
+        <span class="text-[10px] font-black uppercase tracking-widest text-ink/70">Invert Y Axis (Pitch)</span>
+        <button            class="w-10 h-6 rounded-full border-2 border-bento-border transition-all relative {getGestureInverted() ? 'bg-bento-blue' : 'bg-paper'}"
+            aria-label="Invert gyro axes"
+            onclick={() => updateInversion(!getGestureInverted())}
+            disabled={!bleState.connected}
+        >
+            <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full border border-bento-border bg-paper transition-transform duration-200 {getGestureInverted() ? 'translate-x-4' : 'translate-x-0'}"></div>
         </button>
     </div>
 

@@ -309,8 +309,9 @@ std::string GestureService::list_json() const {
 std::string GestureService::settings_json() const {
     char buf[1024];
     std::snprintf(buf, sizeof(buf),
-                  "{\"gm\":%d,\"rt\":%u,\"cf\":%u,\"cd\":%u,\"gst\":%.1f,\"gpt\":%.2f,\"gvt\":%.2f,\"gtt\":%.2f}",
+                  "{\"gm\":%d,\"gi\":%d,\"rt\":%u,\"cf\":%u,\"cd\":%u,\"gst\":%.1f,\"gpt\":%.2f,\"gvt\":%.2f,\"gtt\":%.2f}",
                   matching_enabled_ ? 1 : 0,
+                  inverted_ ? 1 : 0,
                   static_cast<unsigned>(reaction_time_ms_),
                   static_cast<unsigned>(confidence_percent_),
                   static_cast<unsigned>(cooldown_ms_),
