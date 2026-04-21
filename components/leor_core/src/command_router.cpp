@@ -80,7 +80,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
     const unsigned ble_window_ms = static_cast<unsigned>(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
     std::snprintf(
         buf, sizeof(buf),
-        "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"td\":%u,\"wp\":%u,\"pp\":%u},"
+        "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"ct\":%u,\"td\":%u,\"wp\":%u,\"pp\":%u},"
         "\"display\":{\"type\":\"%s\",\"addr\":\"0x%02X\"},"
         "\"state\":{\"shuf\":%d,\"mpu\":%d,\"clk\":%d},"
         "\"clock\":{\"on\":%d,\"tz\":%d,\"sec\":%u,\"fmt\":%d},"
@@ -90,10 +90,11 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
         "\"gesture\":%s}",
         eyes_.eye_width(), eyes_.eye_height(), eyes_.space_between(), eyes_.border_radius(), eyes_.mouth_width(),
         static_cast<int>(preferences_.getInt("bi", 3)), static_cast<int>(preferences_.getInt("gs", 6)), static_cast<int>(preferences_.getInt("os", 12)), static_cast<int>(preferences_.getInt("ss", 10)),
+        static_cast<unsigned>(preferences_.getUInt("disp_con", 0x7f)),
         static_cast<unsigned>(power_.hold_ms()), static_cast<unsigned>(preferences_.getUInt("wake_pin", 0)), static_cast<unsigned>(preferences_.getUInt("pwr_pin", 1)),
         display_config_.controller == DisplayController::kSsd1306 ? "ssd1306" : "sh1106", display_config_.i2c_address,
         shuffle_.enabled() ? 1 : 0, mpu_verbose_ ? 1 : 0, clock_.enabled() ? 1 : 0,
-        clock_.enabled() ? 1 : 0, clock_.tz_offset(), static_cast<unsigned>(clock_.seconds_of_day(now_ms)), clock_.use_24_hour() ? 24 : 12,
+        clock_.enabled() ? 1 : 0, clock_.tz_offset(), static_cast<unsigned>(clock_.seconds_of_day()), clock_.use_24_hour() ? 24 : 12,
         static_cast<unsigned>(shuffle_.expr_min_ms() / 1000U), static_cast<unsigned>(shuffle_.expr_max_ms() / 1000U), static_cast<unsigned>(shuffle_.neutral_min_ms() / 1000U), static_cast<unsigned>(shuffle_.neutral_max_ms() / 1000U),
         eyes_.get_breathing_enabled() ? 1 : 0, eyes_.get_breathing_intensity(), eyes_.get_breathing_speed(),
         ble_window_ms, gestures_.settings_json().c_str());
@@ -239,6 +240,15 @@ std::string CommandRouter::handle_display(const std::string& params) {
         }
         return "display:addr invalid. Use hex format: 0x3C or 0x3D";
     }
+    if (starts_with(params, "contrast=")) {
+        const int value = std::atoi(params.substr(9).c_str());
+        if (value >= 0 && value <= 255) {
+            display_.set_contrast(static_cast<uint8_t>(value));
+            preferences_.putUInt("disp_con", static_cast<uint32_t>(value));
+            return "display:contrast=" + std::to_string(value) + " saved";
+        }
+        return "display:contrast invalid. Use 0-255";
+    }
     if (params == "test") {
         display_.clear();
         display_.set_font_medium();
@@ -257,27 +267,27 @@ std::string CommandRouter::handle_display(const std::string& params) {
         std::snprintf(buf, sizeof(buf), "Display: %s @ 0x%02X (%dx%d)", display_config_.controller == DisplayController::kSsd1306 ? "SSD1306" : "SH1106", display_config_.i2c_address, display_.width(), display_.height());
         return buf;
     }
-    return "display: usage - type=<sh1106|ssd1306>, addr=<hex>, test, clear, info";
+    return "display: usage - type=<sh1106|ssd1306>, addr=<hex>, contrast=<0-255>, test, clear, info";
 }
 
 std::string CommandRouter::handle_clock(const std::string& params, uint32_t now_ms) {
-    if (params.empty()) return clock_.status_string(now_ms, ble_.connected());
+    if (params.empty()) return clock_.status_string(ble_.connected());
     if (params == "on") {
         clock_.set_enabled(true);
         preferences_.putBool("clk_on", true);
-        return clock_.status_string(now_ms, ble_.connected());
+        return clock_.status_string(ble_.connected());
     }
     if (params == "off") {
         clock_.set_enabled(false);
         preferences_.putBool("clk_on", false);
-        return clock_.status_string(now_ms, ble_.connected());
+        return clock_.status_string(ble_.connected());
     }
     if (starts_with(params, "fmt=")) {
         const int fmt = std::atoi(params.substr(4).c_str());
         if (fmt == 12 || fmt == 24) {
             clock_.set_use_24_hour(fmt == 24);
             preferences_.putBool("clk_24", fmt == 24);
-            return clock_.status_string(now_ms, ble_.connected());
+            return clock_.status_string(ble_.connected());
         }
         return "clock:fmt invalid. Use 12 or 24";
     }
@@ -286,11 +296,11 @@ std::string CommandRouter::handle_clock(const std::string& params, uint32_t now_
         const auto comma = value.find(',');
         const uint64_t epoch = std::strtoull(value.substr(0, comma).c_str(), nullptr, 10);
         const int16_t tz = comma == std::string::npos ? 0 : static_cast<int16_t>(std::atoi(value.substr(comma + 1).c_str()));
-        clock_.set_from_epoch_ms(epoch, tz, now_ms);
+        clock_.set_from_epoch_ms(epoch, tz);
         preferences_.putULong64("clk_epoch", epoch);
         preferences_.putInt("clk_tz", tz);
-        preferences_.putUInt("clk_sec", clock_.seconds_of_day(now_ms));
-        return clock_.status_string(now_ms, ble_.connected());
+        preferences_.putUInt("clk_sec", clock_.seconds_of_day());
+        return clock_.status_string(ble_.connected());
     }
     if (starts_with(params, "set=")) {
         const auto parts = split(params.substr(4), ':');
@@ -299,10 +309,10 @@ std::string CommandRouter::handle_clock(const std::string& params, uint32_t now_
         const int mm = std::atoi(parts[1].c_str());
         const int ss = parts.size() > 2 ? std::atoi(parts[2].c_str()) : 0;
         if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) return "clock:set invalid. Use HH:MM or HH:MM:SS";
-        clock_.set_time_of_day(static_cast<uint8_t>(hh), static_cast<uint8_t>(mm), static_cast<uint8_t>(ss), now_ms);
+        clock_.set_time_of_day(static_cast<uint8_t>(hh), static_cast<uint8_t>(mm), static_cast<uint8_t>(ss));
         preferences_.putUInt("clk_sec", hh * 3600U + mm * 60U + ss);
         preferences_.putULong64("clk_epoch", 0);
-        return clock_.status_string(now_ms, ble_.connected());
+        return clock_.status_string(ble_.connected());
     }
     return "clock: usage - on, off, set=HH:MM[:SS], sync=EPOCH_MS[,TZ], fmt=12|24";
 }
@@ -428,14 +438,72 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
 
     if (starts_with(cmd, "s:") || starts_with(cmd, "set:")) return handle_settings(cmd.substr(cmd[1] == ':' ? 2 : 4), now_ms);
     if (cmd == "gs" || cmd == "gx") return cmd == "gs" ? "gs:1" : "gs:0";
-    if (starts_with(cmd, "ga=")) { const auto params = cmd.substr(3); const auto pos = params.find(':'); if (pos != std::string::npos) { gestures_.set_action(std::atoi(params.substr(0, pos).c_str()), trim(params.substr(pos + 1))); return "ga:ok"; } return "ga:err"; }
-    if (starts_with(cmd, "gm=")) { const bool on = std::atoi(cmd.substr(3).c_str()) == 1; gestures_.set_matching_enabled(on); return on ? "gm=1" : "gm=0"; }
+    if (starts_with(cmd, "ga=")) {
+        const auto params = cmd.substr(3);
+        const auto pos = params.find(':');
+        if (pos != std::string::npos) {
+            gestures_.set_action(std::atoi(params.substr(0, pos).c_str()), trim(params.substr(pos + 1)));
+            std::string actions_csv;
+            for (int i = 0; i < 4; ++i) {
+                actions_csv += gestures_.action(i);
+                if (i < 3) actions_csv += ",";
+            }
+            preferences_.putString("ga", actions_csv);
+            return "ga:ok";
+        }
+        return "ga:err";
+    }
+    if (starts_with(cmd, "gm=")) {
+        const bool on = std::atoi(cmd.substr(3).c_str()) == 1;
+        gestures_.set_matching_enabled(on);
+        preferences_.putBool("gm", on);
+        return on ? "gm=1" : "gm=0";
+    }
     if (cmd == "gc") return "gc:ok";
     if (cmd == "gi") return gestures_.list_json();
     if (cmd == "gs:") return gestures_.settings_json();
-    if (starts_with(cmd, "grt=")) { gestures_.set_reaction_time(std::atoi(cmd.substr(4).c_str())); return "rt=" + std::to_string(gestures_.reaction_time_ms()); }
-    if (starts_with(cmd, "gcf=")) { gestures_.set_confidence(std::atoi(cmd.substr(4).c_str())); return "cf=" + std::to_string(gestures_.confidence_percent()); }
-    if (starts_with(cmd, "gcd=")) { gestures_.set_cooldown(std::atoi(cmd.substr(4).c_str())); return "cd=" + std::to_string(gestures_.cooldown_ms()); }
+    if (starts_with(cmd, "grt=")) {
+        const int val = std::atoi(cmd.substr(4).c_str());
+        gestures_.set_reaction_time(val);
+        preferences_.putUInt("grt", val);
+        return "rt=" + std::to_string(gestures_.reaction_time_ms());
+    }
+    if (starts_with(cmd, "gcf=")) {
+        const int val = std::atoi(cmd.substr(4).c_str());
+        gestures_.set_confidence(val);
+        preferences_.putUInt("gcf", val);
+        return "cf=" + std::to_string(gestures_.confidence_percent());
+    }
+    if (starts_with(cmd, "gcd=")) {
+        const int val = std::atoi(cmd.substr(4).c_str());
+        gestures_.set_cooldown(val);
+        preferences_.putUInt("gcd", val);
+        return "cd=" + std::to_string(gestures_.cooldown_ms());
+    }
+    if (starts_with(cmd, "gst=")) {
+        const float val = std::atof(cmd.substr(4).c_str());
+        gestures_.set_shake_threshold(val);
+        preferences_.putFloat("gst", val);
+        return "gst=" + std::to_string(val);
+    }
+    if (starts_with(cmd, "gpt=")) {
+        const float val = std::atof(cmd.substr(4).c_str());
+        gestures_.set_pat_threshold(val);
+        preferences_.putFloat("gpt", val);
+        return "gpt=" + std::to_string(val);
+    }
+    if (starts_with(cmd, "gvt=")) {
+        const float val = std::atof(cmd.substr(4).c_str());
+        gestures_.set_swipe_threshold(val);
+        preferences_.putFloat("gvt", val);
+        return "gvt=" + std::to_string(val);
+    }
+    if (starts_with(cmd, "gtt=")) {
+        const float val = std::atof(cmd.substr(4).c_str());
+        gestures_.set_touch_threshold(val);
+        preferences_.putFloat("gtt", val);
+        return "gtt=" + std::to_string(val);
+    }
 
     if (cmd == "ble:") return std::string("ble:win=") + std::to_string(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
     if (starts_with(cmd, "ble:win=")) {

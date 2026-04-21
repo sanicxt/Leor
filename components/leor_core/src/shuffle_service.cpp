@@ -44,7 +44,9 @@ bool ShuffleService::should_emit(uint32_t now_ms, bool reacting, bool training, 
     if (needs_init_) {
         needs_init_ = false;
         expression_phase_ = false;
-        next_change_ms_ = now_ms + neutral_min_ms_ + (std::rand() % (neutral_max_ms_ - neutral_min_ms_ + 1U));
+        // After a reset (e.g. manual command), wait for a full expression cycle 
+        // before emitting "neutral", so the manual expression has time to show.
+        next_change_ms_ = now_ms + expr_min_ms_ + (std::rand() % (expr_max_ms_ - expr_min_ms_ + 1U));
         return false;
     }
     if (next_change_ms_ != 0 && now_ms < next_change_ms_) {

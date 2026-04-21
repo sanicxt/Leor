@@ -5,14 +5,14 @@ namespace leor {
 void MenuService::on_short_press(uint32_t now_ms) {
   if (open_) {
     cursor_ = (cursor_ + 1) % 2;
-    open_at_ms_ = now_ms;
+    last_activity_ms_ = now_ms;
   }
 }
 
 void MenuService::on_long_press(uint32_t now_ms) {
   if (!open_) {
     open_ = true;
-    open_at_ms_ = now_ms;
+    last_activity_ms_ = now_ms;
     cursor_ = 0; // Default to Power Off
   } else {
     if (cursor_ == 0) {

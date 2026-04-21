@@ -449,6 +449,7 @@ public:
   void set_space_between(int space) { setSpacebetween(space); }
   void set_border_radius(int left, int right) { setBorderradius(left, right); }
   void set_mouth_size(int w, int h) { setMouthSize(w, h); }
+  void set_gaze_manual(float x, float y) { setGaze(x, y); }
   void set_autoblinker(bool active, float i, float v) {
     setAutoblinker(active, i, v);
   }

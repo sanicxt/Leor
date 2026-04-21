@@ -8,6 +8,14 @@
         setGestureConfidence,
         getGestureCooldown,
         setGestureCooldown,
+        getGestureShakeThreshold,
+        setGestureShakeThreshold,
+        getGesturePatThreshold,
+        setGesturePatThreshold,
+        getGestureSwipeThreshold,
+        setGestureSwipeThreshold,
+        getGestureTouchThreshold,
+        setGestureTouchThreshold,
     } from "$lib/ble.svelte";
 
     async function updateReactionTime(val: number) {
@@ -25,183 +33,147 @@
         await sendCommand(`gcd=${val}`);
     }
 
+    async function updateShakeThreshold(val: number) {
+        setGestureShakeThreshold(val);
+        await sendCommand(`gst=${val}`);
+    }
+
+    async function updatePatThreshold(val: number) {
+        setGesturePatThreshold(val);
+        await sendCommand(`gpt=${val}`);
+    }
+
+    async function updateSwipeThreshold(val: number) {
+        setGestureSwipeThreshold(val);
+        await sendCommand(`gvt=${val}`);
+    }
+
+    async function updateTouchThreshold(val: number) {
+        setGestureTouchThreshold(val);
+        await sendCommand(`gtt=${val}`);
+    }
+
     // Quick presets
     async function applySensitive() {
         await updateConfidence(60);
         await updateCooldown(500);
+        await updateShakeThreshold(150);
+        await updatePatThreshold(0.25);
+        await updateSwipeThreshold(0.35);
+        await updateTouchThreshold(0.03);
     }
     async function applyBalanced() {
         await updateConfidence(75);
         await updateCooldown(1500);
+        await updateShakeThreshold(200);
+        await updatePatThreshold(0.32);
+        await updateSwipeThreshold(0.45);
+        await updateTouchThreshold(0.05);
     }
     async function applyStrict() {
         await updateConfidence(90);
         await updateCooldown(2500);
+        await updateShakeThreshold(300);
+        await updatePatThreshold(0.5);
+        await updateSwipeThreshold(0.7);
+        await updateTouchThreshold(0.15);
     }
 </script>
 
-<div class="bento-card bg-bento-peach p-6 space-y-5">
+<div class="bento-card bg-bento-peach p-6 space-y-6">
     <!-- Header -->
     <div class="mb-4 border-b-2 border-bento-border pb-2">
         <h2 class="text-xl font-black uppercase">Gesture Tuning</h2>
-        <p class="text-sm font-bold opacity-80">
-            Fine-tune detection parameters
-        </p>
+        <p class="text-sm font-bold opacity-80">Fine-tune detection parameters</p>
     </div>
 
     <!-- Tuning Presets -->
-    <div class="grid grid-cols-3 gap-2">
-        <button
-            onclick={applySensitive}
-            disabled={!bleState.connected}
-            class="bento-button flex flex-col items-center gap-1 py-2 bg-paper text-ink transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-            <span class="text-lg">🎯</span>
-            <span class="text-[10px] font-bold">Sensitive</span>
+    <div class="grid grid-cols-3 gap-3">
+        <button onclick={applySensitive} disabled={!bleState.connected} class="bento-button py-2 bg-paper text-ink text-[10px] font-black uppercase tracking-tight flex items-center justify-center gap-1.5">
+            <span class="text-base">🎯</span> SENSITIVE
         </button>
-        <button
-            onclick={applyBalanced}
-            disabled={!bleState.connected}
-            class="bento-button flex flex-col items-center gap-1 py-2 bg-paper text-ink transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-            <span class="text-lg">⚖️</span>
-            <span class="text-[10px] font-bold">Balanced</span>
+        <button onclick={applyBalanced} disabled={!bleState.connected} class="bento-button py-2 bg-paper text-ink text-[10px] font-black uppercase tracking-tight flex items-center justify-center gap-1.5">
+            <span class="text-base">⚖️</span> BALANCED
         </button>
-        <button
-            onclick={applyStrict}
-            disabled={!bleState.connected}
-            class="bento-button flex flex-col items-center gap-1 py-2 bg-paper text-ink transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-            <span class="text-lg">🔒</span>
-            <span class="text-[10px] font-bold">Strict</span>
+        <button onclick={applyStrict} disabled={!bleState.connected} class="bento-button py-2 bg-paper text-ink text-[10px] font-black uppercase tracking-tight flex items-center justify-center gap-1.5">
+            <span class="text-base">🔒</span> STRICT
         </button>
     </div>
 
-    <!-- Fine Controls -->
     <div class="space-y-4">
         <!-- Expression Duration -->
-        <div class="p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-2">
+        <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                    <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Expression Duration</span>
+                    <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Expr Duration</span>
                 </div>
-                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
-                    {(getGestureReactionTime() / 1000).toFixed(1)}s
-                </span>
+                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{(getGestureReactionTime() / 1000).toFixed(1)}s</span>
             </div>
-                <input
-                    type="range"
-                    min="500"
-                    max="5000"
-                    step="100"
-                    value={getGestureReactionTime()}
-                    onchange={(e) => updateReactionTime(parseInt(e.currentTarget.value))}
-                    disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
-                />
+            <input type="range" min="500" max="5000" step="100" value={getGestureReactionTime()} onchange={(e) => updateReactionTime(parseInt(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:bg-bento-yellow [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-bento-border" />
             <p class="text-ink/60 font-bold text-[10px]">How long a gesture must be held before triggering</p>
         </div>
 
-        <!-- Confidence Threshold -->
-        <div class="p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-2">
+        <!-- Detection Cooldown -->
+        <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                    <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Confidence Threshold</span>
+                    <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Cooldown</span>
                 </div>
-                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
-                    {getGestureConfidence()}%
-                </span>
+                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{(getGestureCooldown() / 1000).toFixed(1)}s</span>
             </div>
-            <input
-                type="range"
-                min="50"
-                max="95"
-                step="5"
-                value={getGestureConfidence()}
-                onchange={(e) => updateConfidence(parseInt(e.currentTarget.value))}
-                disabled={!bleState.connected}
-                class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                       [&::-webkit-slider-thumb]:appearance-none
-                       [&::-webkit-slider-thumb]:w-4
-                       [&::-webkit-slider-thumb]:h-4
-                       [&::-webkit-slider-thumb]:rounded-sm
-                       [&::-webkit-slider-thumb]:bg-bento-yellow
-                       [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                       [&::-webkit-slider-thumb]:cursor-pointer
-                       [&::-webkit-slider-thumb]:border-2
-                       [&::-webkit-slider-thumb]:border-bento-border
-                       [&::-webkit-slider-thumb]:transition-transform
-                       [&::-webkit-slider-thumb]:active:scale-125
-                       [&::-webkit-slider-thumb]:active:shadow-none
-                       [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                       [&::-webkit-slider-thumb]:active:translate-x-[2px]"
-            />
-            <div class="flex justify-between text-[9px] text-ink/60 font-bold px-1">
-                <span>More sensitive</span>
-                <span>Fewer false +</span>
-            </div>
+            <input type="range" min="500" max="5000" step="250" value={getGestureCooldown()} onchange={(e) => updateCooldown(parseInt(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:bg-bento-yellow [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-bento-border" />
+            <p class="text-ink/60 font-bold text-[10px]">Minimum time between consecutive gesture triggers</p>
         </div>
 
-        <!-- Cooldown -->
-        <div class="p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-2">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Detection Cooldown</span>
+        <div class="grid grid-cols-2 gap-4">
+            <!-- Shake Energy -->
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        <span class="text-ink/80 text-[10px] font-bold uppercase tracking-wider">Shake</span>
+                    </div>
+                    <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGestureShakeThreshold()}</span>
                 </div>
-                <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
-                    {(getGestureCooldown() / 1000).toFixed(1)}s
-                </span>
+                <input type="range" min="100" max="500" step="10" value={getGestureShakeThreshold()} onchange={(e) => updateShakeThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
             </div>
-            <input
-                type="range"
-                min="500"
-                max="5000"
-                step="250"
-                value={getGestureCooldown()}
-                onchange={(e) => updateCooldown(parseInt(e.currentTarget.value))}
-                disabled={!bleState.connected}
-                class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                       [&::-webkit-slider-thumb]:appearance-none
-                       [&::-webkit-slider-thumb]:w-4
-                       [&::-webkit-slider-thumb]:h-4
-                       [&::-webkit-slider-thumb]:rounded-sm
-                       [&::-webkit-slider-thumb]:bg-bento-yellow
-                       [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                       [&::-webkit-slider-thumb]:cursor-pointer
-                       [&::-webkit-slider-thumb]:border-2
-                       [&::-webkit-slider-thumb]:border-bento-border
-                       [&::-webkit-slider-thumb]:transition-transform
-                       [&::-webkit-slider-thumb]:active:scale-125
-                       [&::-webkit-slider-thumb]:active:shadow-none
-                       [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                       [&::-webkit-slider-thumb]:active:translate-x-[2px]"
-            />
-            <div class="flex justify-between text-[9px] text-ink/60 font-bold px-1">
-                <span>Rapid response</span>
-                <span>Debounced</span>
+
+            <!-- Pat Impact -->
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
+                        <span class="text-ink/80 text-[10px] font-bold uppercase tracking-wider">Pat</span>
+                    </div>
+                    <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGesturePatThreshold().toFixed(2)}g</span>
+                </div>
+                <input type="range" min="0.1" max="0.8" step="0.01" value={getGesturePatThreshold()} onchange={(e) => updatePatThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
+            </div>
+
+            <!-- Nudge Impact -->
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
+                        <span class="text-ink/80 text-[10px] font-bold uppercase tracking-wider">Nudge</span>
+                    </div>
+                    <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGestureSwipeThreshold().toFixed(2)}g</span>
+                </div>
+                <input type="range" min="0.2" max="1.0" step="0.05" value={getGestureSwipeThreshold()} onchange={(e) => updateSwipeThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
+            </div>
+
+            <!-- Touch Min -->
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" /></svg>
+                        <span class="text-ink/80 text-[10px] font-bold uppercase tracking-wider">Touch</span>
+                    </div>
+                    <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{(getGestureTouchThreshold() * 100).toFixed(0)}%</span>
+                </div>
+                <input type="range" min="0.01" max="0.4" step="0.01" value={getGestureTouchThreshold()} onchange={(e) => updateTouchThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
             </div>
         </div>
     </div>

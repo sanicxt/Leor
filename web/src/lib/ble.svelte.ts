@@ -32,7 +32,7 @@ export const bleState = $state({
         ew: 36, eh: 36, es: 10, er: 8,
         mw: 20, lt: 1000, vt: 2000, bi: 3,
         gs: 6, os: 12, ss: 10, td: 3000, // gaze speed, openness speed, squish speed, touch hold delay (ms)
-        wp: 0, pp: 1  // wake GPIO pin, power-control GPIO pin (RTC-capable, 0-5 on ESP32-C3)
+        wp: 0, pp: 1, ct: 127 // wake GPIO pin, power-control GPIO pin, contrast (0-255)
     },
     display: {
         type: 'sh1106',  // sh1106 or ssd1306
@@ -42,6 +42,10 @@ export const bleState = $state({
     gestureReactionTime: 1500,
     gestureConfidence: 70,
     gestureCooldown: 2000,
+    gestureShakeThreshold: 200.0,
+    gesturePatThreshold: 0.32,
+    gestureSwipeThreshold: 0.45,
+    gestureTouchThreshold: 0.05,
     gestureMappings: [] as GestureMapping[],  // synced from ESP32
     bleDeviceName: '',  // BLE device name (loaded on connect)
     bleWindowMs: 60000,
@@ -86,11 +90,17 @@ export function getSettingsSs() { return bleState.settings.ss; }
 export function getSettingsTd() { return bleState.settings.td; }
 export function getSettingsWp() { return bleState.settings.wp; }
 export function getSettingsPp() { return bleState.settings.pp; }
+export function getSettingsCt() { return bleState.settings.ct; }
 
 export function getGestureMatching() { return bleState.gestureMatching; }
 export function getGestureReactionTime() { return bleState.gestureReactionTime; }
 export function getGestureConfidence() { return bleState.gestureConfidence; }
 export function getGestureCooldown() { return bleState.gestureCooldown; }
+export function getGestureShakeThreshold() { return bleState.gestureShakeThreshold; }
+export function getGesturePatThreshold() { return bleState.gesturePatThreshold; }
+export function getGestureSwipeThreshold() { return bleState.gestureSwipeThreshold; }
+export function getGestureTouchThreshold() { return bleState.gestureTouchThreshold; }
+
 export function getGestureMappings() { return bleState.gestureMappings; }
 export function getBleWindowMs() { return bleState.bleWindowMs; }
 export function getClockEnabled() { return bleState.clockEnabled; }
@@ -123,11 +133,17 @@ export function setSettingsSs(val: number) { bleState.settings.ss = val; }
 export function setSettingsTd(val: number) { bleState.settings.td = val; }
 export function setSettingsWp(val: number) { bleState.settings.wp = val; }
 export function setSettingsPp(val: number) { bleState.settings.pp = val; }
+export function setSettingsCt(val: number) { bleState.settings.ct = val; }
 
 export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
 export function setGestureReactionTime(val: number) { bleState.gestureReactionTime = val; }
 export function setGestureConfidence(val: number) { bleState.gestureConfidence = val; }
 export function setGestureCooldown(val: number) { bleState.gestureCooldown = val; }
+export function setGestureShakeThreshold(val: number) { bleState.gestureShakeThreshold = val; }
+export function setGesturePatThreshold(val: number) { bleState.gesturePatThreshold = val; }
+export function setGestureSwipeThreshold(val: number) { bleState.gestureSwipeThreshold = val; }
+export function setGestureTouchThreshold(val: number) { bleState.gestureTouchThreshold = val; }
+
 export function setBleWindowMs(val: number) { bleState.bleWindowMs = val; }
 export function setClockEnabled(val: boolean) { bleState.clockEnabled = val; }
 export function setClockSeconds(val: number) { bleState.clockSeconds = val; }
@@ -215,11 +231,15 @@ export async function connect(): Promise<boolean> {
                                 if ('win' in data.ble) bleState.bleWindowMs = data.ble.win;
                             }
                             if (data.gesture) {
-                                if ('gm' in data.gesture) bleState.gestureMatching = (data.gesture.gm === 1);
+                                if ('gm' in data.gesture) bleState.gestureMatching = data.gesture.gm === 1;
                                 if ('rt' in data.gesture) bleState.gestureReactionTime = data.gesture.rt;
                                 if ('cf' in data.gesture) bleState.gestureConfidence = data.gesture.cf;
                                 if ('cd' in data.gesture) bleState.gestureCooldown = data.gesture.cd;
-                                if (data.gesture.map) {
+                                if ('gst' in data.gesture) bleState.gestureShakeThreshold = data.gesture.gst;
+                                if ('gpt' in data.gesture) bleState.gesturePatThreshold = data.gesture.gpt;
+                                if ('gvt' in data.gesture) bleState.gestureSwipeThreshold = data.gesture.gvt;
+                                if ('gtt' in data.gesture) bleState.gestureTouchThreshold = data.gesture.gtt;
+                                if (data.gesture.map && Array.isArray(data.gesture.map)) {
                                     bleState.gestureMappings = data.gesture.map.map((m: { n: string, a: string }) => ({
                                         name: m.n,
                                         action: m.a

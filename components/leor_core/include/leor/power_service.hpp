@@ -20,6 +20,7 @@ public:
   void set_hold_ms(uint32_t value_ms);
   void set_sleep_prepare_callback(SleepPrepareCallback callback);
   void set_i2c_pins(int sda_pin, int scl_pin);
+  bool is_pressed() const { return pressed(); }
 
 private:
   bool pressed() const;

@@ -192,7 +192,7 @@ void advertise() {
     rc = ble_gap_adv_rsp_set_fields(&rsp_fields);
     if (rc != 0) {
         // Fallback for long names: send a shortened scan response name.
-        rsp_fields.name_len = std::min<size_t>(rsp_fields.name_len, 20U);
+        rsp_fields.name_len = std::min<uint8_t>(static_cast<uint8_t>(rsp_fields.name_len), 26U);
         rsp_fields.name_is_complete = 0;
         rc = ble_gap_adv_rsp_set_fields(&rsp_fields);
         if (rc != 0) {
@@ -216,6 +216,9 @@ void advertise() {
 esp_err_t BleService::start(const std::string& device_name, CommandHandler handler) {
     command_handler_ = std::move(handler);
     s_service = this;
+    if (notify_mutex_ == nullptr) {
+        notify_mutex_ = xSemaphoreCreateMutex();
+    }
     ESP_ERROR_CHECK(nimble_port_init());
     ble_att_set_preferred_mtu(BLE_ATT_MTU_MAX);
     ble_hs_cfg.reset_cb = on_reset;
@@ -273,7 +276,11 @@ void BleService::poll() {
 void BleService::notify_status(const std::string& status) {
     s_last_status = status;
     connected_ = s_conn_handle != BLE_HS_CONN_HANDLE_NONE;
-    if (!connected_) {
+    if (!connected_ || notify_mutex_ == nullptr) {
+        return;
+    }
+
+    if (xSemaphoreTake(notify_mutex_, pdMS_TO_TICKS(100)) != pdTRUE) {
         return;
     }
 
@@ -284,6 +291,7 @@ void BleService::notify_status(const std::string& status) {
     if (status.size() <= chunk_size) {
         struct os_mbuf* om = ble_hs_mbuf_from_flat(status.data(), status.size());
         ble_gatts_notify_custom(s_conn_handle, s_status_handle, om);
+        xSemaphoreGive(notify_mutex_);
         return;
     }
 
@@ -295,6 +303,7 @@ void BleService::notify_status(const std::string& status) {
         }
         vTaskDelay(pdMS_TO_TICKS(5));
     }
+    xSemaphoreGive(notify_mutex_);
 }
 
 void BleService::notify_gesture(const std::string& gesture) {

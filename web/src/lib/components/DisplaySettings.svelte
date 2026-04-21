@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { sendCommand, bleState } from "$lib/ble.svelte.ts";
+    import { sendCommand, bleState, getSettingsCt, setSettingsCt } from "$lib/ble.svelte.ts";
 
     const displayTypes = [
         { name: "SH1106", value: "sh1106", description: "Default display" },
@@ -38,6 +38,11 @@
         } finally {
             applyingSettings = false;
         }
+    }
+
+    async function applyContrast() {
+        if (!bleState.connected) return;
+        await sendCommand(`display:contrast=${getSettingsCt()}`);
     }
 
     async function restartDevice() {
@@ -125,6 +130,43 @@
         </svg>
         {applyingSettings ? "Saving..." : "Apply Settings"}
     </button>
+
+    <!-- Display Brightness Slider -->
+    <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                </svg>
+                <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Display Brightness</span>
+            </div>
+            <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{Math.round((getSettingsCt() / 255) * 100)}%</span>
+        </div>
+        <input
+            type="range"
+            min="0"
+            max="255"
+            value={getSettingsCt()}
+            oninput={(e) => setSettingsCt(parseInt(e.currentTarget.value))}
+            onchange={applyContrast}
+            disabled={!bleState.connected}
+            class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
+                   [&::-webkit-slider-thumb]:appearance-none
+                   [&::-webkit-slider-thumb]:w-4
+                   [&::-webkit-slider-thumb]:h-4
+                   [&::-webkit-slider-thumb]:rounded-sm
+                   [&::-webkit-slider-thumb]:bg-bento-yellow
+                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
+                   [&::-webkit-slider-thumb]:cursor-pointer
+                   [&::-webkit-slider-thumb]:border-2
+                   [&::-webkit-slider-thumb]:border-bento-border
+                   [&::-webkit-slider-thumb]:transition-transform
+                   [&::-webkit-slider-thumb]:active:scale-125
+                   [&::-webkit-slider-thumb]:active:shadow-none
+                   [&::-webkit-slider-thumb]:active:translate-y-[2px]
+                   [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+        />
+    </div>
 
     <!-- Restart Required Banner -->
     {#if restartRequired}

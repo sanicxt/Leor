@@ -49,51 +49,67 @@ void Application::open_ble_window(uint32_t now_ms, bool start_advertising) {
 }
 
 void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const char* line2, uint32_t now_ms) {
-  const char* title = line1 != nullptr ? line1 : "OTA UPDATE";
   display.clear();
   display.set_font_small();
 
-  const int title_w = display.text_width(title);
-  display.draw_text((display.width() - title_w) / 2, 10, title);
-  display.draw_hline(0, 12, display.width());
+  bool is_error = (line1 != nullptr && std::string(line1).find("FAILED") != std::string::npos);
 
-  if (line2 != nullptr) {
-    const int sub_w = display.text_width(line2);
-    display.draw_text((display.width() - sub_w) / 2, 22, line2);
-  }
+  if (is_error) {
+    display.draw_frame(0, 0, 128, 64);
+    display.fill_box(2, 2, 124, 11);
+    display.set_color(0);
+    const int tw = display.text_width("CRITICAL ERROR");
+    display.draw_text((display.width() - tw) / 2, 11, "CRITICAL ERROR");
+    display.set_color(1);
+    display.set_font_medium();
+    const char* msg = line2 ? line2 : "UNKNOWN";
+    const int w2 = display.text_width(msg);
+    display.draw_text((display.width() - w2) / 2, 40, msg);
+  } else if (pct >= 0) {
+    // 1. Header (Tightened)
+    display.fill_box(0, 0, 128, 11);
+    display.set_color(0);
+    display.draw_text(4, 9, "RE-FLASHING SYSTEM...");
+    display.set_color(1);
 
-  if (pct >= 0) {
-    constexpr int kBarX = 4;
-    constexpr int kBarY = 28;
-    constexpr int kBarW = 120;
-    constexpr int kBarH = 14;
-    display.draw_frame(kBarX, kBarY, kBarW, kBarH);
-    const int fill = ((kBarW - 4) * pct) / 100;
-    if (fill > 0) {
-      display.fill_rbox(kBarX + 2, kBarY + 2, fill, kBarH - 4, 2);
-    }
-
+    // 2. Data Section (Grid layout)
+    display.set_font_medium();
     char pct_buf[12];
     std::snprintf(pct_buf, sizeof(pct_buf), "%d%%", pct);
-    const int pct_w = display.text_width(pct_buf);
-    display.set_color(pct > 40 ? 0 : 1);
-    display.draw_text((display.width() - pct_w) / 2, kBarY + 11, pct_buf);
-    display.set_color(1);
-  }
+    display.draw_text(4, 32, pct_buf);
 
-  if (pct >= 0 && pct < 100) {
-    char dots[5] = "";
-    const int dot_count = static_cast<int>((now_ms / 400U) % 4U);
-    for (int i = 0; i < dot_count; ++i) {
-      dots[i] = '.';
+    display.set_font_small();
+    if (line2) {
+      // Shorter label 'DATA:' and fixed-position values to prevent out-of-bounds
+      display.draw_text(60, 22, "DATA:");
+      display.draw_text(60, 33, line2);
     }
-    dots[dot_count] = '\0';
-    display.draw_text(4, 50, "Flashing");
-    if (dot_count > 0) {
-      display.draw_text(58, 50, dots);
+
+    // 3. Robust Progress Bar (Moved up slightly)
+    display.draw_frame(2, 40, 124, 10);
+    const int fill_w = (120 * pct) / 100;
+    if (fill_w > 0) {
+      display.fill_box(4, 42, fill_w, 6);
+      display.set_color(0);
+      for (int i = 4; i < 4 + fill_w; i += 5) {
+        display.draw_vline(i, 42, 6);
+      }
+      display.set_color(1);
     }
-  } else if (pct == 100) {
-    display.draw_text(36, 50, "Rebooting...");
+
+    // 4. Footer (Moved to bottom pixel)
+    if (pct == 100) {
+      display.draw_text(30, 62, "[VERIFICATION OK]");
+    } else {
+      const int dots = (now_ms / 400) % 4;
+      char dots_s[8] = "----";
+      if (dots > 0) {
+        for(int i=0; i<dots; ++i) dots_s[i] = '>';
+        dots_s[dots] = '\0';
+      }
+      display.draw_text(4, 62, "STATUS: BUSY");
+      display.draw_text(80, 62, dots_s);
+    }
   }
 
   display.send_buffer();
@@ -187,12 +203,25 @@ esp_err_t Application::start() {
   eyes_->set_border_radius(preferences_.getInt("er", 8),
                            preferences_.getInt("er", 8));
   eyes_->set_mouth_size(preferences_.getInt("mw", 20), 6);
+  eyes_->setGazeSpeed(static_cast<float>(preferences_.getInt("gs", 6)));
+  eyes_->setOpennessSpeed(static_cast<float>(preferences_.getInt("os", 12)));
+  eyes_->setSquishSpeed(static_cast<float>(preferences_.getInt("ss", 10)));
   eyes_->set_breathing(preferences_.getBool("br_en", true),
                        preferences_.getFloat("br_int", 0.08f),
                        preferences_.getFloat("br_spd", 0.3f));
 
   gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
                  config_.display.scl_pin, display_.get());
+  gesture_.restore(preferences_.getBool("gm", true),
+                   preferences_.getUInt("grt", 1500),
+                   preferences_.getUInt("gcf", 70),
+                   preferences_.getUInt("gcd", 1500),
+                   preferences_.getString("ga", "happy,angry,curious,neutral,love"));
+  gesture_.set_shake_threshold(preferences_.getFloat("gst", 200.0f));
+  gesture_.set_pat_threshold(preferences_.getFloat("gpt", 0.32f));
+  gesture_.set_swipe_threshold(preferences_.getFloat("gvt", 0.45f));
+  gesture_.set_touch_threshold(preferences_.getFloat("gtt", 0.05f));
+
   shuffle_.restore(preferences_.getBool("shuf_en", true),
                    preferences_.getUInt("shuf_emin", 2000),
                    preferences_.getUInt("shuf_emax", 5000),
@@ -200,10 +229,9 @@ esp_err_t Application::start() {
                    preferences_.getUInt("shuf_nmax", 5000));
   clock_.restore(preferences_.getBool("clk_on", false),
                  preferences_.getBool("clk_24", true),
-                 preferences_.getUInt("clk_sec", 0),
                  static_cast<int16_t>(preferences_.getInt("clk_tz", 0)),
                  preferences_.getULong64("clk_epoch", 0),
-                 static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+                 preferences_.getUInt("clk_sec", 0));
   was_clock_enabled_ = clock_.enabled();
 
   commands_ = std::make_unique<CommandRouter>(preferences_, config_.display,
@@ -217,7 +245,7 @@ esp_err_t Application::start() {
     return commands_->handle(cmd, now_ms);
   }));
   open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
-  display_->set_contrast(0x7f);
+  display_->set_contrast(static_cast<uint8_t>(preferences_.getUInt("disp_con", 0x7f)));
 
   ESP_LOGI(kTag, "application started");
   return ESP_OK;
@@ -256,17 +284,14 @@ void Application::tick() {
         } else {
           char msg[48];
           const uint32_t kb_done = ble_.ota().bytes_received() / 1024U;
-          const uint32_t pkts = ble_.ota().packets_received();
           if (ble_.ota().progress_known()) {
             const uint32_t kb_total = ble_.ota().expected_size() / 1024U;
-            std::snprintf(msg, sizeof(msg), "%lu / %lu KB (%lu)",
+            std::snprintf(msg, sizeof(msg), "%lu/%lu KB",
                           static_cast<unsigned long>(kb_done),
-                          static_cast<unsigned long>(kb_total),
-                          static_cast<unsigned long>(pkts));
+                          static_cast<unsigned long>(kb_total));
           } else {
-            std::snprintf(msg, sizeof(msg), "%lu KB (%lu pkts)",
-                          static_cast<unsigned long>(kb_done),
-                          static_cast<unsigned long>(pkts));
+            std::snprintf(msg, sizeof(msg), "%lu KB",
+                          static_cast<unsigned long>(kb_done));
           }
           draw_ota_screen(*display_, pct, nullptr, msg, now_ms);
         }
@@ -279,10 +304,26 @@ void Application::tick() {
 
   ButtonEvent btn = power_.poll(now_ms);
   if (btn == ButtonEvent::kShortPress) {
-    open_ble_window(now_ms, true);
-    menu_.on_short_press(now_ms);
+    if (now_ms - last_short_press_ms_ < kDoubleTapThresholdMs) {
+      // Double tap detected
+      if (menu_.is_open()) {
+        menu_.close();
+      }
+      last_short_press_ms_ = 0; // Reset
+    } else {
+      last_short_press_ms_ = now_ms;
+      open_ble_window(now_ms, true);
+      if (menu_.is_open()) {
+        menu_.on_short_press(now_ms);
+      }
+    }
   } else if (btn == ButtonEvent::kLongPress) {
     menu_.on_long_press(now_ms);
+    last_short_press_ms_ = 0;
+  }
+
+  if (menu_.is_open() && (now_ms - menu_.last_activity_ms() > MenuService::kTimeoutMs)) {
+    menu_.close();
   }
 
   MenuAction action = menu_.consume_action();
@@ -328,26 +369,26 @@ void Application::tick() {
   default:
     break;
   }
-  const GestureEvent event = gesture_.poll(now_ms);
-
-  switch (event) {
-  case GestureEvent::kPat:
-    eyes_->set_mood(HAPPY);
-    break;
-  case GestureEvent::kShake:
-    eyes_->set_mood(ANGRY);
-    break;
-  case GestureEvent::kSwipe:
-    eyes_->set_position(POS_E);
-    break;
-  case GestureEvent::kPickup:
-    eyes_->set_mood(DEFAULT);
-    eyes_->set_position(POS_N);
-    break;
-  case GestureEvent::kNone:
-  default:
-    break;
+  const std::string gesture_cmd = gesture_.poll(now_ms, power_.is_pressed());
+  if (!gesture_cmd.empty() && !clock_.enabled() && !menu_.is_open()) {
+    commands_->handle(gesture_cmd, now_ms);
   }
+
+  // --- Tilt Compensation (Passive) ---
+  if (!clock_.enabled() && !menu_.is_open() && eyes_) {
+    float p = gesture_.pitch();
+    float r = gesture_.roll();
+    if (std::abs(p) > 10.0f || std::abs(r) > 10.0f) {
+        // Simple mapping: 45 deg tilt = 0.5 gaze offset
+        float gx = std::clamp(-r / 45.0f, -0.6f, 0.6f);
+        float gy = std::clamp(-p / 45.0f, -0.6f, 0.6f);
+        eyes_->set_gaze_manual(gx, gy);
+    } else {
+        // Return to neutral if not tilted
+        // eyes_->set_gaze_manual(0, 0); 
+    }
+  }
+  // -----------------------------------
 
   const char *shuffle_cmd = nullptr;
   if (!clock_.enabled() && shuffle_.should_emit(now_ms, false, false, &shuffle_cmd) &&
@@ -356,6 +397,9 @@ void Application::tick() {
   }
 
   const bool is_clock_enabled = clock_.enabled();
+  const bool is_suspended = is_clock_enabled || menu_.is_open();
+  gesture_.set_suspended(is_suspended);
+
   if (is_clock_enabled != was_clock_enabled_) {
     display_->clear();
     display_->send_buffer();
@@ -379,7 +423,7 @@ void Application::tick() {
     display_->send_buffer();
   } else {
     if (is_clock_enabled) {
-      clock_.draw(*display_, now_ms, ble_.connected());
+      clock_.draw(*display_, ble_.connected());
     } else {
       eyes_->update(now_ms);
     }
