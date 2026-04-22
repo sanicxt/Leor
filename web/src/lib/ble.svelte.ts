@@ -39,6 +39,7 @@ export const bleState = $state({
         addr: '0x3c'     // I2C address
     },
     gestureMatching: false,
+    gestureInverted: false,
     gestureReactionTime: 1500,
     gestureConfidence: 70,
     gestureCooldown: 2000,
@@ -93,6 +94,7 @@ export function getSettingsPp() { return bleState.settings.pp; }
 export function getSettingsCt() { return bleState.settings.ct; }
 
 export function getGestureMatching() { return bleState.gestureMatching; }
+export function getGestureInverted() { return bleState.gestureInverted; }
 export function getGestureReactionTime() { return bleState.gestureReactionTime; }
 export function getGestureConfidence() { return bleState.gestureConfidence; }
 export function getGestureCooldown() { return bleState.gestureCooldown; }
@@ -136,6 +138,7 @@ export function setSettingsPp(val: number) { bleState.settings.pp = val; }
 export function setSettingsCt(val: number) { bleState.settings.ct = val; }
 
 export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
+export function setGestureInverted(val: boolean) { bleState.gestureInverted = val; }
 export function setGestureReactionTime(val: number) { bleState.gestureReactionTime = val; }
 export function setGestureConfidence(val: number) { bleState.gestureConfidence = val; }
 export function setGestureCooldown(val: number) { bleState.gestureCooldown = val; }
@@ -232,6 +235,7 @@ export async function connect(): Promise<boolean> {
                             }
                             if (data.gesture) {
                                 if ('gm' in data.gesture) bleState.gestureMatching = data.gesture.gm === 1;
+                                if ('gi' in data.gesture) bleState.gestureInverted = data.gesture.gi === 1;
                                 if ('rt' in data.gesture) bleState.gestureReactionTime = data.gesture.rt;
                                 if ('cf' in data.gesture) bleState.gestureConfidence = data.gesture.cf;
                                 if ('cd' in data.gesture) bleState.gestureCooldown = data.gesture.cd;

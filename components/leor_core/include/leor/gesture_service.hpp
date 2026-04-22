@@ -41,6 +41,8 @@ class GestureService {
     float swipe_threshold() const { return swipe_threshold_; }
     void set_touch_threshold(float val) { touch_ratio_threshold_ = val; }
     float touch_threshold() const { return touch_ratio_threshold_; }
+    void set_inverted(bool inv) { inverted_ = inv; }
+    bool inverted() const { return inverted_; }
     // ------------------------
 
     void set_action(int index, const std::string& action);
@@ -48,7 +50,7 @@ class GestureService {
     std::string list_json() const;
     std::string settings_json() const;
 
-    float pitch() const { return mpu_.data().pitch; }
+    float pitch() const { return inverted_ ? -mpu_.data().pitch : mpu_.data().pitch; }
     float roll() const { return mpu_.data().roll; }
 
   private:
@@ -83,6 +85,7 @@ class GestureService {
     bool dummy_enabled_ = true;
     bool matching_enabled_ = true;
     bool suspended_ = false;
+    bool inverted_ = false;
     uint32_t last_emit_ms_ = 0;
     uint32_t reaction_time_ms_ = 1500;
     uint32_t confidence_percent_ = 70;

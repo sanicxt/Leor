@@ -444,14 +444,20 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         if (pos != std::string::npos) {
             gestures_.set_action(std::atoi(params.substr(0, pos).c_str()), trim(params.substr(pos + 1)));
             std::string actions_csv;
-            for (int i = 0; i < 4; ++i) {
+            for (int i = 0; i < 5; ++i) {
                 actions_csv += gestures_.action(i);
-                if (i < 3) actions_csv += ",";
+                if (i < 4) actions_csv += ",";
             }
             preferences_.putString("ga", actions_csv);
             return "ga:ok";
         }
         return "ga:err";
+    }
+    if (starts_with(cmd, "ginv=")) {
+        const bool inv = std::atoi(cmd.substr(5).c_str()) == 1;
+        gestures_.set_inverted(inv);
+        preferences_.putBool("ginv", inv);
+        return inv ? "ginv=1" : "ginv=0";
     }
     if (starts_with(cmd, "gm=")) {
         const bool on = std::atoi(cmd.substr(3).c_str()) == 1;

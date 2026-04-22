@@ -217,6 +217,7 @@ esp_err_t Application::start() {
                    preferences_.getUInt("gcf", 70),
                    preferences_.getUInt("gcd", 1500),
                    preferences_.getString("ga", "happy,angry,curious,neutral,love"));
+  gesture_.set_inverted(preferences_.getBool("ginv", false));
   gesture_.set_shake_threshold(preferences_.getFloat("gst", 200.0f));
   gesture_.set_pat_threshold(preferences_.getFloat("gpt", 0.32f));
   gesture_.set_swipe_threshold(preferences_.getFloat("gvt", 0.45f));
@@ -376,16 +377,20 @@ void Application::tick() {
 
   // --- Tilt Compensation (Passive) ---
   if (!clock_.enabled() && !menu_.is_open() && eyes_) {
-    float p = gesture_.pitch();
-    float r = gesture_.roll();
-    if (std::abs(p) > 10.0f || std::abs(r) > 10.0f) {
-        // Simple mapping: 45 deg tilt = 0.5 gaze offset
-        float gx = std::clamp(-r / 45.0f, -0.6f, 0.6f);
-        float gy = std::clamp(-p / 45.0f, -0.6f, 0.6f);
-        eyes_->set_gaze_manual(gx, gy);
+    if (gesture_.matching_enabled() && !gesture_.suspended()) {
+      float p = gesture_.pitch();
+      float r = gesture_.roll();
+      if (std::abs(p) > 10.0f || std::abs(r) > 10.0f) {
+          // Simple mapping: 45 deg tilt = 0.5 gaze offset
+          float gx = std::clamp(-r / 45.0f, -0.6f, 0.6f);
+          float gy = std::clamp(-p / 45.0f, -0.6f, 0.6f);
+          eyes_->set_gaze_manual(gx, gy);
+      } else {
+          eyes_->set_gaze_manual(0.0f, 0.0f); 
+      }
     } else {
-        // Return to neutral if not tilted
-        // eyes_->set_gaze_manual(0, 0); 
+      // Force neutral if gestures are disabled/suspended
+      eyes_->set_gaze_manual(0.0f, 0.0f);
     }
   }
   // -----------------------------------
