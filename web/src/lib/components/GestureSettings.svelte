@@ -16,6 +16,8 @@
         setGestureSwipeThreshold,
         getGestureTouchThreshold,
         setGestureTouchThreshold,
+        getGesturePickupTiltDeg,
+        setGesturePickupTiltDeg,
         getGestureInverted,
         setGestureInverted,
     } from "$lib/ble.svelte";
@@ -60,6 +62,11 @@
         await sendCommand(`gtt=${val}`);
     }
 
+    async function updatePickupTiltDeg(val: number) {
+        setGesturePickupTiltDeg(val);
+        await sendCommand(`gtd=${val}`);
+    }
+
     // Quick presets
     async function applySensitive() {
         await updateConfidence(60);
@@ -68,6 +75,7 @@
         await updatePatThreshold(0.25);
         await updateSwipeThreshold(0.35);
         await updateTouchThreshold(0.03);
+        await updatePickupTiltDeg(20);
     }
     async function applyBalanced() {
         await updateConfidence(75);
@@ -76,6 +84,7 @@
         await updatePatThreshold(0.32);
         await updateSwipeThreshold(0.45);
         await updateTouchThreshold(0.05);
+        await updatePickupTiltDeg(30);
     }
     async function applyStrict() {
         await updateConfidence(90);
@@ -84,6 +93,7 @@
         await updatePatThreshold(0.5);
         await updateSwipeThreshold(0.7);
         await updateTouchThreshold(0.15);
+        await updatePickupTiltDeg(45);
     }
 </script>
 
@@ -191,6 +201,18 @@
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{(getGestureTouchThreshold() * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0.01" max="0.4" step="0.01" value={getGestureTouchThreshold()} onchange={(e) => updateTouchThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
+            </div>
+
+            <!-- Pickup Tilt Angle -->
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-7 7 3-14L3 7l7 7" /></svg>
+                        <span class="text-ink/80 text-[10px] font-bold uppercase tracking-wider">Pickup Tilt</span>
+                    </div>
+                    <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGesturePickupTiltDeg().toFixed(0)}°</span>
+                </div>
+                <input type="range" min="10" max="80" step="5" value={getGesturePickupTiltDeg()} onchange={(e) => updatePickupTiltDeg(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
             </div>
         </div>
     </div>

@@ -5,6 +5,7 @@
     import DisplaySettings from "$lib/components/DisplaySettings.svelte";
     import GestureManager from "$lib/components/GestureManager.svelte";
     import GestureSettings from "$lib/components/GestureSettings.svelte";
+    import GestureCalibration from "$lib/components/GestureCalibration.svelte";
     import PowerSettings from "$lib/components/PowerSettings.svelte";
     import OtaPanel from "$lib/components/OtaPanel.svelte";
     import { base } from "$app/paths";
@@ -68,6 +69,10 @@
 
         <section>
             <GestureSettings />
+        </section>
+
+        <section>
+            <GestureCalibration />
         </section>
 
         <section>

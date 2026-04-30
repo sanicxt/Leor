@@ -47,13 +47,22 @@ export const bleState = $state({
     gesturePatThreshold: 0.32,
     gestureSwipeThreshold: 0.45,
     gestureTouchThreshold: 0.05,
+    gesturePickupTiltDeg: 30.0,
     gestureMappings: [] as GestureMapping[],  // synced from ESP32
     bleDeviceName: '',  // BLE device name (loaded on connect)
     bleWindowMs: 60000,
     clockEnabled: false,
     clockTimezoneOffset: 0,
     clockSeconds: 0,
-    clock24Hour: true
+    clock24Hour: true,
+    // Gesture calibration state (synced from device)
+    calPhase: 'idle' as 'idle' | 'wait' | 'capturing' | 'complete' | 'timeout',
+    calGesture: '' as string,
+    calPeak: 0 as number,
+    calNewThreshold: 0 as number,
+    calOldThreshold: 0 as number,
+    calCaptureMs: 0 as number,
+    calSamples: 0 as number,
 });
 
 // BLE device and characteristics
@@ -102,6 +111,7 @@ export function getGestureShakeThreshold() { return bleState.gestureShakeThresho
 export function getGesturePatThreshold() { return bleState.gesturePatThreshold; }
 export function getGestureSwipeThreshold() { return bleState.gestureSwipeThreshold; }
 export function getGestureTouchThreshold() { return bleState.gestureTouchThreshold; }
+export function getGesturePickupTiltDeg() { return bleState.gesturePickupTiltDeg; }
 
 export function getGestureMappings() { return bleState.gestureMappings; }
 export function getBleWindowMs() { return bleState.bleWindowMs; }
@@ -146,6 +156,7 @@ export function setGestureShakeThreshold(val: number) { bleState.gestureShakeThr
 export function setGesturePatThreshold(val: number) { bleState.gesturePatThreshold = val; }
 export function setGestureSwipeThreshold(val: number) { bleState.gestureSwipeThreshold = val; }
 export function setGestureTouchThreshold(val: number) { bleState.gestureTouchThreshold = val; }
+export function setGesturePickupTiltDeg(val: number) { bleState.gesturePickupTiltDeg = val; }
 
 export function setBleWindowMs(val: number) { bleState.bleWindowMs = val; }
 export function setClockEnabled(val: boolean) { bleState.clockEnabled = val; }
@@ -243,6 +254,7 @@ export async function connect(): Promise<boolean> {
                                 if ('gpt' in data.gesture) bleState.gesturePatThreshold = data.gesture.gpt;
                                 if ('gvt' in data.gesture) bleState.gestureSwipeThreshold = data.gesture.gvt;
                                 if ('gtt' in data.gesture) bleState.gestureTouchThreshold = data.gesture.gtt;
+                                if ('gtd' in data.gesture) bleState.gesturePickupTiltDeg = data.gesture.gtd;
                                 if (data.gesture.map && Array.isArray(data.gesture.map)) {
                                     bleState.gestureMappings = data.gesture.map.map((m: { n: string, a: string }) => ({
                                         name: m.n,
@@ -256,6 +268,17 @@ export async function connect(): Promise<boolean> {
                                 if ('sec' in data.clock) bleState.clockSeconds = data.clock.sec;
                                 if ('fmt' in data.clock) bleState.clock24Hour = (data.clock.fmt === 24);
                             }
+                        }
+
+                        if (data.type === 'cal') {
+                            bleState.calPhase = data.phase || 'idle';
+                            bleState.calGesture = data.gesture || '';
+                            bleState.calPeak = parseFloat(data.peak) || 0;
+                            bleState.calNewThreshold = parseFloat(data.new) || 0;
+                            bleState.calOldThreshold = parseFloat(data.old) || 0;
+                            bleState.calCaptureMs = data.capture_ms || 0;
+                            bleState.calSamples = data.samples || 0;
+                            console.log('[BLE RX Cal]', bleState.calPhase, bleState.calGesture, 'peak:', bleState.calPeak);
                         }
 
                         bleState.lastStatus = 'Sync complete';
@@ -296,7 +319,7 @@ export async function connect(): Promise<boolean> {
             }
 
             // Parse appearance and gesture settings
-            const params = ['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss', 'td', 'wp', 'pp', 'rt', 'cf', 'cd', 'gm'];
+            const params = ['ew', 'eh', 'es', 'er', 'mw', 'lt', 'vt', 'bi', 'gs', 'os', 'ss', 'td', 'wp', 'pp', 'rt', 'cf', 'cd', 'gm', 'gtd'];
             if (value.includes('=') || value.includes('gs:')) {
                 params.forEach(param => {
                     const match = value.match(new RegExp(`${param}=(\\d+(\\.\\d+)?)`));
@@ -312,6 +335,8 @@ export async function connect(): Promise<boolean> {
                             bleState.gestureCooldown = val;
                         } else if (param === 'gm') {
                             bleState.gestureMatching = (val === 1);
+                        } else if (param === 'gtd') {
+                            bleState.gesturePickupTiltDeg = val;
                         }
                     }
                 });
@@ -418,6 +443,43 @@ export async function sendCommand(cmd: string): Promise<void> {
 // Check if Web Bluetooth is supported
 export function isWebBluetoothSupported(): boolean {
     return typeof navigator !== 'undefined' && 'bluetooth' in navigator;
+}
+
+// ==================== Gesture Calibration ====================
+
+export function resetCalibrationState() {
+    bleState.calPhase = 'idle';
+    bleState.calGesture = '';
+    bleState.calPeak = 0;
+    bleState.calNewThreshold = 0;
+    bleState.calOldThreshold = 0;
+    bleState.calCaptureMs = 0;
+    bleState.calSamples = 0;
+}
+
+const CAL_GESTURE_NAMES: Record<string, string> = {
+    pat: 'gcal:pat',
+    shake: 'gcal:shake',
+    swipe: 'gcal:swipe',
+    pickup: 'gcal:pickup',
+};
+
+export async function startCalibration(gesture: string) {
+    const cmd = CAL_GESTURE_NAMES[gesture];
+    if (!cmd) return;
+    resetCalibrationState();
+    bleState.calGesture = gesture;
+    bleState.calPhase = 'wait';
+    await sendCommand(cmd);
+}
+
+export async function abortCalibration() {
+    await sendCommand('gcal:stop');
+    resetCalibrationState();
+}
+
+export async function pollCalibrationStatus() {
+    await sendCommand('gcal:status');
 }
 
 // ==================== OTA firmware update ====================

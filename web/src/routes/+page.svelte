@@ -18,6 +18,7 @@
   import DisplaySettings from "$lib/components/DisplaySettings.svelte";
   import GestureManager from "$lib/components/GestureManager.svelte";
   import GestureSettings from "$lib/components/GestureSettings.svelte";
+  import GestureCalibration from "$lib/components/GestureCalibration.svelte";
   import PowerSettings from "$lib/components/PowerSettings.svelte";
   import BreathingControl from "$lib/components/BreathingControl.svelte";
   import ClockSettings from "$lib/components/ClockSettings.svelte";
@@ -187,8 +188,9 @@
           <ClockSettings />
         </div>
       {:else if activeTab === "gestures"}
-        <div in:fly={{ y: 20, duration: 300 }}>
+        <div in:fly={{ y: 20, duration: 300 }} class="space-y-6">
           <GestureManager />
+          <GestureCalibration />
         </div>
       {:else if activeTab === "ota"}
         <div in:fly={{ y: 20, duration: 300 }} class="max-w-2xl mx-auto">

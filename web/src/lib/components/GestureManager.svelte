@@ -62,13 +62,6 @@
             description: "Lift or tilt device",
             color: "sky",
         },
-        {
-            name: "pet",
-            action: "love",
-            icon: "💗",
-            description: "Gently held touch",
-            color: "pink",
-        },
     ]);
 
     // State

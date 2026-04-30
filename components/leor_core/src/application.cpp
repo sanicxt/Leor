@@ -213,15 +213,16 @@ esp_err_t Application::start() {
   gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
                  config_.display.scl_pin, display_.get());
   gesture_.restore(preferences_.getBool("gm", true),
-                   preferences_.getUInt("grt", 1500),
-                   preferences_.getUInt("gcf", 70),
-                   preferences_.getUInt("gcd", 1500),
-                   preferences_.getString("ga", "happy,angry,curious,neutral,love"));
+                    preferences_.getUInt("grt", 1500),
+                    preferences_.getUInt("gcf", 70),
+                    preferences_.getUInt("gcd", 1500),
+                    preferences_.getString("ga", "happy,angry,curious,neutral"));
   gesture_.set_inverted(preferences_.getBool("ginv", false));
   gesture_.set_shake_threshold(preferences_.getFloat("gst", 200.0f));
   gesture_.set_pat_threshold(preferences_.getFloat("gpt", 0.32f));
   gesture_.set_swipe_threshold(preferences_.getFloat("gvt", 0.45f));
   gesture_.set_touch_threshold(preferences_.getFloat("gtt", 0.05f));
+  gesture_.set_pickup_tilt_deg(preferences_.getFloat("gtd", 30.0f));
 
   shuffle_.restore(preferences_.getBool("shuf_en", true),
                    preferences_.getUInt("shuf_emin", 2000),
@@ -370,9 +371,96 @@ void Application::tick() {
   default:
     break;
   }
-  const std::string gesture_cmd = gesture_.poll(now_ms, power_.is_pressed());
-  if (!gesture_cmd.empty() && !clock_.enabled() && !menu_.is_open()) {
-    commands_->handle(gesture_cmd, now_ms);
+
+  if (gesture_.calibrating()) {
+    std::string cal_result = gesture_.calibration_tick(now_ms, power_.is_pressed());
+    if (!cal_result.empty()) {
+      // Persist calibrated thresholds
+      int idx = gesture_.calibration_gesture_index();
+      float new_thresh = gesture_.calibration_new_threshold();
+      switch (idx) {
+        case 0: preferences_.putFloat("gpt", new_thresh); break;
+        case 1: preferences_.putFloat("gst", new_thresh); break;
+        case 2: preferences_.putFloat("gvt", new_thresh); break;
+        case 3: preferences_.putFloat("gtd", new_thresh); break;
+      }
+      ble_.notify_status(cal_result);
+      gesture_.abort_calibration();
+    }
+    // Draw calibration screen on OLED
+    if (gesture_.calibrating() && display_) {
+      const char* gesture_name = "unknown";
+      switch (gesture_.calibration_gesture_index()) {
+        case 0: gesture_name = "Pat"; break;
+        case 1: gesture_name = "Shake"; break;
+        case 2: gesture_name = "Swipe"; break;
+        case 3: gesture_name = "Pickup"; break;
+      }
+      const auto phase = gesture_.calibration_phase();
+      const uint32_t capture_ms = gesture_.calibration_progress_ms();
+
+      display_->clear();
+      display_->set_font_small();
+
+      // Title
+      const char* title = "CALIBRATING";
+      int tw = display_->text_width(title);
+      display_->draw_text((display_->width() - tw) / 2, 6, title);
+
+      // Gesture name
+      tw = display_->text_width(gesture_name);
+      display_->draw_text((display_->width() - tw) / 2, 18, gesture_name);
+
+      // Phase indicator
+      const char* phase_str = "";
+      switch (phase) {
+        case CalibrationPhase::kWait: phase_str = "Get ready..."; break;
+        case CalibrationPhase::kCapturing:
+          { char buf[32];
+            std::snprintf(buf, sizeof(buf), "Capturing %lums", static_cast<unsigned long>(capture_ms));
+            phase_str = buf;
+            break; }
+        case CalibrationPhase::kComplete: phase_str = "Complete!"; break;
+        default: break;
+      }
+      tw = display_->text_width(phase_str);
+      display_->draw_text((display_->width() - tw) / 2, 32, phase_str);
+
+      // Progress bar
+      int bar_x = 14, bar_y = 40, bar_w = 100, bar_h = 8;
+      display_->draw_frame(bar_x, bar_y, bar_w, bar_h);
+      int fill = 0;
+      switch (phase) {
+        case CalibrationPhase::kWait:
+          fill = 10; break;
+        case CalibrationPhase::kCapturing:
+          fill = 10 + (90 * (int)capture_ms) / 3000;
+          if (fill > 100) fill = 100;
+          break;
+        case CalibrationPhase::kComplete:
+          fill = 100; break;
+        default: break;
+      }
+      if (fill > 0) {
+        display_->fill_rbox(bar_x + 2, bar_y + 2, ((bar_w - 4) * fill) / 100, bar_h - 4, 2);
+      }
+
+      // Peak value during capture
+      if (phase == CalibrationPhase::kCapturing) {
+        char peak_buf[32];
+        std::snprintf(peak_buf, sizeof(peak_buf), "Peak:%.3f", 
+                      (double)gesture_.calibration_peak());
+        tw = display_->text_width(peak_buf);
+        display_->draw_text((display_->width() - tw) / 2, 52, peak_buf);
+      }
+
+      display_->send_buffer();
+    }
+  } else {
+    const std::string gesture_cmd = gesture_.poll(now_ms, power_.is_pressed());
+    if (!gesture_cmd.empty() && !clock_.enabled() && !menu_.is_open()) {
+      commands_->handle(gesture_cmd, now_ms);
+    }
   }
 
   // --- Tilt Compensation (Passive) ---
@@ -405,13 +493,13 @@ void Application::tick() {
   const bool is_suspended = is_clock_enabled || menu_.is_open();
   gesture_.set_suspended(is_suspended);
 
-  if (is_clock_enabled != was_clock_enabled_) {
+  if (is_clock_enabled != was_clock_enabled_ && !gesture_.calibrating()) {
     display_->clear();
     display_->send_buffer();
     was_clock_enabled_ = is_clock_enabled;
   }
 
-  if (menu_.is_open() != was_menu_open_) {
+  if (menu_.is_open() != was_menu_open_ && !gesture_.calibrating()) {
     if (menu_.is_open()) {
       power_.set_hold_ms(1000);
     } else {
@@ -426,7 +514,7 @@ void Application::tick() {
     display_->clear();
     menu_.draw(*display_, is_clock_enabled, now_ms);
     display_->send_buffer();
-  } else {
+  } else if (!gesture_.calibrating()) {
     if (is_clock_enabled) {
       clock_.draw(*display_, ble_.connected());
     } else {

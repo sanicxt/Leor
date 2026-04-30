@@ -16,6 +16,13 @@ enum class GestureEvent : uint8_t {
     kPickup,
 };
 
+enum class CalibrationPhase : uint8_t {
+    kIdle,
+    kWait,
+    kCapturing,
+    kComplete,
+};
+
 class GestureService {
   public:
     void start(bool dummy_enabled, int i2c_sda_pin = 10, int i2c_scl_pin = 7, DisplayBackend* display = nullptr);
@@ -41,9 +48,26 @@ class GestureService {
     float swipe_threshold() const { return swipe_threshold_; }
     void set_touch_threshold(float val) { touch_ratio_threshold_ = val; }
     float touch_threshold() const { return touch_ratio_threshold_; }
+    void set_pickup_tilt_deg(float val) { pickup_tilt_deg_ = val; }
+    float pickup_tilt_deg() const { return pickup_tilt_deg_; }
     void set_inverted(bool inv) { inverted_ = inv; }
     bool inverted() const { return inverted_; }
     // ------------------------
+
+    // --- Per-Gesture Calibration ---
+    bool calibrating() const { return calib_.phase != CalibrationPhase::kIdle; }
+    CalibrationPhase calibration_phase() const { return calib_.phase; }
+    int calibration_gesture_index() const { return calib_.gesture_index; }
+    float calibration_peak() const { return calib_.peak_value; }
+    float calibration_new_threshold() const { return calib_.new_threshold; }
+    uint32_t calibration_progress_ms() const { return calib_.capture_ms; }
+
+    void start_calibration(int gesture_index, uint32_t now_ms);
+    void abort_calibration();
+    /// Returns non-empty JSON string when calibration completes or aborts
+    std::string calibration_tick(uint32_t now_ms, bool touch_active);
+    std::string calibration_status_json() const;
+    // ---------------------------
 
     void set_action(int index, const std::string& action);
     std::string action(int index) const;
@@ -80,6 +104,34 @@ class GestureService {
     State state_ = State::kReady;
     uint32_t state_start_ms_ = 0;
 
+    struct CalibrationState {
+        CalibrationPhase phase = CalibrationPhase::kIdle;
+        uint32_t phase_start_ms = 0;
+        uint32_t calib_start_ms = 0;
+        uint32_t capture_ms = 0;
+        int gesture_index = -1;
+        float peak_value = 0.0f;
+        float new_threshold = 0.0f;
+        int sample_count = 0;
+
+        static constexpr uint32_t kWaitMs = 500;
+        static constexpr uint32_t kCaptureMs = 3000;
+        static constexpr uint32_t kTotalTimeoutMs = 15000;
+        static constexpr float kThresholdRatio = 0.70f;
+
+        void reset() {
+            phase = CalibrationPhase::kIdle;
+            phase_start_ms = 0;
+            calib_start_ms = 0;
+            capture_ms = 0;
+            gesture_index = -1;
+            peak_value = 0.0f;
+            new_threshold = 0.0f;
+            sample_count = 0;
+        }
+    };
+    CalibrationState calib_{};
+
     std::string classify();
 
     bool dummy_enabled_ = true;
@@ -95,10 +147,11 @@ class GestureService {
     float pat_threshold_ = 0.32f;
     float swipe_threshold_ = 0.45f;
     float touch_ratio_threshold_ = 0.05f;
+    float pickup_tilt_deg_ = 30.0f;
 
-    static constexpr int kLabelCount = 5;
-    const char* labels_[kLabelCount] = {"pat", "shake", "swipe", "pickup", "pet"};
-    std::string actions_[kLabelCount] = {"happy", "angry", "curious", "neutral", "love"};
+    static constexpr int kLabelCount = 4;
+    const char* labels_[kLabelCount] = {"pat", "shake", "swipe", "pickup"};
+    std::string actions_[kLabelCount] = {"happy", "angry", "curious", "neutral"};
 
     bool mpu_available_ = false;
     bool mpu_calibrated_ = false;

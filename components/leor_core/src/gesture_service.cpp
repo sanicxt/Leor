@@ -91,6 +91,7 @@ void GestureService::set_suspended(bool suspended) {
 }
 
 std::string GestureService::poll(uint32_t now_ms, bool touch_active) {
+    if (calibrating()) return "";
     if (!matching_enabled_ || suspended_ || !mpu_available_ || !mpu_calibrated_) {
         return "";
     }
@@ -110,23 +111,12 @@ std::string GestureService::poll(uint32_t now_ms, bool touch_active) {
     ax_lp_ = ax_lp_ * 0.95f + d.axG * 0.05f;
     ay_lp_ = ay_lp_ * 0.95f + d.ayG * 0.05f;
 
-    const bool currently_tilted = (std::abs(d.pitch) > 30.0f || std::abs(d.roll) > 30.0f);
+    const bool currently_tilted = (std::abs(d.pitch) > pickup_tilt_deg_ || std::abs(d.roll) > pickup_tilt_deg_);
     const float gyro_mag = std::sqrt(d.gxDps * d.gxDps + d.gyDps * d.gyDps + d.gzDps * d.gzDps);
     const float az_delta = d.azG - az_lp_;
     const float axy_delta = std::max(std::abs(d.axG - ax_lp_), std::abs(d.ayG - ay_lp_));
 
     // --- State Machine ---
-
-    // 1. PET Override (Priority)
-    if (touch_active) {
-        if (!was_touching_) touch_start_ms_ = now_ms;
-        if (now_ms - touch_start_ms_ > 1500 && state_ != State::kActive) {
-            state_ = State::kActive;
-            state_start_ms_ = now_ms;
-            ESP_LOGI("leor_gest", "LIFE: PET DETECTED -> Entering ACTIVE");
-            return actions_[4]; // love
-        }
-    }
 
     switch (state_) {
         case State::kReady: {
@@ -211,13 +201,152 @@ std::string GestureService::classify() {
         return actions_[3]; // pickup
     }
 
-    // Rule 4: Nudge/Swipe (Horizontal impulse)
-    if (window_stats_.max_axy_delta > swipe_threshold_) {
+    // Rule 4: Swipe (Horizontal impulse + touch contact)
+    if (window_stats_.max_axy_delta > swipe_threshold_ && touch_ratio > touch_ratio_threshold_) {
         return actions_[2]; // swipe
     }
 
     ESP_LOGI("leor_gest", "ALGO: DISCARDED (Below Confidence)");
     return "";
+}
+
+// ==========================================================================
+// Per-Gesture Calibration
+// ==========================================================================
+
+void GestureService::start_calibration(int gesture_index, uint32_t now_ms) {
+    if (gesture_index < 0 || gesture_index >= 4) return;
+
+    calib_.reset();
+    calib_.gesture_index = gesture_index;
+    calib_.phase = CalibrationPhase::kWait;
+    calib_.phase_start_ms = now_ms;
+    calib_.calib_start_ms = now_ms;
+
+    if (mpu_available_) mpu_.wake();
+    ESP_LOGI("leor_gest", "CAL: Starting calibration for gesture[%d] %s",
+             gesture_index, labels_[gesture_index]);
+}
+
+void GestureService::abort_calibration() {
+    calib_.reset();
+    if (mpu_available_ && !matching_enabled_) mpu_.sleep();
+    ESP_LOGI("leor_gest", "CAL: Aborted");
+}
+
+std::string GestureService::calibration_tick(uint32_t now_ms, bool touch_active) {
+    if (calib_.phase == CalibrationPhase::kIdle) return "";
+
+    const uint32_t elapsed_total = now_ms - calib_.calib_start_ms;
+    if (elapsed_total > CalibrationState::kTotalTimeoutMs) {
+        ESP_LOGW("leor_gest", "CAL: Timeout after %ums — aborting", 
+                 static_cast<unsigned>(elapsed_total));
+        calib_.reset();
+        if (mpu_available_ && !matching_enabled_) mpu_.sleep();
+        return "{\"type\":\"cal\",\"phase\":\"timeout\"}";
+    }
+
+    // Rate-limit IMU reads to 50 Hz
+    if (now_ms - last_mpu_read_ms_ < 20) return "";
+    last_mpu_read_ms_ = now_ms;
+    if (!read_mpu_sample()) return "";
+
+    const auto& d = mpu_.data();
+
+    const float gyro_mag = std::sqrt(d.gxDps * d.gxDps + d.gyDps * d.gyDps + d.gzDps * d.gzDps);
+    const float az_delta_raw = d.azG - az_lp_;
+    const float axy_mag = std::max(std::abs(d.axG - ax_lp_), std::abs(d.ayG - ay_lp_));
+    const float tilt_mag = std::max(std::abs(d.pitch), std::abs(d.roll));
+
+    az_lp_ = az_lp_ * 0.95f + d.azG * 0.05f;
+    ax_lp_ = ax_lp_ * 0.95f + d.axG * 0.05f;
+    ay_lp_ = ay_lp_ * 0.95f + d.ayG * 0.05f;
+
+    switch (calib_.phase) {
+        case CalibrationPhase::kWait: {
+            if (now_ms - calib_.phase_start_ms >= CalibrationState::kWaitMs) {
+                calib_.phase = CalibrationPhase::kCapturing;
+                calib_.phase_start_ms = now_ms;
+                calib_.capture_ms = 0;
+                calib_.peak_value = 0.0f;
+                ESP_LOGI("leor_gest", "CAL: NOW CAPTURING — perform gesture %s",
+                         labels_[calib_.gesture_index]);
+            }
+            break;
+        }
+
+        case CalibrationPhase::kCapturing: {
+            calib_.sample_count++;
+            calib_.capture_ms = now_ms - calib_.phase_start_ms;
+
+            float feature = 0.0f;
+            switch (calib_.gesture_index) {
+                case 0: feature = az_delta_raw; break;
+                case 1: feature = gyro_mag;     break;
+                case 2: feature = axy_mag;      break;
+                case 3: feature = tilt_mag;     break;
+            }
+            if (feature > calib_.peak_value) calib_.peak_value = feature;
+
+            ESP_LOGD("leor_gest", "CAL: capture g=%d f=%.3f peak=%.3f ms=%lu",
+                     calib_.gesture_index, (double)feature, (double)calib_.peak_value,
+                     (unsigned long)calib_.capture_ms);
+
+            if (calib_.capture_ms >= CalibrationState::kCaptureMs) {
+                float new_thresh = calib_.peak_value * CalibrationState::kThresholdRatio;
+                calib_.new_threshold = new_thresh;
+                switch (calib_.gesture_index) {
+                    case 0: pat_threshold_ = new_thresh;   break;
+                    case 1: shake_threshold_ = new_thresh; break;
+                    case 2: swipe_threshold_ = new_thresh; break;
+                    case 3: pickup_tilt_deg_ = new_thresh; break;
+                }
+                calib_.phase = CalibrationPhase::kComplete;
+                ESP_LOGI("leor_gest", "CAL: COMPLETE — gesture[%d] peak=%.3f new_threshold=%.3f",
+                         calib_.gesture_index, (double)calib_.peak_value, (double)new_thresh);
+                return calibration_status_json();
+            }
+            break;
+        }
+
+        case CalibrationPhase::kComplete:
+            return "";
+
+        default:
+            break;
+    }
+
+    return "";
+}
+
+std::string GestureService::calibration_status_json() const {
+    const char* gesture_name = (calib_.gesture_index >= 0 && calib_.gesture_index < 4)
+                                   ? labels_[calib_.gesture_index] : "unknown";
+    const char* phase_str = "idle";
+    switch (calib_.phase) {
+        case CalibrationPhase::kWait:      phase_str = "wait";      break;
+        case CalibrationPhase::kCapturing: phase_str = "capturing"; break;
+        case CalibrationPhase::kComplete:  phase_str = "complete";  break;
+        default: break;
+    }
+
+    float current_thresh = 0.0f;
+    switch (calib_.gesture_index) {
+        case 0: current_thresh = pat_threshold_;   break;
+        case 1: current_thresh = shake_threshold_; break;
+        case 2: current_thresh = swipe_threshold_; break;
+        case 3: current_thresh = pickup_tilt_deg_; break;
+    }
+
+    char buf[256];
+    std::snprintf(buf, sizeof(buf),
+                  "{\"type\":\"cal\",\"phase\":\"%s\",\"gesture\":\"%s\",\"peak\":%.2f,"
+                  "\"new\":%.2f,\"old\":%.2f,\"ratio\":%.2f,\"capture_ms\":%u,\"samples\":%d}",
+                  phase_str, gesture_name,
+                  calib_.peak_value, calib_.new_threshold, current_thresh,
+                  CalibrationState::kThresholdRatio,
+                  static_cast<unsigned>(calib_.capture_ms), calib_.sample_count);
+    return buf;
 }
 
 bool GestureService::init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* display) {
@@ -299,17 +428,17 @@ std::string GestureService::action(int index) const {
 }
 
 std::string GestureService::list_json() const {
-    char buf[768];
+    char buf[640];
     std::snprintf(buf, sizeof(buf),
-                  "[{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"}]",
-                  labels_[0], actions_[0].c_str(), labels_[1], actions_[1].c_str(), labels_[2], actions_[2].c_str(), labels_[3], actions_[3].c_str(), labels_[4], actions_[4].c_str());
+                  "[{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"},{\"n\":\"%s\",\"a\":\"%s\"}]",
+                  labels_[0], actions_[0].c_str(), labels_[1], actions_[1].c_str(), labels_[2], actions_[2].c_str(), labels_[3], actions_[3].c_str());
     return buf;
 }
 
 std::string GestureService::settings_json() const {
     char buf[1024];
     std::snprintf(buf, sizeof(buf),
-                  "{\"gm\":%d,\"gi\":%d,\"rt\":%u,\"cf\":%u,\"cd\":%u,\"gst\":%.1f,\"gpt\":%.2f,\"gvt\":%.2f,\"gtt\":%.2f}",
+                  "{\"gm\":%d,\"gi\":%d,\"rt\":%u,\"cf\":%u,\"cd\":%u,\"gst\":%.1f,\"gpt\":%.2f,\"gvt\":%.2f,\"gtt\":%.2f,\"gtd\":%.1f,\"map\":%s}",
                   matching_enabled_ ? 1 : 0,
                   inverted_ ? 1 : 0,
                   static_cast<unsigned>(reaction_time_ms_),
@@ -318,7 +447,9 @@ std::string GestureService::settings_json() const {
                   shake_threshold_,
                   pat_threshold_,
                   swipe_threshold_,
-                  touch_ratio_threshold_);
+                  touch_ratio_threshold_,
+                  pickup_tilt_deg_,
+                  list_json().c_str());
     return buf;
 }
 

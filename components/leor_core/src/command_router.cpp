@@ -444,9 +444,9 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         if (pos != std::string::npos) {
             gestures_.set_action(std::atoi(params.substr(0, pos).c_str()), trim(params.substr(pos + 1)));
             std::string actions_csv;
-            for (int i = 0; i < 5; ++i) {
+            for (int i = 0; i < 4; ++i) {
                 actions_csv += gestures_.action(i);
-                if (i < 4) actions_csv += ",";
+                if (i < 3) actions_csv += ",";
             }
             preferences_.putString("ga", actions_csv);
             return "ga:ok";
@@ -509,6 +509,51 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         gestures_.set_touch_threshold(val);
         preferences_.putFloat("gtt", val);
         return "gtt=" + std::to_string(val);
+    }
+    if (starts_with(cmd, "gtd=")) {
+        const float val = std::atof(cmd.substr(4).c_str());
+        gestures_.set_pickup_tilt_deg(val);
+        preferences_.putFloat("gtd", val);
+        return "gtd=" + std::to_string(val);
+    }
+
+    // Per-gesture calibration commands
+    if (cmd == "gcal:pat" || cmd == "gcal:start=0") {
+        gestures_.start_calibration(0, now_ms);
+        return "gcal:pat — hold still, then perform a PAT gesture";
+    }
+    if (cmd == "gcal:shake" || cmd == "gcal:start=1") {
+        gestures_.start_calibration(1, now_ms);
+        return "gcal:shake — hold still, then perform a SHAKE gesture";
+    }
+    if (cmd == "gcal:swipe" || cmd == "gcal:start=2") {
+        gestures_.start_calibration(2, now_ms);
+        return "gcal:swipe — hold still, then perform a SWIPE gesture";
+    }
+    if (cmd == "gcal:pickup" || cmd == "gcal:start=3") {
+        gestures_.start_calibration(3, now_ms);
+        return "gcal:pickup — hold still, then perform a PICKUP gesture";
+    }
+    if (cmd == "gcal:stop") {
+        gestures_.abort_calibration();
+        return "gcal:stop — calibration aborted";
+    }
+    if (cmd == "gcal:status") {
+        if (!gestures_.calibrating()) return "gcal:status — idle (no calibration running)";
+        std::string json = gestures_.calibration_status_json();
+        // Persist on completion
+        if (gestures_.calibration_phase() == CalibrationPhase::kComplete) {
+            int idx = gestures_.calibration_gesture_index();
+            float new_thresh = gestures_.calibration_new_threshold();
+            switch (idx) {
+                case 0: preferences_.putFloat("gpt", new_thresh); break;
+                case 1: preferences_.putFloat("gst", new_thresh); break;
+                case 2: preferences_.putFloat("gvt", new_thresh); break;
+                case 3: preferences_.putFloat("gtd", new_thresh); break;
+            }
+            gestures_.abort_calibration();
+        }
+        return json;
     }
 
     if (cmd == "ble:") return std::string("ble:win=") + std::to_string(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
