@@ -27,6 +27,22 @@ idf_component_register(
         freertos
 )
 
+# ── Auto-generate icon C headers from SVG assets ──────────────────────────────
+set(ICON_OUT_DIR "${CMAKE_CURRENT_LIST_DIR}/include/leor/icons")
+file(GLOB ICON_SVG_SRGS "${CMAKE_SOURCE_DIR}/assets/icons/icons8-*.svg")
+add_custom_command(
+    OUTPUT  ${ICON_OUT_DIR}/icons.h
+    DEPENDS ${ICON_SVG_SRGS}
+    COMMAND ${CMAKE_SOURCE_DIR}/.venv/bin/python3
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/convert_icons.py
+            --input ${CMAKE_SOURCE_DIR}/assets/icons
+            --output ${ICON_OUT_DIR}
+    COMMENT "Generating icon C headers from SVGs..."
+)
+add_custom_target(icons_generate DEPENDS ${ICON_OUT_DIR}/icons.h)
+add_dependencies(${COMPONENT_LIB} icons_generate)
+# ──────────────────────────────────────────────────────────────────────────────
+
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)
 target_include_directories(${COMPONENT_LIB} PRIVATE
     "${IDF_PATH}/components/bt/host/nimble/nimble/nimble/host/include"

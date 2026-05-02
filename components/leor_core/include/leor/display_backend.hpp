@@ -48,6 +48,8 @@ class DisplayBackend {
     virtual void set_font_large() = 0;
     virtual void draw_text(int x, int y, const char* text) = 0;
     virtual int text_width(const char* text) = 0;
+
+    virtual void draw_xbmp(int x, int y, int w, int h, const uint8_t* bitmap) = 0;
 };
 
 class NullDisplayBackend final : public DisplayBackend {
@@ -79,6 +81,7 @@ class NullDisplayBackend final : public DisplayBackend {
     void set_font_large() override {}
     void draw_text(int, int, const char*) override {}
     int text_width(const char*) override { return 0; }
+    void draw_xbmp(int, int, int, int, const uint8_t*) override {}
 
   private:
     int width_ = 128;
@@ -120,6 +123,7 @@ class U8g2DisplayBackend final : public DisplayBackend {
     void set_font_large() override;
     void draw_text(int x, int y, const char* text) override;
     int text_width(const char* text) override;
+    void draw_xbmp(int x, int y, int w, int h, const uint8_t* bitmap) override;
 
   private:
     void select_font(const uint8_t* font);
