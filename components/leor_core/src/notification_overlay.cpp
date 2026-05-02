@@ -94,7 +94,8 @@ void draw_header(DisplayBackend& disp, const char* label, const uint8_t* icon, u
     disp.draw_xbmp(2, 0, 16, 16, icon);
 
     disp.set_font_small();
-    disp.draw_text(20, 11, label);
+    // Vertically center 11px font in 16px bar: baseline ~12
+    disp.draw_text(20, 12, label);
 
     uint32_t secs = (now / 1000) % 86400;
     uint8_t hh = static_cast<uint8_t>(secs / 3600);
@@ -102,7 +103,7 @@ void draw_header(DisplayBackend& disp, const char* label, const uint8_t* icon, u
     char time_buf[8];
     std::snprintf(time_buf, sizeof(time_buf), "%02u:%02u", hh, mm);
     int tw = disp.text_width(time_buf);
-    disp.draw_text(128 - tw - 2, 11, time_buf);
+    disp.draw_text(128 - tw - 2, 12, time_buf);
 
     disp.set_color(1);
 }
@@ -150,14 +151,13 @@ void wrap_text_word(const char* text, int max_width, DisplayBackend& disp,
 // ── Message Notification ─────────────────────────────────────────────────────
 
 static void draw_message_overlay(DisplayBackend& disp, const NotificationOverlay& n, uint32_t now) {
-    draw_header(disp, n.title, leor::icons::notification, now);
+    // Header shows app-specific icon + app name
+    draw_header(disp, n.title, n.icon, now);
 
     disp.draw_hline(0, 16, 128);
 
-    disp.draw_xbmp(4, 22, 16, 16, n.icon);
-
     disp.set_font_medium();
-    int max_w = 128 - 24;
+    int max_w = 120;  // full width with 4px side margins
 
     char lines[3][64] = {};
     int line_count = 0;
@@ -170,9 +170,8 @@ static void draw_message_overlay(DisplayBackend& disp, const NotificationOverlay
         if (total_written < std::strlen(n.body)) {
             int last = std::min(line_count, 3) - 1;
             std::string last_line = lines[last];
-            int last_max = (last < 2) ? max_w : (128 - 24);
             std::string with_dots = last_line + "...";
-            while (!last_line.empty() && disp.text_width(with_dots.c_str()) > last_max) {
+            while (!last_line.empty() && disp.text_width(with_dots.c_str()) > max_w) {
                 last_line.pop_back();
                 with_dots = last_line + "...";
             }
@@ -183,12 +182,13 @@ static void draw_message_overlay(DisplayBackend& disp, const NotificationOverlay
         }
     }
 
+    // Line spacing: 16px for medium font (ProFont15 ~14px tall + 2px gap)
     for (int i = 0; i < line_count && i < 2; ++i) {
-        disp.draw_text(22, 35 + i * 14, lines[i]);
+        disp.draw_text(4, 32 + i * 16, lines[i]);
     }
     if (line_count > 2) {
         disp.set_font_small();
-        disp.draw_text(22, 61, lines[2]);
+        disp.draw_text(4, 62, lines[2]);
     }
 }
 
@@ -199,25 +199,26 @@ static void draw_call_screen(DisplayBackend& disp, const NotificationOverlay& n,
     disp.fill_box(0, 0, 128, 64);
     disp.set_color(0);
 
-    disp.draw_xbmp(56, 8, 16, 16, n.icon);
+    // Tighter vertical grouping: icon ~top third, name middle, subtitle bottom
+    disp.draw_xbmp(56, 10, 16, 16, n.icon);
 
     disp.set_font_medium();
-    int tw = disp.text_width(n.title);
+    std::string display_name = n.title;
+    int tw = disp.text_width(display_name.c_str());
     if (tw > 120) {
-        std::string name = n.title;
-        std::string with_dots = name + "...";
-        while (!name.empty() && disp.text_width(with_dots.c_str()) > 120) {
-            name.pop_back();
-            with_dots = name + "...";
+        std::string with_dots = display_name + "...";
+        while (!display_name.empty() && disp.text_width(with_dots.c_str()) > 120) {
+            display_name.pop_back();
+            with_dots = display_name + "...";
         }
-        disp.draw_text(4, 40, with_dots.c_str());
-    } else {
-        disp.draw_text((128 - tw) / 2, 40, n.title);
+        display_name = with_dots;
+        tw = disp.text_width(display_name.c_str());
     }
+    disp.draw_text((128 - tw) / 2, 42, display_name.c_str());
 
     disp.set_font_small();
     tw = disp.text_width("Incoming Call");
-    disp.draw_text((128 - tw) / 2, 54, "Incoming Call");
+    disp.draw_text((128 - tw) / 2, 58, "Incoming Call");
 
     disp.set_color(1);
 }
@@ -235,12 +236,12 @@ static void draw_calendar_screen(DisplayBackend& disp, const NotificationOverlay
     if (std::strlen(n.body) > 0) {
         disp.set_font_small();
         tw = disp.text_width(n.body);
-        disp.draw_text((128 - tw) / 2, 48, n.body);
+        disp.draw_text((128 - tw) / 2, 46, n.body);
     }
 
     if (std::strlen(n.location) > 0) {
         tw = disp.text_width(n.location);
-        disp.draw_text((128 - tw) / 2, 58, n.location);
+        disp.draw_text((128 - tw) / 2, 60, n.location);
     }
 }
 
