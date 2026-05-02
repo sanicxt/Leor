@@ -8,6 +8,7 @@ idf_component_register(
         "src/gesture_service.cpp"
         "src/menu_service.cpp"
         "src/mochi_eyes_engine.cpp"
+        "src/notification_overlay.cpp"
         "src/mpu6050_ahrs_ng.cpp"
         "src/ota_service.cpp"
         "src/power_service.cpp"

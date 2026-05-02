@@ -270,7 +270,7 @@ void U8g2DisplayBackend::fill_round_rect(int x, int y, int w, int h, int r) { fi
 void U8g2DisplayBackend::select_font(const uint8_t* font) { u8g2_SetFont(handle_, font); }
 void U8g2DisplayBackend::set_font_small() { select_font(u8g2_font_profont11_tf); }
 void U8g2DisplayBackend::set_font_medium() { select_font(u8g2_font_profont15_tf); }
-void U8g2DisplayBackend::set_font_large() { select_font(u8g2_font_logisoso32_tn); }
+void U8g2DisplayBackend::set_font_large() { select_font(u8g2_font_logisoso32_tf); }
 void U8g2DisplayBackend::draw_text(int x, int y, const char* text) { u8g2_DrawStr(handle_, x, y, text); }
 int U8g2DisplayBackend::text_width(const char* text) { return static_cast<int>(u8g2_GetStrWidth(handle_, text)); }
 

@@ -4,6 +4,7 @@
 #include "leor/clock_service.hpp"
 #include "leor/gesture_service.hpp"
 #include "leor/mochi_eyes_engine.hpp"
+#include "leor/notification_overlay.hpp"
 #include "leor/power_service.hpp"
 #include "leor/preferences.hpp"
 #include "leor/shuffle_service.hpp"
@@ -27,6 +28,8 @@ class CommandRouter {
                   BleService& ble);
 
     std::string handle(std::string cmd, uint32_t now_ms, bool is_manual = true);
+    void set_notif_overlay(NotificationOverlay* notif);
+    uint32_t notif_duration_ms() const { return notif_duration_ms_; }
 
   private:
     std::string handle_settings(const std::string& params, uint32_t now_ms);
@@ -47,6 +50,8 @@ class CommandRouter {
     BleService& ble_;
     bool mpu_verbose_ = false;
     bool reacting_ = false;
+    NotificationOverlay* notif_overlay_ = nullptr;
+    uint32_t notif_duration_ms_ = 5000;
 };
 
 }  // namespace leor

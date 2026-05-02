@@ -18,5 +18,6 @@
 #include "icon_spotify.h"
 #include "icon_telegram.h"
 #include "icon_tiktok.h"
+#include "icon_twitter.h"
 #include "icon_whatsapp.h"
 #include "icon_youtube.h"

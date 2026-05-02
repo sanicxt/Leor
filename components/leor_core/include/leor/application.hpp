@@ -5,6 +5,7 @@
 #include "leor/command_router.hpp"
 #include "leor/config.hpp"
 #include "leor/display_backend.hpp"
+#include "leor/notification_overlay.hpp"
 #include "leor/gesture_service.hpp"
 #include "leor/menu_service.hpp"
 #include "leor/mochi_eyes_engine.hpp"
@@ -39,6 +40,7 @@ private:
   MenuService menu_;
   BleService ble_;
   std::unique_ptr<CommandRouter> commands_;
+  NotificationOverlay notif_;
   bool was_clock_enabled_ = false;
   bool was_menu_open_ = false;
   bool ble_window_open_ = false;

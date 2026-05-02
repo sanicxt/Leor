@@ -239,6 +239,7 @@ esp_err_t Application::start() {
   commands_ = std::make_unique<CommandRouter>(preferences_, config_.display,
                                               *display_, *eyes_, gesture_,
                                               shuffle_, clock_, power_, ble_);
+  commands_->set_notif_overlay(&notif_);
 
   const std::string ble_name = preferences_.getString("ble_name", "Leor");
   ESP_ERROR_CHECK(ble_.start(ble_name, [this](const std::string &cmd) {
@@ -371,6 +372,25 @@ void Application::tick() {
   default:
     break;
   }
+
+  // --- Notification Overlay Bypass ---
+  if (notif_.active) {
+    if (notif_.expired(now_ms)) {
+      notif_.dismiss();
+    } else {
+      // Button dismisses msg and calendar, but NOT calls
+      if (btn != ButtonEvent::kNone && notif_.type != NotificationType::kCall) {
+        notif_.dismiss();
+      }
+      if (notif_.active) {
+        display_->clear();
+        draw_notification(*display_, notif_, now_ms);
+        display_->send_buffer();
+        return;
+      }
+    }
+  }
+  // -----------------------------------
 
   if (gesture_.calibrating()) {
     std::string cal_result = gesture_.calibration_tick(now_ms, power_.is_pressed());

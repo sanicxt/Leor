@@ -59,7 +59,13 @@ CommandRouter::CommandRouter(Preferences& preferences,
       shuffle_(shuffle),
       clock_(clock),
       power_(power),
-      ble_(ble) {}
+      ble_(ble) {
+    notif_duration_ms_ = preferences_.getUInt("notif_nd", 5000);
+}
+
+void CommandRouter::set_notif_overlay(NotificationOverlay* notif) {
+    notif_overlay_ = notif;
+}
 
 void CommandRouter::reset_effects() {
     clock_.set_enabled(false);
@@ -80,7 +86,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
     const unsigned ble_window_ms = static_cast<unsigned>(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
     std::snprintf(
         buf, sizeof(buf),
-        "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"ct\":%u,\"td\":%u,\"wp\":%u,\"pp\":%u},"
+        "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"ct\":%u,\"td\":%u,\"wp\":%u,\"pp\":%u,\"nd\":%u},"
         "\"display\":{\"type\":\"%s\",\"addr\":\"0x%02X\"},"
         "\"state\":{\"shuf\":%d,\"mpu\":%d,\"clk\":%d},"
         "\"clock\":{\"on\":%d,\"tz\":%d,\"sec\":%u,\"fmt\":%d},"
@@ -92,6 +98,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
         static_cast<int>(preferences_.getInt("bi", 3)), static_cast<int>(preferences_.getInt("gs", 6)), static_cast<int>(preferences_.getInt("os", 12)), static_cast<int>(preferences_.getInt("ss", 10)),
         static_cast<unsigned>(preferences_.getUInt("disp_con", 0x7f)),
         static_cast<unsigned>(power_.hold_ms()), static_cast<unsigned>(preferences_.getUInt("wake_pin", 0)), static_cast<unsigned>(preferences_.getUInt("pwr_pin", 1)),
+        static_cast<unsigned>(notif_duration_ms_),
         display_config_.controller == DisplayController::kSsd1306 ? "ssd1306" : "sh1106", display_config_.i2c_address,
         shuffle_.enabled() ? 1 : 0, mpu_verbose_ ? 1 : 0, clock_.enabled() ? 1 : 0,
         clock_.enabled() ? 1 : 0, clock_.tz_offset(), static_cast<unsigned>(clock_.seconds_of_day()), clock_.use_24_hour() ? 24 : 12,
@@ -149,6 +156,9 @@ std::string CommandRouter::handle_settings(const std::string& params, uint32_t n
             if (value >= 0 && value <= 5) {
                 preferences_.putUInt("pwr_pin", static_cast<uint32_t>(value));
             }
+        } else if (key == "nd") {
+            notif_duration_ms_ = static_cast<uint32_t>(std::max(1000, value));
+            preferences_.putUInt("notif_nd", notif_duration_ms_);
         }
     }
     return "Settings applied & saved";
@@ -570,9 +580,58 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         return "ble:name=" + name + " saved. Reconnect now; restart if not visible.";
     }
     if (cmd == "tw:") return "tw:pin=" + std::to_string(preferences_.getUInt("wake_pin", 0)) + " active=high hold=" + std::to_string(power_.hold_ms()) + "ms";
-    if (starts_with(cmd, "sh:") || starts_with(cmd, "shuffle:")) return handle_shuffle(cmd.substr(cmd[2] == ':' ? 3 : 8));
+    if (starts_with(cmd, "sh:") || starts_with(cmd, "shuffle:")) return handle_shuffle(cmd.substr(cmd[2] == '?' ? 3 : 8));
     if (starts_with(cmd, "display:")) return handle_display(trim(cmd.substr(8)));
     if (starts_with(cmd, "clock:")) return handle_clock(trim(cmd.substr(6)), now_ms);
+    if (starts_with(cmd, "notify:")) {
+        if (!notif_overlay_) return "No notification overlay";
+        const auto rest = std::string(cmd.substr(7));
+        const auto first_colon = rest.find(':');
+        if (first_colon == std::string::npos) {
+            if (rest == "call:end" && notif_overlay_->type == NotificationType::kCall) {
+                notif_overlay_->dismiss();
+                return "Call dismissed";
+            }
+            return "notify: invalid format";
+        }
+        const auto type_str = rest.substr(0, first_colon);
+        const auto payload = rest.substr(first_colon + 1);
+        const auto pipe1 = payload.find('|');
+        if (type_str == "call" && payload == "end") {
+            if (notif_overlay_->type == NotificationType::kCall) {
+                notif_overlay_->dismiss();
+                return "Call dismissed";
+            }
+            return "No active call";
+        }
+        if (type_str == "call") {
+            if (pipe1 == std::string::npos) return "notify:call: invalid format";
+            const auto app = payload.substr(0, pipe1);
+            const auto caller = payload.substr(pipe1 + 1);
+            const uint8_t* ic = icon_for_app(app.c_str());
+            notif_overlay_->show_call(caller.c_str(), ic, now_ms);
+            return "Call notification shown";
+        }
+        if (type_str == "msg") {
+            if (pipe1 == std::string::npos) return "notify:msg: invalid format";
+            const auto app = payload.substr(0, pipe1);
+            const auto body = payload.substr(pipe1 + 1);
+            const uint8_t* ic = icon_for_app(app.c_str());
+            notif_overlay_->show_msg(app.c_str(), body.c_str(), ic, now_ms, notif_duration_ms_);
+            return "Message notification shown";
+        }
+        if (type_str == "cal") {
+            const auto pipe2 = payload.find('|', pipe1 + 1);
+            if (pipe1 == std::string::npos || pipe2 == std::string::npos) return "notify:cal: invalid format";
+            const auto app = payload.substr(0, pipe1);
+            const auto time_str = payload.substr(pipe1 + 1, pipe2 - pipe1 - 1);
+            const auto loc = payload.substr(pipe2 + 1);
+            const uint8_t* ic = icon_for_app(app.c_str());
+            notif_overlay_->show_cal(app.c_str(), time_str.c_str(), loc.c_str(), ic, now_ms, notif_duration_ms_);
+            return "Calendar notification shown";
+        }
+        return "notify: unknown type (use msg, call, or cal)";
+    }
     if (cmd == "restart" || cmd == "reboot") { esp_restart(); return "Restarting..."; }
     if (cmd == "help" || cmd == "?") return "help";
     return "Unknown: " + cmd;
