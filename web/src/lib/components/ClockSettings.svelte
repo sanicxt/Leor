@@ -81,7 +81,7 @@
     });
 </script>
 
-<div class="bento-card bg-bento-peach p-6 space-y-5">
+<div class="bento-card bg-bento-yellow p-6 space-y-5">
     <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between gap-3">
         <div>
             <h2 class="text-xl font-black uppercase tracking-tight">Clock</h2>
