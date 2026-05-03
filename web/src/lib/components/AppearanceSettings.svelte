@@ -196,7 +196,7 @@
     </div>
 
     <!-- Eye Appearance Card -->
-    <div class="bento-card bg-bento-blue p-6 space-y-6">
+    <div class="bento-card bg-bento-blue p-6 space-y-6" style="--slider-thumb: var(--color-bento-blue)">
         <!-- Header -->
         <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between">
             <div>
@@ -324,7 +324,7 @@
     </div>
 
     <!-- Mouth & Animations Card -->
-    <div class="bento-card bg-bento-pink p-6 space-y-5">
+    <div class="bento-card bg-bento-pink p-6 space-y-5" style="--slider-thumb: var(--color-bento-pink)">
         <div class="mb-4 border-b-2 border-bento-border pb-2">
             <h2 class="text-xl font-black uppercase">Mouth & Animations</h2>
             <p class="text-sm font-bold opacity-80">
@@ -436,7 +436,7 @@
     </div>
 
     <!-- Animation Speeds Card -->
-    <div class="bento-card bg-bento-green p-6 space-y-5">
+    <div class="bento-card bg-bento-green p-6 space-y-5" style="--slider-thumb: var(--color-bento-green)">
         <div class="mb-4 border-b-2 border-bento-border pb-2">
             <h2 class="text-xl font-black uppercase">Animation Speeds</h2>
             <p class="text-sm font-bold opacity-80">How fast things move</p>

@@ -47,7 +47,7 @@
     }
 </script>
 
-<div class="bento-card bg-bento-blue p-6 space-y-5">
+<div class="bento-card bg-bento-blue p-6 space-y-5" style="--slider-thumb: var(--color-bento-blue)">
     <!-- Header with Main Toggle -->
     <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between">
         <div>
