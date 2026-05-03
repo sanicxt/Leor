@@ -32,7 +32,7 @@ export const bleState = $state({
         ew: 36, eh: 36, es: 10, er: 8,
         mw: 20, lt: 1000, vt: 2000, bi: 3,
         gs: 6, os: 12, ss: 10, td: 3000, // gaze speed, openness speed, squish speed, touch hold delay (ms)
-        wp: 0, pp: 1, ct: 127 // wake GPIO pin, power-control GPIO pin, contrast (0-255)
+        wp: 0, pp: 1, ct: 127, nd: 5000 // wake GPIO pin, power-control GPIO pin, contrast (0-255), notification duration (ms)
     },
     display: {
         type: 'sh1106',  // sh1106 or ssd1306
@@ -101,6 +101,7 @@ export function getSettingsTd() { return bleState.settings.td; }
 export function getSettingsWp() { return bleState.settings.wp; }
 export function getSettingsPp() { return bleState.settings.pp; }
 export function getSettingsCt() { return bleState.settings.ct; }
+export function getSettingsNd() { return bleState.settings.nd; }
 
 export function getGestureMatching() { return bleState.gestureMatching; }
 export function getGestureInverted() { return bleState.gestureInverted; }
@@ -146,6 +147,7 @@ export function setSettingsTd(val: number) { bleState.settings.td = val; }
 export function setSettingsWp(val: number) { bleState.settings.wp = val; }
 export function setSettingsPp(val: number) { bleState.settings.pp = val; }
 export function setSettingsCt(val: number) { bleState.settings.ct = val; }
+export function setSettingsNd(val: number) { bleState.settings.nd = val; }
 
 export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
 export function setGestureInverted(val: boolean) { bleState.gestureInverted = val; }

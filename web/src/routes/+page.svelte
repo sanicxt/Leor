@@ -22,6 +22,7 @@
   import PowerSettings from "$lib/components/PowerSettings.svelte";
   import BreathingControl from "$lib/components/BreathingControl.svelte";
   import ClockSettings from "$lib/components/ClockSettings.svelte";
+  import NotificationSettings from "$lib/components/NotificationSettings.svelte";
   import OtaPanel from "$lib/components/OtaPanel.svelte";
   
   import {
@@ -186,6 +187,7 @@
           <BreathingControl />
           <PowerSettings />
           <ClockSettings />
+          <NotificationSettings />
         </div>
       {:else if activeTab === "gestures"}
         <div in:fly={{ y: 20, duration: 300 }} class="space-y-6">

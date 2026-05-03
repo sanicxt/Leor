@@ -7,6 +7,7 @@
     import GestureSettings from "$lib/components/GestureSettings.svelte";
     import GestureCalibration from "$lib/components/GestureCalibration.svelte";
     import PowerSettings from "$lib/components/PowerSettings.svelte";
+    import NotificationSettings from "$lib/components/NotificationSettings.svelte";
     import OtaPanel from "$lib/components/OtaPanel.svelte";
     import { base } from "$app/paths";
     import MasterBackground from "$lib/components/MasterBackground.svelte";
@@ -61,6 +62,10 @@
 
         <section>
             <DisplaySettings />
+        </section>
+
+        <section>
+            <NotificationSettings />
         </section>
 
         <section>
