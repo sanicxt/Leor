@@ -106,24 +106,32 @@
 
     <!-- Tuning Presets -->
     <div class="grid grid-cols-3 gap-3">
-        <button onclick={applySensitive} disabled={!bleState.connected} class="bento-button py-2 bg-paper text-ink text-[10px] font-black uppercase tracking-tight flex items-center justify-center gap-1.5">
+        <button onclick={applySensitive} disabled={!bleState.connected} class="bento-button py-2 bg-paper text-ink text-[10px] font-black uppercase tracking-tight flex items-center justify-center gap-1.5 disabled:opacity-50">
             <span class="text-base">🎯</span> SENSITIVE
         </button>
-        <button onclick={applyBalanced} disabled={!bleState.connected} class="bento-button py-2 bg-paper text-ink text-[10px] font-black uppercase tracking-tight flex items-center justify-center gap-1.5">
+        <button onclick={applyBalanced} disabled={!bleState.connected} class="bento-button py-2 bg-paper text-ink text-[10px] font-black uppercase tracking-tight flex items-center justify-center gap-1.5 disabled:opacity-50">
             <span class="text-base">⚖️</span> BALANCED
         </button>
-        <button onclick={applyStrict} disabled={!bleState.connected} class="bento-button py-2 bg-paper text-ink text-[10px] font-black uppercase tracking-tight flex items-center justify-center gap-1.5">
+        <button onclick={applyStrict} disabled={!bleState.connected} class="bento-button py-2 bg-paper text-ink text-[10px] font-black uppercase tracking-tight flex items-center justify-center gap-1.5 disabled:opacity-50">
             <span class="text-base">🔒</span> STRICT
         </button>
     </div>
     <div class="flex items-center justify-between p-3 rounded-2xl bg-paper/30 border-2 border-bento-border/10">
         <span class="text-[10px] font-black uppercase tracking-widest text-ink/70">Invert Y Axis (Pitch)</span>
-        <button            class="w-10 h-6 rounded-full border-2 border-bento-border transition-all relative {getGestureInverted() ? 'bg-bento-blue' : 'bg-paper'}"
+        <button
+            class="w-14 h-8 rounded-full border-2 border-bento-border transition-all duration-300 relative focus:outline-none disabled:opacity-50
+             {getGestureInverted() ? 'bg-bento-blue shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)]'}"
             aria-label="Invert gyro axes"
             onclick={() => updateInversion(!getGestureInverted())}
             disabled={!bleState.connected}
         >
-            <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full border border-bento-border bg-paper transition-transform duration-200 {getGestureInverted() ? 'translate-x-4' : 'translate-x-0'}"></div>
+            <span class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-bento-border rounded-full transition-transform duration-300 flex items-center justify-center {getGestureInverted() ? 'translate-x-6' : 'translate-x-0'}">
+                {#if getGestureInverted()}
+                    <svg class="w-3 h-3 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                {:else}
+                    <svg class="w-3 h-3 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                {/if}
+            </span>
         </button>
     </div>
 
@@ -133,11 +141,11 @@
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Expr Duration</span>
+                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Expression Duration</span>
                 </div>
                 <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{(getGestureReactionTime() / 1000).toFixed(1)}s</span>
             </div>
-            <input type="range" min="500" max="5000" step="100" value={getGestureReactionTime()} onchange={(e) => updateReactionTime(parseInt(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:bg-bento-yellow [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-bento-border" />
+            <input type="range" min="500" max="5000" step="100" value={getGestureReactionTime()} onchange={(e) => updateReactionTime(parseInt(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
             <p class="text-ink/60 font-bold text-[10px]">How long a gesture must be held before triggering</p>
         </div>
 
@@ -150,7 +158,7 @@
                 </div>
                 <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{(getGestureCooldown() / 1000).toFixed(1)}s</span>
             </div>
-            <input type="range" min="500" max="5000" step="250" value={getGestureCooldown()} onchange={(e) => updateCooldown(parseInt(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:bg-bento-yellow [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-bento-border" />
+            <input type="range" min="500" max="5000" step="250" value={getGestureCooldown()} onchange={(e) => updateCooldown(parseInt(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
             <p class="text-ink/60 font-bold text-[10px]">Minimum time between consecutive gesture triggers</p>
         </div>
 
@@ -164,7 +172,7 @@
                     </div>
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGestureShakeThreshold()}</span>
                 </div>
-                <input type="range" min="100" max="500" step="10" value={getGestureShakeThreshold()} onchange={(e) => updateShakeThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
+                <input type="range" min="100" max="500" step="10" value={getGestureShakeThreshold()} onchange={(e) => updateShakeThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
             </div>
 
             <!-- Pat Impact -->
@@ -176,7 +184,7 @@
                     </div>
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGesturePatThreshold().toFixed(2)}g</span>
                 </div>
-                <input type="range" min="0.1" max="0.8" step="0.01" value={getGesturePatThreshold()} onchange={(e) => updatePatThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
+                <input type="range" min="0.1" max="0.8" step="0.01" value={getGesturePatThreshold()} onchange={(e) => updatePatThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
             </div>
 
             <!-- Nudge Impact -->
@@ -188,7 +196,7 @@
                     </div>
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGestureSwipeThreshold().toFixed(2)}g</span>
                 </div>
-                <input type="range" min="0.2" max="1.0" step="0.05" value={getGestureSwipeThreshold()} onchange={(e) => updateSwipeThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
+                <input type="range" min="0.2" max="1.0" step="0.05" value={getGestureSwipeThreshold()} onchange={(e) => updateSwipeThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
             </div>
 
             <!-- Touch Min -->
@@ -200,7 +208,7 @@
                     </div>
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{(getGestureTouchThreshold() * 100).toFixed(0)}%</span>
                 </div>
-                <input type="range" min="0.01" max="0.4" step="0.01" value={getGestureTouchThreshold()} onchange={(e) => updateTouchThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
+                <input type="range" min="0.01" max="0.4" step="0.01" value={getGestureTouchThreshold()} onchange={(e) => updateTouchThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
             </div>
 
             <!-- Pickup Tilt Angle -->
@@ -212,7 +220,7 @@
                     </div>
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGesturePickupTiltDeg().toFixed(0)}°</span>
                 </div>
-                <input type="range" min="10" max="80" step="5" value={getGesturePickupTiltDeg()} onchange={(e) => updatePickupTiltDeg(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="w-full h-1.5 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer" />
+                <input type="range" min="10" max="80" step="5" value={getGesturePickupTiltDeg()} onchange={(e) => updatePickupTiltDeg(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
             </div>
         </div>
     </div>

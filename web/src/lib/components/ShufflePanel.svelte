@@ -58,6 +58,7 @@
              {getShuffleEnabled() ? 'bg-bento-green shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)]'}"
             onclick={toggleShuffle}
             disabled={!bleState.connected}
+            aria-label="Toggle shuffle"
         >
             <span class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-bento-border rounded-full transition-transform duration-300 flex items-center justify-center {getShuffleEnabled() ? 'translate-x-6' : 'translate-x-0'}">
                 {#if getShuffleEnabled()}
@@ -82,7 +83,7 @@
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Expr Time</span>
+                    <span class="text-ink/80 text-xs font-bold uppercase tracking-wider">Expression Time</span>
                 </div>
                 <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getShuffleExprMin()}-{getShuffleExprMax()}s</span>
             </div>
