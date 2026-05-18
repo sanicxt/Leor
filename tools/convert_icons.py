@@ -14,31 +14,52 @@ import argparse
 import io
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 from PIL import Image
 
+try:
+    import cairosvg
+    _HAS_CAIROSVG = True
+except ImportError:
+    _HAS_CAIROSVG = False
+
+_RSVG_CONVERT = shutil.which("rsvg-convert")
+
 
 def svg_to_bitmap(svg_path: Path, size: int = 16) -> bytes:
     """Render SVG to packed 1-bit bitmap bytes (MSB=leftmost)."""
-    result = subprocess.run(
-        [
-            "rsvg-convert",
-            "--width", str(size),
-            "--height", str(size),
-            "--format", "png",
-            str(svg_path),
-        ],
-        capture_output=True,
-    )
-    if result.returncode != 0:
+    png_data: bytes
+
+    if _RSVG_CONVERT:
+        result = subprocess.run(
+            [
+                _RSVG_CONVERT,
+                "--width", str(size),
+                "--height", str(size),
+                "--format", "png",
+                str(svg_path),
+            ],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"rsvg-convert failed on {svg_path}: {result.stderr.decode()}"
+            )
+        png_data = result.stdout
+    elif _HAS_CAIROSVG:
+        png_data = cairosvg.svg2png(
+            url=str(svg_path), output_width=size, output_height=size
+        )
+    else:
         raise RuntimeError(
-            f"rsvg-convert failed on {svg_path}: {result.stderr.decode()}"
+            "Neither rsvg-convert nor cairosvg found. Install librsvg2-bin or `pip install cairosvg`."
         )
 
-    overlay = Image.open(io.BytesIO(result.stdout)).convert("RGBA")
+    overlay = Image.open(io.BytesIO(png_data)).convert("RGBA")
     bg = Image.new("RGBA", (size, size), (255, 255, 255, 255))
     composite = Image.alpha_composite(bg, overlay)
     gray = composite.convert("L")
@@ -49,7 +70,7 @@ def svg_to_bitmap(svg_path: Path, size: int = 16) -> bytes:
     # Threshold at 128, no dither. 1 = white = ON = drawn pixel
     bw = inverted.convert("1", dither=Image.NONE)
 
-    pixels = list(bw.get_flattened_data())
+    pixels = list(bw.getdata())
     bytes_per_row = (size + 7) // 8
     out = bytearray()
     for row in range(size):

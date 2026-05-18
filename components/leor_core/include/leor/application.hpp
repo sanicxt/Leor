@@ -1,6 +1,7 @@
 #pragma once
 
 #include "leor/ble_service.hpp"
+#include "leor/buzzer_service.hpp"
 #include "leor/clock_service.hpp"
 #include "leor/command_router.hpp"
 #include "leor/config.hpp"
@@ -34,6 +35,7 @@ private:
   std::unique_ptr<DisplayBackend> display_;
   std::unique_ptr<MochiEyesEngine> eyes_;
   GestureService gesture_;
+  BuzzerService buzzer_;
   ClockService clock_;
   ShuffleService shuffle_;
   PowerService power_;

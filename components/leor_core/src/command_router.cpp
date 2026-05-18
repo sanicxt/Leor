@@ -473,6 +473,7 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         const bool on = std::atoi(cmd.substr(3).c_str()) == 1;
         gestures_.set_matching_enabled(on);
         preferences_.putBool("gm", on);
+        if (buzzer_cb_) buzzer_cb_(on);
         return on ? "gm=1" : "gm=0";
     }
     if (cmd == "gc") return "gc:ok";

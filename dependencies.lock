@@ -2,7 +2,7 @@ dependencies:
   idf:
     source:
       type: idf
-    version: 6.0.0
+    version: 6.0.1
   nixy4/u8g2:
     component_hash: d23326bf33da6b0a41ef16caa527689d770bcb7c469d8d57ca18a42f4cfed81b
     dependencies:

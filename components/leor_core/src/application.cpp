@@ -173,6 +173,7 @@ esp_err_t Application::start() {
   gpio_deep_sleep_hold_dis();
   release_held_pin(config_.display.sda_pin);
   release_held_pin(config_.display.scl_pin);
+  if (config_.buzzer_pin >= 0) release_held_pin(config_.buzzer_pin);
 
   power_.init(config_.touch_wake_pin, config_.touch_active_level,
               config_.touch_hold_ms, config_.pwr_ctrl_pin, config_.led_pin);
@@ -224,6 +225,14 @@ esp_err_t Application::start() {
   gesture_.set_touch_threshold(preferences_.getFloat("gtt", 0.05f));
   gesture_.set_pickup_tilt_deg(preferences_.getFloat("gtd", 30.0f));
 
+  config_.buzzer_pin = static_cast<int>(preferences_.getUInt("buz_pin", config_.buzzer_pin));
+  if (conflicts_with_display_i2c(config_.buzzer_pin, config_.display)) {
+    ESP_LOGW(kTag, "buzzer pin %d conflicts with I2C, disabling buzzer", config_.buzzer_pin);
+    config_.buzzer_pin = -1;
+  }
+  buzzer_.init(config_.buzzer_pin);
+  buzzer_.play_power_on();
+
   shuffle_.restore(preferences_.getBool("shuf_en", true),
                    preferences_.getUInt("shuf_emin", 2000),
                    preferences_.getUInt("shuf_emax", 5000),
@@ -237,9 +246,18 @@ esp_err_t Application::start() {
   was_clock_enabled_ = clock_.enabled();
 
   commands_ = std::make_unique<CommandRouter>(preferences_, config_.display,
-                                              *display_, *eyes_, gesture_,
-                                              shuffle_, clock_, power_, ble_);
+                                               *display_, *eyes_, gesture_,
+                                               shuffle_, clock_, power_, ble_);
   commands_->set_notif_overlay(&notif_);
+  commands_->set_buzzer_callback([this](bool on) {
+      if (on) buzzer_.play_toggle_on();
+      else buzzer_.play_toggle_off();
+  });
+
+  power_.set_sleep_prepare_callback([this]() {
+      buzzer_.stop();
+      buzzer_.prepare_sleep();
+  });
 
   const std::string ble_name = preferences_.getString("ble_name", "Leor");
   ESP_ERROR_CHECK(ble_.start(ble_name, [this](const std::string &cmd) {
@@ -342,6 +360,7 @@ void Application::tick() {
       bool was_shuffle = shuffle_.enabled();
       if (was_shuffle) shuffle_.set_enabled(false);
 
+      buzzer_.play_power_off();
       eyes_->triggerSleep();
       uint32_t start_ms = now_ms;
       while (!eyes_->is_sleep_done()) {

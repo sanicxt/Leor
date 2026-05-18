@@ -2,12 +2,14 @@ idf_component_register(
     SRCS
         "src/application.cpp"
         "src/ble_service.cpp"
+        "src/buzzer_service.cpp"
         "src/clock_service.cpp"
         "src/command_router.cpp"
         "src/display_backend.cpp"
         "src/gesture_service.cpp"
         "src/menu_service.cpp"
         "src/mochi_eyes_engine.cpp"
+        "src/musical_score_encoder.c"
         "src/notification_overlay.cpp"
         "src/mpu6050_ahrs_ng.cpp"
         "src/ota_service.cpp"
@@ -19,6 +21,7 @@ idf_component_register(
     REQUIRES
         bt
         driver
+        esp_driver_rmt
         esp_hw_support
         esp_timer
         app_update

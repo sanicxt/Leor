@@ -11,6 +11,7 @@
 #include "leor/display_backend.hpp"
 #include "leor/config.hpp"
 
+#include <functional>
 #include <string>
 
 namespace leor {
@@ -29,6 +30,7 @@ class CommandRouter {
 
     std::string handle(std::string cmd, uint32_t now_ms, bool is_manual = true);
     void set_notif_overlay(NotificationOverlay* notif);
+    void set_buzzer_callback(std::function<void(bool)> cb) { buzzer_cb_ = std::move(cb); }
     uint32_t notif_duration_ms() const { return notif_duration_ms_; }
 
   private:
@@ -52,6 +54,7 @@ class CommandRouter {
     bool reacting_ = false;
     NotificationOverlay* notif_overlay_ = nullptr;
     uint32_t notif_duration_ms_ = 5000;
+    std::function<void(bool)> buzzer_cb_;
 };
 
 }  // namespace leor
