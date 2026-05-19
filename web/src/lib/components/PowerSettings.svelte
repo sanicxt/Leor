@@ -87,7 +87,7 @@
     }
 </script>
 
-<div class="bento-card bg-bento-green p-6 space-y-5">
+<div class="bento-card bg-bento-green p-6 space-y-5" style="--slider-thumb: var(--color-bento-green)">
     <!-- Header -->
     <div class="mb-4 border-b-2 border-bento-border pb-2">
         <h2 class="text-xl font-black uppercase">Power Settings</h2>
@@ -164,21 +164,7 @@
             value={touchHoldDelay}
             onchange={(e) => updateTouchHoldDelay(parseInt(e.currentTarget.value))}
             disabled={!bleState.connected}
-            class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                   [&::-webkit-slider-thumb]:appearance-none
-                   [&::-webkit-slider-thumb]:w-4
-                   [&::-webkit-slider-thumb]:h-4
-                   [&::-webkit-slider-thumb]:rounded-sm
-                   [&::-webkit-slider-thumb]:bg-bento-yellow
-                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                   [&::-webkit-slider-thumb]:cursor-pointer
-                   [&::-webkit-slider-thumb]:border-2
-                   [&::-webkit-slider-thumb]:border-bento-border
-                   [&::-webkit-slider-thumb]:transition-transform
-                   [&::-webkit-slider-thumb]:active:scale-125
-                   [&::-webkit-slider-thumb]:active:shadow-none
-                   [&::-webkit-slider-thumb]:active:translate-y-0.5
-                   [&::-webkit-slider-thumb]:active:translate-x-0.5"
+            class="slider"
         />
 
         <div class="flex justify-between text-[10px] text-ink/60 font-bold px-1">
@@ -289,21 +275,7 @@
             value={bleWindowMs}
             onchange={(e) => updateBleWindow(parseInt(e.currentTarget.value))}
             disabled={!bleState.connected}
-            class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                   [&::-webkit-slider-thumb]:appearance-none
-                   [&::-webkit-slider-thumb]:w-4
-                   [&::-webkit-slider-thumb]:h-4
-                   [&::-webkit-slider-thumb]:rounded-sm
-                   [&::-webkit-slider-thumb]:bg-bento-green
-                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                   [&::-webkit-slider-thumb]:cursor-pointer
-                   [&::-webkit-slider-thumb]:border-2
-                   [&::-webkit-slider-thumb]:border-bento-border
-                   [&::-webkit-slider-thumb]:transition-transform
-                   [&::-webkit-slider-thumb]:active:scale-125
-                   [&::-webkit-slider-thumb]:active:shadow-none
-                   [&::-webkit-slider-thumb]:active:translate-y-0.5
-                   [&::-webkit-slider-thumb]:active:translate-x-0.5"
+            class="slider"
         />
 
         <div class="flex justify-between text-[10px] text-ink/60 font-bold px-1">

@@ -81,7 +81,7 @@
     });
 </script>
 
-<div class="bento-card bg-bento-peach p-6 space-y-5">
+<div class="bento-card bg-bento-yellow p-6 space-y-5">
     <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between gap-3">
         <div>
             <h2 class="text-xl font-black uppercase tracking-tight">Clock</h2>
@@ -102,11 +102,14 @@
                 <div class="text-xs font-black uppercase tracking-wider">Clock Power</div>
                 <div class="text-[10px] font-bold opacity-70">Turn the OLED clock on or off</div>
             </div>
-            <div class="flex items-center gap-2">
-                <div class={`w-12 h-7 rounded-full border-2 border-bento-border p-1 transition-all ${getClockEnabled() ? 'bg-bento-green' : 'bg-paper'}`}>
-                    <div class={`h-4 w-4 rounded-full bg-ink transition-transform ${getClockEnabled() ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                </div>
-                <span class="text-[10px] font-black uppercase tracking-wider">{getClockEnabled() ? 'On' : 'Off'}</span>
+            <div class="w-14 h-8 rounded-full border-2 border-bento-border transition-all duration-300 relative {getClockEnabled() ? 'bg-bento-green shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)]'}">
+                <span class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-bento-border rounded-full transition-transform duration-300 flex items-center justify-center {getClockEnabled() ? 'translate-x-6' : 'translate-x-0'}">
+                    {#if getClockEnabled()}
+                        <svg class="w-3 h-3 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                    {:else}
+                        <svg class="w-3 h-3 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    {/if}
+                </span>
             </div>
         </div>
     </button>

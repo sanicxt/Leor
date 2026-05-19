@@ -52,7 +52,8 @@
         <label
             class="flex flex-col items-center justify-center gap-2 border-2 border-dashed
                    {selectedFile ? 'border-bento-blue bg-bento-blue/20' : 'border-bento-border/30 hover:border-bento-border/60 bg-paper hover:bg-ink/5'}
-                   rounded-xl p-5 cursor-pointer transition-colors"
+                   rounded-xl p-5 cursor-pointer transition-colors
+                   {!bleState.connected ? 'opacity-50 pointer-events-none' : ''}"
         >
             <svg class="w-8 h-8 {selectedFile ? 'text-bento-blue' : 'text-ink/60'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"

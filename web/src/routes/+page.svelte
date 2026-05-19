@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly } from "svelte/transition";
+  import { fly, slide } from "svelte/transition";
   import { onMount } from "svelte";
   import MasterBackground from "$lib/components/MasterBackground.svelte";
   import AnimatedTabs from "$lib/components/AnimatedTabs.svelte";
@@ -22,6 +22,7 @@
   import PowerSettings from "$lib/components/PowerSettings.svelte";
   import BreathingControl from "$lib/components/BreathingControl.svelte";
   import ClockSettings from "$lib/components/ClockSettings.svelte";
+  import NotificationSettings from "$lib/components/NotificationSettings.svelte";
   import OtaPanel from "$lib/components/OtaPanel.svelte";
   
   import {
@@ -33,8 +34,13 @@
     bleState,
   } from "$lib/ble.svelte";
 
-  let activeTab = $state("home"); // 'home' | 'settings' | 'gestures'
+  let activeTab = $state("home");
   let isDarkMode = $state(false);
+  let settingsActive = $state('appearance');
+
+  function settingsToggle(id: string) {
+    settingsActive = settingsActive === id ? '' : id;
+  }
 
   onMount(() => {
     // Initialize dark mode based on existing class or system preference
@@ -176,16 +182,58 @@
 
         </div>
       {:else if activeTab === "settings"}
-        <div in:fly={{ y: 20, duration: 300 }} class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <ShufflePanel />
-            <GestureSettings />
-          </div>
-          <AppearanceSettings />
-          <DisplaySettings />
-          <BreathingControl />
-          <PowerSettings />
-          <ClockSettings />
+        <div in:fly={{ y: 20, duration: 300 }} class="space-y-4">
+          <!-- Appearance -->
+          <button
+            onclick={() => settingsToggle('appearance')}
+            class="bento-card w-full flex items-center justify-between px-5 py-3 bg-paper hover:shadow-[2px_2px_0px_0px_var(--color-bento-border)] transition-all"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-black uppercase">Appearance</span>
+              {#if settingsActive !== 'appearance'}
+                <span class="text-[10px] font-bold text-ink/30 uppercase">Shuffle · Eyes · Breathing</span>
+              {/if}
+            </div>
+            <svg class="w-4 h-4 text-ink transition-transform duration-200 {settingsActive === 'appearance' ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {#if settingsActive === 'appearance'}
+            <div transition:slide={{ duration: 200 }} class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ShufflePanel />
+                <BreathingControl />
+              </div>
+              <AppearanceSettings />
+            </div>
+          {/if}
+
+          <!-- Display & System -->
+          <button
+            onclick={() => settingsToggle('system')}
+            class="bento-card w-full flex items-center justify-between px-5 py-3 bg-paper hover:shadow-[2px_2px_0px_0px_var(--color-bento-border)] transition-all"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-black uppercase">Display & System</span>
+              {#if settingsActive !== 'system'}
+                <span class="text-[10px] font-bold text-ink/30 uppercase">OLED · Clock · Power</span>
+              {/if}
+            </div>
+            <svg class="w-4 h-4 text-ink transition-transform duration-200 {settingsActive === 'system' ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {#if settingsActive === 'system'}
+            <div transition:slide={{ duration: 200 }} class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DisplaySettings />
+                <ClockSettings />
+              </div>
+              <PowerSettings />
+              <NotificationSettings />
+              <GestureSettings />
+            </div>
+          {/if}
         </div>
       {:else if activeTab === "gestures"}
         <div in:fly={{ y: 20, duration: 300 }} class="space-y-6">

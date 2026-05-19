@@ -62,7 +62,7 @@
     }
 </script>
 
-<div class="bento-card bg-bento-peach p-6 space-y-5">
+<div class="bento-card bg-bento-blue p-6 space-y-5" style="--slider-thumb: var(--color-bento-blue)">
     <!-- Header -->
     <div class="mb-4 border-b-2 border-bento-border pb-2">
         <h2 class="text-xl font-black uppercase">Display Settings</h2>
@@ -80,7 +80,7 @@
                     class="bento-button group relative p-3 transition-all duration-200 disabled:opacity-50 {selectedDisplay === display.value ? 'bg-bento-yellow' : 'bg-paper'}"
                 >
                     <div class="flex flex-col items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg border-2 border-bento-border flex items-center justify-center transition-colors {selectedDisplay === display.value ? 'bg-paper text-ink' : 'bg-black/10 dark:bg-white/10 text-ink/60 group-hover:text-ink'}">
+                        <div class="w-8 h-8 rounded-lg border-2 border-bento-border flex items-center justify-center transition-colors {selectedDisplay === display.value ? 'bg-paper text-ink' : 'bg-bento-blue/15 text-ink/40 group-hover:text-ink/60'}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <rect x="3" y="4" width="18" height="14" rx="2" stroke-width="2" />
                                 <path d="M8 2v4M16 2v4" stroke-width="2" stroke-linecap="round" />
@@ -150,27 +150,13 @@
             oninput={(e) => setSettingsCt(parseInt(e.currentTarget.value))}
             onchange={applyContrast}
             disabled={!bleState.connected}
-            class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                   [&::-webkit-slider-thumb]:appearance-none
-                   [&::-webkit-slider-thumb]:w-4
-                   [&::-webkit-slider-thumb]:h-4
-                   [&::-webkit-slider-thumb]:rounded-sm
-                   [&::-webkit-slider-thumb]:bg-bento-yellow
-                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                   [&::-webkit-slider-thumb]:cursor-pointer
-                   [&::-webkit-slider-thumb]:border-2
-                   [&::-webkit-slider-thumb]:border-bento-border
-                   [&::-webkit-slider-thumb]:transition-transform
-                   [&::-webkit-slider-thumb]:active:scale-125
-                   [&::-webkit-slider-thumb]:active:shadow-none
-                   [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                   [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+            class="slider"
         />
     </div>
 
     <!-- Restart Required Banner -->
     {#if restartRequired}
-        <div class="flex gap-3 p-3 bg-bento-peach border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl items-center">
+        <div class="flex gap-3 p-3 bg-bento-yellow border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl items-center">
             <svg class="w-5 h-5 text-ink flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -178,7 +164,7 @@
                 <p class="text-ink font-bold text-xs uppercase tracking-wider">Restart Required</p>
                 <p class="text-ink/80 text-xs mt-0.5 font-bold">Changes saved. Restart to apply.</p>
             </div>
-            <button onclick={restartDevice} class="bento-button px-3 py-1.5 bg-bento-pink text-ink text-xs">
+            <button onclick={restartDevice} class="bento-button px-3 py-1.5 bg-paper text-ink text-xs">
                 Restart
             </button>
         </div>
