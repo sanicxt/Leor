@@ -21,6 +21,8 @@ public:
   void set_sleep_prepare_callback(SleepPrepareCallback callback);
   void set_i2c_pins(int sda_pin, int scl_pin);
   bool is_pressed() const { return pressed(); }
+  bool touch_enabled() const { return touch_pin_ != 0; }
+  bool power_control_enabled() const { return pwr_ctrl_pin_ >= 0; }
 
 private:
   bool pressed() const;

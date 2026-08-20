@@ -20,6 +20,7 @@ public:
     void play_power_on();
     void play_power_off();
     void play_melody();
+    bool initialized() const { return initialized_; }
 
 private:
     void play_seq(const Note* notes, int count);

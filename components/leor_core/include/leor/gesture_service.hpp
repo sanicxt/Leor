@@ -76,6 +76,7 @@ class GestureService {
 
     float pitch() const { return inverted_ ? -mpu_.data().pitch : mpu_.data().pitch; }
     float roll() const { return mpu_.data().roll; }
+    bool mpu_available() const { return mpu_available_; }
 
   private:
     bool init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* display);
