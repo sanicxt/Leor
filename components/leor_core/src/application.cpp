@@ -350,8 +350,19 @@ esp_err_t Application::start() {
   // Gyro is brought up BEFORE touch auto-detection: gesture_.start() runs the
   // IMU calibration loop, and doing it first avoids any MPU I2C activity being
   // mistaken for a touch press during the subsequent GPIO scan.
+  //
+  // We pass nullptr for the display so init_mpu's internal calibration screen
+  // does NOT hijack the LEOR boot screen. The boot screen's GYRO row stays
+  // visible (frozen at 0%) during the ~5s blocking calibration, then jumps to
+  // 100% when it completes. This keeps the boot screen coherent and, crucially,
+  // ensures the subsequent TOUCH WAIT stage is actually shown — previously the
+  // hijacked calibration screen covered it and the user's touch press was
+  // missed because no GPIO scan was running during the hijack.
+  if (display_ok)
+    draw_boot_screen(*display_, BootStage::kGyro, hw_, 0, false,
+                     static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
   gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
-                 config_.display.scl_pin, display_.get());
+                 config_.display.scl_pin, nullptr);
   hw_.gyro = gesture_.mpu_available() ? HwState::kPresent : HwState::kProbeFailed;
   gesture_.restore(preferences_.getBool("gm", true),
                     preferences_.getUInt("grt", 1500),
