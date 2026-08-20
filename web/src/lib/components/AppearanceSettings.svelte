@@ -167,7 +167,7 @@
     <!-- Quick Presets -->
     <div class="bento-card bg-bento-yellow p-6 space-y-4">
         <div class="mb-4 border-b-2 border-bento-border pb-2">
-            <h2 class="text-xl font-black uppercase">Quick Presets</h2>
+            <h2 class="font-display text-xl uppercase">Quick Presets</h2>
         </div>
         <div class="grid grid-cols-4 gap-3">
             {#each presets as preset}
@@ -200,7 +200,7 @@
         <!-- Header -->
         <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between">
             <div>
-                <h2 class="text-xl font-black uppercase">Eye Appearance</h2>
+                <h2 class="font-display text-xl uppercase">Eye Appearance</h2>
                 <p class="text-sm font-bold opacity-80">
                     Customize geometry & style
                 </p>
@@ -326,7 +326,7 @@
     <!-- Mouth & Animations Card -->
     <div class="bento-card bg-bento-pink p-6 space-y-5" style="--slider-thumb: var(--color-bento-pink)">
         <div class="mb-4 border-b-2 border-bento-border pb-2">
-            <h2 class="text-xl font-black uppercase">Mouth & Animations</h2>
+            <h2 class="font-display text-xl uppercase">Mouth & Animations</h2>
             <p class="text-sm font-bold opacity-80">
                 Control expressions & timing
             </p>
@@ -438,7 +438,7 @@
     <!-- Animation Speeds Card -->
     <div class="bento-card bg-bento-green p-6 space-y-5" style="--slider-thumb: var(--color-bento-green)">
         <div class="mb-4 border-b-2 border-bento-border pb-2">
-            <h2 class="text-xl font-black uppercase">Animation Speeds</h2>
+            <h2 class="font-display text-xl uppercase">Animation Speeds</h2>
             <p class="text-sm font-bold opacity-80">How fast things move</p>
         </div>
 

@@ -19,7 +19,7 @@
 
 <div class="bento-card bg-paper p-4">
   <div class="mb-4 border-b-2 border-bento-border pb-2">
-    <h2 class="text-xl font-black uppercase">Hardware</h2>
+    <h2 class="font-display text-xl uppercase">Hardware</h2>
     <p class="text-sm font-bold opacity-80">Detected peripherals</p>
   </div>
   <div class="grid grid-cols-2 md:grid-cols-5 gap-3">

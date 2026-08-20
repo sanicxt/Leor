@@ -44,29 +44,19 @@
   }
 
   onMount(() => {
-    // Initialize dark mode based on existing class or system preference
-    isDarkMode = document.documentElement.classList.contains("dark") || 
-      (!document.documentElement.classList.contains("light") && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    
-    // Apply explicitly on mount to ensure variables are set
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
-    }
+    // Default to the light cream look. Dark is opt-in via the toggle, persisted
+    // in localStorage; the OS color scheme is intentionally ignored.
+    const saved = localStorage.getItem("leor-theme");
+    isDarkMode = saved === "dark";
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    document.documentElement.classList.toggle("light", !isDarkMode);
   });
 
   function toggleDarkMode() {
     isDarkMode = !isDarkMode;
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
-    }
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    document.documentElement.classList.toggle("light", !isDarkMode);
+    localStorage.setItem("leor-theme", isDarkMode ? "dark" : "light");
   }
 
   async function handleConnect() {

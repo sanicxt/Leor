@@ -161,30 +161,17 @@
         transition-duration: 300ms;
     }
 
-    /* Dark mode override */
+    /* Dark mode override — only applied when the user toggles it.
+       The app defaults to the light cream look; the OS color scheme is ignored. */
     :root.dark {
-        --color-ink: #f2f0ec;
-        --color-bento-border: #0c0d0d;
-        --color-paper: #1a1818;
-        --color-bento-pink: #2a2626;
-        --color-bento-blue: #58499e;
-        --color-bento-green: #2e7d45;
-        --color-bento-yellow: #3a332b;
-        --color-bento-peach: #8a5a3d;
-    }
-
-    /* System dark mode fallback if no explicit class is set */
-    @media (prefers-color-scheme: dark) {
-        :root:not(.light) {
-            --color-ink: #f2f0ec;
-            --color-bento-border: #0c0a0d;
-            --color-paper: #1a1818;
-            --color-bento-pink: #2a2626;
-            --color-bento-blue: #58499e;
-            --color-bento-green: #2f7d45;
-            --color-bento-yellow: #3a332b;
-            --color-bento-peach: #8a5a3d;
-        }
+        --color-ink: #f2efe9;
+        --color-bento-border: #0a0a0a;
+        --color-paper: #151519;
+        --color-bento-pink: #2a2a30;
+        --color-bento-blue: #3a2f66;
+        --color-bento-green: #1f4d34;
+        --color-bento-yellow: #453722;
+        --color-bento-peach: #5c3a2c;
     }
 }
 

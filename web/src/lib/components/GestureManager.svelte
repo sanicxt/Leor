@@ -177,7 +177,7 @@
     <!-- Header -->
     <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between flex-wrap gap-3">
         <div>
-            <h2 class="text-xl font-black uppercase">Gesture Recognition</h2>
+            <h2 class="font-display text-xl uppercase">Gesture Recognition</h2>
             <p class="text-sm font-bold opacity-80">TTP223 + MPU6050 • Hybrid Logic</p>
         </div>
 
@@ -230,7 +230,7 @@
                         {getActionEmoji(gestures.find((g) => g.name === lastDetectedGesture)?.action || "")}
                     </span>
                 </div>
-                <div class="text-ink text-lg font-black uppercase">
+                <div class="text-ink font-display text-lg uppercase">
                     {lastDetectedGesture}
                 </div>
                 <div class="text-ink/60 font-bold text-xs mt-1">
