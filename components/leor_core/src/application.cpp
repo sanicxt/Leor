@@ -489,7 +489,14 @@ esp_err_t Application::start() {
         static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
     return commands_->handle(cmd, now_ms);
   }));
-  open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
+  // With touch present, don't arm the BLE window at boot — a touch
+  // (short press) opens it for the configured window. With touch absent
+  // the tick loop keeps advertising continuously.
+  if (hw_.touch != HwState::kAbsent) {
+    ble_window_open_ = false;
+  } else {
+    open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
+  }
   display_->set_contrast(static_cast<uint8_t>(preferences_.getUInt("disp_con", 0x7f)));
 
   ESP_LOGI(kTag, "application started");

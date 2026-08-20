@@ -39,7 +39,9 @@ class BleService {
     CommandHandler command_handler_;
     OtaService ota_{};
     bool connected_ = false;
-    bool advertising_enabled_ = true;
+    // Advertising is off by default; the app decides when to advertise
+    // (touch present: on touch, for the BLE window; touch absent: continuously).
+    bool advertising_enabled_ = false;
     SemaphoreHandle_t notify_mutex_ = nullptr;
 };
 
