@@ -21,13 +21,17 @@ public:
   void set_sleep_prepare_callback(SleepPrepareCallback callback);
   void set_i2c_pins(int sda_pin, int scl_pin);
   bool is_pressed() const { return pressed(); }
-  bool touch_enabled() const { return touch_pin_ != 0; }
+  bool touch_enabled() const { return touch_pin_ != kTouchPinDisabled; }
   bool power_control_enabled() const { return pwr_ctrl_pin_ >= 0; }
+
+  // 255 = "no touch pin configured". GPIO 0 is a valid touch pin, so it
+  // cannot be the disabled sentinel.
+  static constexpr uint8_t kTouchPinDisabled = 255;
 
 private:
   bool pressed() const;
 
-  uint8_t touch_pin_ = 0;
+  uint8_t touch_pin_ = kTouchPinDisabled;
   uint8_t active_level_ = 1;
   int pwr_ctrl_pin_ = 1;
   int led_pin_ = 8;

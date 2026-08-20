@@ -188,10 +188,13 @@ bool pin_in_use(int pin, const DisplayConfig& display, int buzzer_pin,
 // unwired pins read inactive; a pin needs kDebounceSamples consecutive active
 // reads to be accepted (prevents floating-pin false detects).
 struct TouchProbe {
+  // 255 = not detected yet. GPIO 0 is a valid touch pin, so it cannot be
+  // the 'no detection' sentinel.
+  static constexpr uint8_t kNotDetected = 255;
   uint8_t active_level = 1;
   bool configured[kTouchCandidatesCount] = {};
   uint8_t stable[kTouchCandidatesCount] = {};
-  uint8_t detected_pin = 0;
+  uint8_t detected_pin = kNotDetected;
 
   void setup(const DisplayConfig& display, int buzzer_pin, int pwr_ctrl_pin,
              uint8_t level) {
@@ -215,7 +218,7 @@ struct TouchProbe {
   }
 
   uint8_t poll() {
-    if (detected_pin != 0) return detected_pin;
+    if (detected_pin != kNotDetected) return detected_pin;
     constexpr uint32_t kDebounceSamples = 5;
     for (size_t i = 0; i < kTouchCandidatesCount; ++i) {
       if (!configured[i]) continue;
@@ -230,7 +233,7 @@ struct TouchProbe {
         stable[i] = 0;
       }
     }
-    return 0;
+    return kNotDetected;
   }
 };
 
@@ -264,7 +267,7 @@ esp_err_t Application::start() {
   config_.display.i2c_address =
       static_cast<uint8_t>(preferences_.getUInt("disp_addr", 0x3c));
   config_.touch_wake_pin =
-      static_cast<uint8_t>(preferences_.getUInt("wake_pin", 0));
+      static_cast<uint8_t>(preferences_.getUInt("wake_pin", 255));
   config_.touch_active_level = 1;
   config_.touch_hold_ms = preferences_.getUInt("touch_ms", 3000);
   config_.pwr_ctrl_pin = static_cast<int>(preferences_.getUInt("pwr_pin", 1));
@@ -272,11 +275,8 @@ esp_err_t Application::start() {
   const std::string touch_mode = preferences_.getString("touch_mode", "detect");
   const std::string buzzer_mode = preferences_.getString("buzzer_mode", "off");
 
-  if (touch_mode == "off") {
-    config_.touch_wake_pin = 0;
-  }
-  if (touch_mode == "detect") {
-    config_.touch_wake_pin = 0;
+  if (touch_mode == "off" || touch_mode == "detect") {
+    config_.touch_wake_pin = 255;
   }
 
   if (buzzer_mode == "off") {
@@ -286,15 +286,16 @@ esp_err_t Application::start() {
         static_cast<int>(preferences_.getUInt("buz_pin", config_.buzzer_pin));
   }
 
-  if (conflicts_with_display_i2c(static_cast<int>(config_.touch_wake_pin),
+  if (config_.touch_wake_pin != 255 &&
+      conflicts_with_display_i2c(static_cast<int>(config_.touch_wake_pin),
                                  config_.display)) {
     ESP_LOGW(kTag,
              "wake pin %d conflicts with display I2C pins (SDA=%d, SCL=%d), "
-             "reverting to 0",
+             "reverting to disabled",
              static_cast<int>(config_.touch_wake_pin), config_.display.sda_pin,
              config_.display.scl_pin);
-    config_.touch_wake_pin = 0;
-    preferences_.putUInt("wake_pin", 0);
+    config_.touch_wake_pin = 255;
+    preferences_.putUInt("wake_pin", 255);
   }
 
   if (conflicts_with_display_i2c(config_.pwr_ctrl_pin, config_.display)) {
@@ -382,10 +383,10 @@ esp_err_t Application::start() {
   gesture_.set_touch_threshold(preferences_.getFloat("gtt", 0.05f));
   gesture_.set_pickup_tilt_deg(preferences_.getFloat("gtd", 30.0f));
 
-  if (want_touch_detect && touch_probe.detected_pin == 0) {
+  if (want_touch_detect && touch_probe.detected_pin == TouchProbe::kNotDetected) {
     const uint32_t window_deadline_ms = touch_window_start_ms + kTouchDetectWindowMs;
     uint32_t last_draw_ms = 0;
-    while (touch_probe.detected_pin == 0) {
+    while (touch_probe.detected_pin == TouchProbe::kNotDetected) {
       const uint32_t now_ms =
           static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
       if (now_ms >= window_deadline_ms) break;
@@ -400,7 +401,7 @@ esp_err_t Application::start() {
 
   if (want_touch_detect) {
     const uint8_t detected = touch_probe.detected_pin;
-    if (detected != 0) {
+    if (detected != TouchProbe::kNotDetected) {
       config_.touch_wake_pin = detected;
       preferences_.putUInt("wake_pin", detected);
       ESP_LOGW(kTag, "auto-detected touch pin %u", detected);
