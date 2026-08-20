@@ -129,69 +129,55 @@ void draw_hw_summary_screen(DisplayBackend& display, const HardwareStatus& hw) {
 
 enum class BootStage { kDisplay, kGyro, kTouch, kBuzzer, kPower, kDone };
 
-// Animated OS-style boot screen: header sweep, stage checklist with status
-// icons, a hatched progress bar, and a blinking footer. `stage` marks which
-// peripheral is currently being brought up; `hw` holds each peripheral's
-// final health so completed stages show their status.
 void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatus& hw,
                       int gyro_pct, bool touch_waiting, uint32_t now_ms) {
   disp.clear();
 
-  // 1. Header with a sweeping underline.
-  disp.set_font_large();
-  disp.draw_text(4, 2, "LEOR");
-  disp.set_font_small();
-  const int under = static_cast<int>((now_ms / 30) % 124);
-  disp.fill_box(4, 12, under, 2);
-
-  // 2. Hatched top progress bar (overall boot progress).
-  disp.draw_frame(2, 18, 124, 6);
   const int stage_count = static_cast<int>(BootStage::kDone);
-  int done = static_cast<int>(stage);
-  const int overall_pct = (done * 100) / stage_count;
-  const int fill_w = (120 * overall_pct) / 100;
-  if (fill_w > 0) {
-    disp.fill_box(4, 20, fill_w, 2);
-    disp.set_color(0);
-    for (int i = 4; i < 4 + fill_w; i += 5) disp.draw_vline(i, 20, 2);
-    disp.set_color(1);
-  }
+  const int overall_pct = (static_cast<int>(stage) * 100) / stage_count;
 
-  // 3. Stage status rows.
   disp.set_font_small();
-  constexpr int kRowY[] = {27, 33, 39, 45, 51};
-  int row = 0;
-  auto status_tag = [&](HwState s, const char* label) {
-    const char* tag = s == HwState::kPresent ? "OK" : (s == HwState::kAbsent ? "ABSENT" : "FAILED");
-    disp.draw_text(4, kRowY[row], label);
-    const int tagw = disp.text_width(tag);
-    disp.draw_text(disp.width() - 6 - tagw, kRowY[row], tag);
-  };
+  disp.draw_text(2, 2, "LEOR");
+  char pct_s[8];
+  std::snprintf(pct_s, sizeof(pct_s), "%d%%", overall_pct);
+  const int pw = disp.text_width(pct_s);
+  disp.draw_text(disp.width() - 2 - pw, 2, pct_s);
 
-  status_tag(hw.display, "DISPLAY"); row++;
-  if (stage == BootStage::kGyro) {
-    char buf[32]; std::snprintf(buf, sizeof(buf), "GYRO [%d%%]", gyro_pct);
-    disp.draw_text(4, kRowY[row], buf);
-    row++;
-  } else {
-    status_tag(hw.gyro, "GYRO"); row++;
+  disp.draw_frame(2, 12, 124, 6);
+  const int fill_w = (120 * overall_pct) / 100;
+  if (fill_w > 0) disp.fill_box(4, 14, fill_w, 2);
+
+  const char* label = "";
+  const char* hint = "";
+  switch (stage) {
+    case BootStage::kDisplay: label = "DISPLAY"; break;
+    case BootStage::kGyro:    label = "GYRO";    break;
+    case BootStage::kTouch:   label = "TOUCH";   break;
+    case BootStage::kBuzzer:  label = "BUZZER";  break;
+    case BootStage::kPower:   label = "POWER";   break;
+    default: break;
   }
+  disp.set_font_large();
+  const int lw = disp.text_width(label);
+  disp.draw_text((disp.width() - lw) / 2, 30, label);
+  disp.set_font_small();
+
   if (touch_waiting) {
-    disp.draw_text(4, kRowY[row], "TOUCH  WAIT...");
-    row++;
-  } else {
-    status_tag(hw.touch, "TOUCH"); row++;
+    hint = "press touch";
+  } else if (stage == BootStage::kGyro) {
+    std::snprintf(pct_s, sizeof(pct_s), "%d%%", gyro_pct);
+    hint = pct_s;
+  } else if (stage == BootStage::kDisplay) {
+    hint = hw.display == HwState::kPresent ? "OK" : "FAIL";
+  } else if (stage == BootStage::kBuzzer) {
+    hint = hw.buzzer == HwState::kPresent ? "OK" : "ABSENT";
+  } else if (stage == BootStage::kPower) {
+    hint = hw.power == HwState::kPresent ? "OK" : "ABSENT";
+  } else if (stage == BootStage::kTouch) {
+    hint = hw.touch == HwState::kPresent ? "OK" : "ABSENT";
   }
-  status_tag(hw.buzzer, "BUZZER"); row++;
-  status_tag(hw.power, "POWER"); row++;
-
-  // 4. Footer with blinking boot dots.
-  disp.draw_text(4, 60, "BOOTING");
-  const int dots = (now_ms / 300) % 4;
-  char dots_s[5] = "....";
-  for (int i = 0; i < dots; ++i) dots_s[i] = '>';
-  dots_s[dots] = '\0';
-  disp.draw_text(60, 60, dots_s);
+  const int hint_w = disp.text_width(hint);
+  disp.draw_text((disp.width() - hint_w) / 2, 52, hint);
 
   disp.send_buffer();
 }
@@ -217,7 +203,7 @@ uint8_t autodetect_touch_pin(const DisplayConfig& display, int buzzer_pin,
                              const HardwareStatus& hw, DisplayBackend* disp) {
   constexpr uint32_t kTouchDetectWindowMs = 10000;
   constexpr uint32_t kSampleMs = 20;
-  constexpr uint32_t kDebounceSamples = 3;
+  constexpr uint32_t kDebounceSamples = 5;
   const uint32_t start_ms =
       static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
   const uint32_t deadline_ms = start_ms + kTouchDetectWindowMs;
@@ -230,9 +216,14 @@ uint8_t autodetect_touch_pin(const DisplayConfig& display, int buzzer_pin,
     gpio_config_t io = {};
     io.pin_bit_mask = (1ULL << pin);
     io.mode = GPIO_MODE_INPUT;
-    io.pull_up_en = GPIO_PULLUP_DISABLE;
-    io.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io.intr_type = GPIO_INTR_DISABLE;
+    if (active_level == 1) {
+      io.pull_up_en = GPIO_PULLUP_DISABLE;
+      io.pull_down_en = GPIO_PULLDOWN_ENABLE;
+    } else {
+      io.pull_up_en = GPIO_PULLUP_ENABLE;
+      io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    }
     if (gpio_config(&io) == ESP_OK) configured[i] = true;
   }
 
