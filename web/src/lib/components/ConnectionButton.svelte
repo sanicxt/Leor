@@ -1,6 +1,7 @@
 <script lang="ts">
     import {
         connect,
+        reconnect,
         disconnect,
         getConnected,
         isWebBluetoothSupported,
@@ -11,7 +12,12 @@
 
     async function handleConnect() {
         connecting = true;
-        await connect();
+        // Prefer reconnecting to an already-paired device — getDevices()
+        // needs no live advertising, so this works even after the BLE
+        // window lapsed. Fall back to the discovery picker.
+        if (!(await reconnect())) {
+            await connect();
+        }
         connecting = false;
     }
 </script>
