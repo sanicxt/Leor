@@ -210,7 +210,7 @@ std::string CommandRouter::handle_settings(const std::string& params, uint32_t n
             }
         }
     }
-    return "Settings applied & saved";
+    return sync_json(now_ms);
 }
 
 std::string CommandRouter::handle_shuffle(const std::string& params) {
