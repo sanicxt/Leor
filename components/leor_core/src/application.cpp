@@ -157,9 +157,9 @@ void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatu
     case BootStage::kPower:   label = "POWER";   break;
     default: break;
   }
-  disp.set_font_large();
+  disp.set_font_medium();
   const int lw = disp.text_width(label);
-  disp.draw_text((disp.width() - lw) / 2, 30, label);
+  disp.draw_text((disp.width() - lw) / 2, 28, label);
   disp.set_font_small();
 
   if (touch_waiting) {
@@ -193,64 +193,56 @@ bool pin_in_use(int pin, const DisplayConfig& display, int buzzer_pin,
   return false;
 }
 
-// Waits up to 10s for the user to press the touch input and scans candidate
-// GPIOs for the active level, refreshing the boot screen meanwhile. A pin is
-// only accepted once it reads the active level across enough consecutive
-// samples (debounced) so a transient glitch from other I/O is not misread as a
-// touch. Returns the detected pin, or 0 if nothing was pressed (touch absent).
-uint8_t autodetect_touch_pin(const DisplayConfig& display, int buzzer_pin,
-                             int pwr_ctrl_pin, uint8_t active_level,
-                             const HardwareStatus& hw, DisplayBackend* disp) {
-  constexpr uint32_t kTouchDetectWindowMs = 10000;
-  constexpr uint32_t kSampleMs = 20;
-  constexpr uint32_t kDebounceSamples = 5;
-  const uint32_t start_ms =
-      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
-  const uint32_t deadline_ms = start_ms + kTouchDetectWindowMs;
-
-  // Configure every available candidate as a digital input.
+// poll() is invoked from inside the gyro calibration loop so one 5s window
+// runs both concurrently. Pull resistor is set opposite to active_level so
+// unwired pins read inactive; a pin needs kDebounceSamples consecutive active
+// reads to be accepted (prevents floating-pin false detects).
+struct TouchProbe {
+  uint8_t active_level = 1;
   bool configured[kTouchCandidatesCount] = {};
-  for (size_t i = 0; i < kTouchCandidatesCount; ++i) {
-    const int pin = kTouchCandidates[i];
-    if (pin_in_use(pin, display, buzzer_pin, pwr_ctrl_pin)) continue;
-    gpio_config_t io = {};
-    io.pin_bit_mask = (1ULL << pin);
-    io.mode = GPIO_MODE_INPUT;
-    io.intr_type = GPIO_INTR_DISABLE;
-    if (active_level == 1) {
-      io.pull_up_en = GPIO_PULLUP_DISABLE;
-      io.pull_down_en = GPIO_PULLDOWN_ENABLE;
-    } else {
-      io.pull_up_en = GPIO_PULLUP_ENABLE;
-      io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  uint8_t stable[kTouchCandidatesCount] = {};
+  uint8_t detected_pin = 0;
+
+  void setup(const DisplayConfig& display, int buzzer_pin, int pwr_ctrl_pin,
+             uint8_t level) {
+    active_level = level;
+    for (size_t i = 0; i < kTouchCandidatesCount; ++i) {
+      const int pin = kTouchCandidates[i];
+      if (pin_in_use(pin, display, buzzer_pin, pwr_ctrl_pin)) continue;
+      gpio_config_t io = {};
+      io.pin_bit_mask = (1ULL << pin);
+      io.mode = GPIO_MODE_INPUT;
+      io.intr_type = GPIO_INTR_DISABLE;
+      if (active_level == 1) {
+        io.pull_up_en = GPIO_PULLUP_DISABLE;
+        io.pull_down_en = GPIO_PULLDOWN_ENABLE;
+      } else {
+        io.pull_up_en = GPIO_PULLUP_ENABLE;
+        io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+      }
+      if (gpio_config(&io) == ESP_OK) configured[i] = true;
     }
-    if (gpio_config(&io) == ESP_OK) configured[i] = true;
   }
 
-  // Debounce counter per candidate: counts consecutive active samples.
-  uint8_t stable[kTouchCandidatesCount] = {};
-
-  while (true) {
-    const uint32_t now_ms =
-        static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
-    if (now_ms >= deadline_ms) break;  // window expired, touch absent
-    if (disp) draw_boot_screen(*disp, BootStage::kTouch, hw, 100, true, now_ms);
+  uint8_t poll() {
+    if (detected_pin != 0) return detected_pin;
+    constexpr uint32_t kDebounceSamples = 5;
     for (size_t i = 0; i < kTouchCandidatesCount; ++i) {
       if (!configured[i]) continue;
       const int pin = kTouchCandidates[i];
       if (gpio_get_level(static_cast<gpio_num_t>(pin)) ==
           static_cast<int>(active_level)) {
         if (++stable[i] >= kDebounceSamples) {
-          return static_cast<uint8_t>(pin);
+          detected_pin = static_cast<uint8_t>(pin);
+          return detected_pin;
         }
       } else {
         stable[i] = 0;
       }
     }
-    vTaskDelay(pdMS_TO_TICKS(kSampleMs));
+    return 0;
   }
-  return 0;
-}
+};
 
 Application::Application() = default;
 
@@ -286,6 +278,23 @@ esp_err_t Application::start() {
   config_.touch_active_level = 1;
   config_.touch_hold_ms = preferences_.getUInt("touch_ms", 3000);
   config_.pwr_ctrl_pin = static_cast<int>(preferences_.getUInt("pwr_pin", 1));
+
+  const std::string touch_mode = preferences_.getString("touch_mode", "detect");
+  const std::string buzzer_mode = preferences_.getString("buzzer_mode", "off");
+
+  if (touch_mode == "off") {
+    config_.touch_wake_pin = 0;
+  }
+  if (touch_mode == "detect") {
+    config_.touch_wake_pin = 0;
+  }
+
+  if (buzzer_mode == "off") {
+    config_.buzzer_pin = -1;
+  } else {
+    config_.buzzer_pin =
+        static_cast<int>(preferences_.getUInt("buz_pin", config_.buzzer_pin));
+  }
 
   if (conflicts_with_display_i2c(static_cast<int>(config_.touch_wake_pin),
                                  config_.display)) {
@@ -338,22 +347,26 @@ esp_err_t Application::start() {
   const uint32_t boot_now = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
   if (display_ok) draw_boot_screen(*display_, BootStage::kDisplay, hw_, 0, false, boot_now);
 
-  // Gyro is brought up BEFORE touch auto-detection: gesture_.start() runs the
-  // IMU calibration loop, and doing it first avoids any MPU I2C activity being
-  // mistaken for a touch press during the subsequent GPIO scan.
-  //
-  // We pass nullptr for the display so init_mpu's internal calibration screen
-  // does NOT hijack the LEOR boot screen. The boot screen's GYRO row stays
-  // visible (frozen at 0%) during the ~5s blocking calibration, then jumps to
-  // 100% when it completes. This keeps the boot screen coherent and, crucially,
-  // ensures the subsequent TOUCH WAIT stage is actually shown — previously the
-  // hijacked calibration screen covered it and the user's touch press was
-  // missed because no GPIO scan was running during the hijack.
+  // Gyro calibration and touch auto-detection run concurrently in one 5s
+  // window. The touch_probe callback is polled each IMU calibration iteration;
+  // a display=nullptr suppresses init_mpu's internal screen so the LEOR boot
+  // screen stays visible. Running them together avoids a separate 10s touch
+  // window and the earlier race where MPU I2C traffic was misread as a press.
+  TouchProbe touch_probe{};
+  const bool want_touch_detect = (touch_mode == "detect");
+  if (want_touch_detect) {
+    touch_probe.setup(config_.display, config_.buzzer_pin,
+                      config_.pwr_ctrl_pin, config_.touch_active_level);
+  }
+
   if (display_ok)
-    draw_boot_screen(*display_, BootStage::kGyro, hw_, 0, false,
+    draw_boot_screen(*display_, BootStage::kGyro, hw_, 0, want_touch_detect,
                      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+
+  std::function<uint8_t()> probe_cb;
+  if (want_touch_detect) probe_cb = [&touch_probe]() -> uint8_t { return touch_probe.poll(); };
   gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
-                 config_.display.scl_pin, nullptr);
+                 config_.display.scl_pin, nullptr, probe_cb);
   hw_.gyro = gesture_.mpu_available() ? HwState::kPresent : HwState::kProbeFailed;
   gesture_.restore(preferences_.getBool("gm", true),
                     preferences_.getUInt("grt", 1500),
@@ -366,20 +379,9 @@ esp_err_t Application::start() {
   gesture_.set_swipe_threshold(preferences_.getFloat("gvt", 0.45f));
   gesture_.set_touch_threshold(preferences_.getFloat("gtt", 0.05f));
   gesture_.set_pickup_tilt_deg(preferences_.getFloat("gtd", 30.0f));
-  if (display_ok)
-    draw_boot_screen(*display_, BootStage::kGyro, hw_, 100, false,
-                     static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
 
-  // If no touch pin is configured (e.g. fresh NVS after a partition change),
-  // prompt on-screen and wait up to 10s for the user to press the touch input
-  // so we can auto-detect which GPIO it is on, rather than spuriously
-  // reporting the touch peripheral as absent. The press must read a stable
-  // active level (debounced) before it is committed.
-  if (hw_.touch == HwState::kAbsent) {
-    uint8_t detected =
-        autodetect_touch_pin(config_.display, config_.buzzer_pin,
-                             config_.pwr_ctrl_pin, config_.touch_active_level,
-                             hw_, display_.get());
+  if (want_touch_detect) {
+    const uint8_t detected = touch_probe.detected_pin;
     if (detected != 0) {
       config_.touch_wake_pin = detected;
       preferences_.putUInt("wake_pin", detected);
@@ -391,6 +393,10 @@ esp_err_t Application::start() {
       hw_.touch = HwState::kPresent;
     }
   }
+
+  if (display_ok)
+    draw_boot_screen(*display_, BootStage::kGyro, hw_, 100, false,
+                     static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
   if (display_ok)
     draw_boot_screen(*display_, BootStage::kTouch, hw_, 100, false,
                      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
@@ -412,7 +418,6 @@ esp_err_t Application::start() {
                        preferences_.getFloat("br_int", 0.08f),
                        preferences_.getFloat("br_spd", 0.3f));
 
-  config_.buzzer_pin = static_cast<int>(preferences_.getUInt("buz_pin", config_.buzzer_pin));
   if (conflicts_with_display_i2c(config_.buzzer_pin, config_.display)) {
     ESP_LOGW(kTag, "buzzer pin %d conflicts with I2C, disabling buzzer", config_.buzzer_pin);
     config_.buzzer_pin = -1;

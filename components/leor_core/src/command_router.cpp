@@ -40,6 +40,28 @@ std::vector<std::string> split(const std::string& text, char delim) {
     return out;
 }
 
+int touch_mode_int(const std::string& mode) {
+    if (mode == "on") return 1;
+    if (mode == "detect") return 2;
+    return 0;
+}
+
+std::string touch_mode_str(int value) {
+    switch (value) {
+        case 1: return "on";
+        case 2: return "detect";
+        default: return "off";
+    }
+}
+
+int buzzer_mode_int(const std::string& mode) {
+    return mode == "on" ? 1 : 0;
+}
+
+std::string buzzer_mode_str(int value) {
+    return value == 1 ? "on" : "off";
+}
+
 }  // namespace
 
 CommandRouter::CommandRouter(Preferences& preferences,
@@ -90,7 +112,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
     const unsigned ble_window_ms = static_cast<unsigned>(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
     std::snprintf(
         buf, sizeof(buf),
-        "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"ct\":%u,\"td\":%u,\"wp\":%u,\"pp\":%u,\"nd\":%u},"
+        "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"ct\":%u,\"td\":%u,\"wp\":%u,\"pp\":%u,\"nd\":%u,\"tm\":%d,\"bm\":%d},"
         "\"display\":{\"type\":\"%s\",\"addr\":\"0x%02X\"},"
         "\"state\":{\"shuf\":%d,\"mpu\":%d,\"clk\":%d},"
         "\"clock\":{\"on\":%d,\"tz\":%d,\"sec\":%u,\"fmt\":%d},"
@@ -103,6 +125,8 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
         static_cast<unsigned>(preferences_.getUInt("disp_con", 0x7f)),
         static_cast<unsigned>(power_.hold_ms()), static_cast<unsigned>(preferences_.getUInt("wake_pin", 0)), static_cast<unsigned>(preferences_.getUInt("pwr_pin", 1)),
         static_cast<unsigned>(notif_duration_ms_),
+        touch_mode_int(preferences_.getString("touch_mode", "detect")),
+        buzzer_mode_int(preferences_.getString("buzzer_mode", "off")),
         display_config_.controller == DisplayController::kSsd1306 ? "ssd1306" : "sh1106", display_config_.i2c_address,
         shuffle_.enabled() ? 1 : 0, mpu_verbose_ ? 1 : 0, clock_.enabled() ? 1 : 0,
         clock_.enabled() ? 1 : 0, clock_.tz_offset(), static_cast<unsigned>(clock_.seconds_of_day()), clock_.use_24_hour() ? 24 : 12,
@@ -176,6 +200,14 @@ std::string CommandRouter::handle_settings(const std::string& params, uint32_t n
         } else if (key == "nd") {
             notif_duration_ms_ = static_cast<uint32_t>(std::max(1000, value));
             preferences_.putUInt("notif_nd", notif_duration_ms_);
+        } else if (key == "tm") {
+            if (value >= 0 && value <= 2) {
+                preferences_.putString("touch_mode", touch_mode_str(value).c_str());
+            }
+        } else if (key == "bm") {
+            if (value == 0 || value == 1) {
+                preferences_.putString("buzzer_mode", buzzer_mode_str(value).c_str());
+            }
         }
     }
     return "Settings applied & saved";
