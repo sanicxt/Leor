@@ -21,6 +21,7 @@ constexpr uint32_t kPowerOffMessageMs = 320;
 constexpr uint32_t kOtaUiFrameMs = 33;
 constexpr uint32_t kBleWindowMinMs = 20000;
 constexpr uint32_t kBleWindowDefaultMs = 60000;
+constexpr uint32_t kTouchDetectWindowMs = 5000;
 
 bool conflicts_with_display_i2c(int pin, const DisplayConfig &display) {
   return pin == display.sda_pin || pin == display.scl_pin;
@@ -359,12 +360,23 @@ esp_err_t Application::start() {
                       config_.pwr_ctrl_pin, config_.touch_active_level);
   }
 
+  const uint32_t touch_window_start_ms =
+      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
   if (display_ok)
     draw_boot_screen(*display_, BootStage::kGyro, hw_, 0, want_touch_detect,
-                     static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+                     touch_window_start_ms);
 
-  std::function<uint8_t()> probe_cb;
-  if (want_touch_detect) probe_cb = [&touch_probe]() -> uint8_t { return touch_probe.poll(); };
+  std::function<uint8_t(int)> probe_cb;
+  if (want_touch_detect) {
+    probe_cb = [this, &touch_probe, display_ok, last = 0](int pct) mutable -> uint8_t {
+      if (display_ok && (pct >= last + 4 || pct >= 100)) {
+        last = pct;
+        draw_boot_screen(*display_, BootStage::kGyro, hw_, pct, true,
+                         static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+      }
+      return touch_probe.poll();
+    };
+  }
   gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
                  config_.display.scl_pin, nullptr, probe_cb);
   hw_.gyro = gesture_.mpu_available() ? HwState::kPresent : HwState::kProbeFailed;
@@ -379,6 +391,22 @@ esp_err_t Application::start() {
   gesture_.set_swipe_threshold(preferences_.getFloat("gvt", 0.45f));
   gesture_.set_touch_threshold(preferences_.getFloat("gtt", 0.05f));
   gesture_.set_pickup_tilt_deg(preferences_.getFloat("gtd", 30.0f));
+
+  if (want_touch_detect && touch_probe.detected_pin == 0) {
+    const uint32_t window_deadline_ms = touch_window_start_ms + kTouchDetectWindowMs;
+    uint32_t last_draw_ms = 0;
+    while (touch_probe.detected_pin == 0) {
+      const uint32_t now_ms =
+          static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+      if (now_ms >= window_deadline_ms) break;
+      if (display_ok && now_ms - last_draw_ms >= 100) {
+        last_draw_ms = now_ms;
+        draw_boot_screen(*display_, BootStage::kTouch, hw_, 100, true, now_ms);
+      }
+      touch_probe.poll();
+      vTaskDelay(pdMS_TO_TICKS(20));
+    }
+  }
 
   if (want_touch_detect) {
     const uint8_t detected = touch_probe.detected_pin;
@@ -494,8 +522,7 @@ void Application::tick() {
   }
 
   if (hw_.touch == HwState::kAbsent) {
-    // No touch input → keep BLE discoverable so the user can control via web dashboard.
-    if (!ble_window_open_) {
+    if (!ble_.advertising_enabled()) {
       ble_window_open_ = true;
       ble_.start_advertising();
     }
