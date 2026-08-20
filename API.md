@@ -107,6 +107,7 @@ Common keys:
 - `restart` / `reboot`
 - `help` / `?`
 - `music` — plays Beethoven's "Ode to Joy" on the buzzer
+- `hw:status` — returns a JSON object `{"type":"hw","display":N,"gyro":N,"buzzer":N,"touch":N,"power":N}` where N is 0=present, 1=absent, 2=probe-failed
 
 ## OTA Notes
 
