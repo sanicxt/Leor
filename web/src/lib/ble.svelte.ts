@@ -55,6 +55,9 @@ export const bleState = $state({
     clockTimezoneOffset: 0,
     clockSeconds: 0,
     clock24Hour: true,
+    hardware: {
+        display: 0, gyro: 0, buzzer: 0, touch: 0, power: 0
+    },
     // Gesture calibration state (synced from device)
     calPhase: 'idle' as 'idle' | 'wait' | 'capturing' | 'complete' | 'timeout',
     calGesture: '' as string,
@@ -120,6 +123,7 @@ export function getClockEnabled() { return bleState.clockEnabled; }
 export function getClockSeconds() { return bleState.clockSeconds; }
 export function getClockTimezoneOffset() { return bleState.clockTimezoneOffset; }
 export function getClock24Hour() { return bleState.clock24Hour; }
+export function getHardware() { return bleState.hardware; }
 
 // Setters
 export function setShuffleEnabled(val: boolean) { bleState.shuffleEnabled = val; }
@@ -270,6 +274,13 @@ export async function connect(): Promise<boolean> {
                                 if ('sec' in data.clock) bleState.clockSeconds = data.clock.sec;
                                 if ('fmt' in data.clock) bleState.clock24Hour = (data.clock.fmt === 24);
                             }
+                            if (data.hardware) {
+                                if ('display' in data.hardware) bleState.hardware.display = data.hardware.display;
+                                if ('gyro' in data.hardware) bleState.hardware.gyro = data.hardware.gyro;
+                                if ('buzzer' in data.hardware) bleState.hardware.buzzer = data.hardware.buzzer;
+                                if ('touch' in data.hardware) bleState.hardware.touch = data.hardware.touch;
+                                if ('power' in data.hardware) bleState.hardware.power = data.hardware.power;
+                            }
                         }
 
                         if (data.type === 'cal') {
@@ -281,6 +292,14 @@ export async function connect(): Promise<boolean> {
                             bleState.calCaptureMs = data.capture_ms || 0;
                             bleState.calSamples = data.samples || 0;
                             console.log('[BLE RX Cal]', bleState.calPhase, bleState.calGesture, 'peak:', bleState.calPeak);
+                        }
+
+                        if (data.type === 'hw') {
+                            if ('display' in data) bleState.hardware.display = data.display;
+                            if ('gyro' in data) bleState.hardware.gyro = data.gyro;
+                            if ('buzzer' in data) bleState.hardware.buzzer = data.buzzer;
+                            if ('touch' in data) bleState.hardware.touch = data.touch;
+                            if ('power' in data) bleState.hardware.power = data.power;
                         }
 
                         bleState.lastStatus = 'Sync complete';
