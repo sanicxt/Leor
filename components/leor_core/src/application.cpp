@@ -115,6 +115,18 @@ void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const 
   display.send_buffer();
 }
 
+void draw_hw_summary_screen(DisplayBackend& display, const HardwareStatus& hw) {
+  display.clear();
+  display.set_font_small();
+  display.draw_text(4, 6, "HARDWARE CHECK");
+  display.draw_hline(4, 12, 124);
+  display.set_font_medium();
+  const std::string summary = hw.summary();
+  const int tw = display.text_width(summary.c_str());
+  display.draw_text((display.width() - tw) / 2, 40, summary.c_str());
+  display.send_buffer();
+}
+
 Application::Application() = default;
 
 esp_err_t Application::start() {
@@ -179,9 +191,12 @@ esp_err_t Application::start() {
               config_.touch_hold_ms, config_.pwr_ctrl_pin, config_.led_pin);
   power_.set_i2c_pins(config_.display.sda_pin, config_.display.scl_pin);
   power_.arm(1000, 0);
+  hw_.touch = power_.touch_enabled() ? HwState::kPresent : HwState::kAbsent;
+  hw_.power = power_.power_control_enabled() ? HwState::kPresent : HwState::kAbsent;
 
   display_ = std::make_unique<U8g2DisplayBackend>();
-  if (!display_->init(config_.display)) {
+  const bool display_ok = display_->init(config_.display);
+  if (!display_ok) {
     ESP_LOGW(kTag,
              "display init failed, falling back to null backend (%s, SDA=%d, "
              "SCL=%d, addr=0x%02x)",
@@ -193,6 +208,7 @@ esp_err_t Application::start() {
     display_ = std::make_unique<NullDisplayBackend>();
     display_->init(config_.display);
   }
+  hw_.display = display_ok ? HwState::kPresent : HwState::kProbeFailed;
 
   eyes_ = std::make_unique<MochiEyesEngine>(*display_);
   eyes_->begin();
@@ -213,6 +229,7 @@ esp_err_t Application::start() {
 
   gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
                  config_.display.scl_pin, display_.get());
+  hw_.gyro = gesture_.mpu_available() ? HwState::kPresent : HwState::kProbeFailed;
   gesture_.restore(preferences_.getBool("gm", true),
                     preferences_.getUInt("grt", 1500),
                     preferences_.getUInt("gcf", 70),
@@ -231,6 +248,7 @@ esp_err_t Application::start() {
     config_.buzzer_pin = -1;
   }
   buzzer_.init(config_.buzzer_pin);
+  hw_.buzzer = buzzer_.initialized() ? HwState::kPresent : HwState::kAbsent;
   buzzer_.play_power_on();
 
   shuffle_.restore(preferences_.getBool("shuf_en", true),
@@ -269,6 +287,13 @@ esp_err_t Application::start() {
   open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
   display_->set_contrast(static_cast<uint8_t>(preferences_.getUInt("disp_con", 0x7f)));
 
+  if (hw_.any_failure() && display_ && display_ok) {
+    const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+    boot_summary_until_ms_ = now_ms + 3000;
+    boot_summary_shown_ = true;
+    ESP_LOGW(kTag, "hardware check: %s", hw_.summary().c_str());
+  }
+
   ESP_LOGI(kTag, "application started");
   return ESP_OK;
 }
@@ -286,7 +311,13 @@ void Application::tick() {
     }
   }
 
-  if (ble_window_open_ && !ota_active && now_ms >= ble_window_deadline_ms_) {
+  if (hw_.touch == HwState::kAbsent) {
+    // No touch input → keep BLE discoverable so the user can control via web dashboard.
+    if (!ble_window_open_) {
+      ble_window_open_ = true;
+      ble_.start_advertising();
+    }
+  } else if (ble_window_open_ && !ota_active && now_ms >= ble_window_deadline_ms_) {
     ble_.stop(false);
     ble_window_open_ = false;
   }
@@ -323,6 +354,15 @@ void Application::tick() {
     return;
   }
   // ---------------------------
+
+  if (boot_summary_shown_) {
+    if (now_ms < boot_summary_until_ms_) {
+      draw_hw_summary_screen(*display_, hw_);
+      vTaskDelay(pdMS_TO_TICKS(33));
+      return;
+    }
+    boot_summary_shown_ = false;
+  }
 
   ButtonEvent btn = power_.poll(now_ms);
   if (btn == ButtonEvent::kShortPress) {

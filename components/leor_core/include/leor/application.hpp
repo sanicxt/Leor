@@ -8,6 +8,7 @@
 #include "leor/display_backend.hpp"
 #include "leor/notification_overlay.hpp"
 #include "leor/gesture_service.hpp"
+#include "leor/hardware_status.hpp"
 #include "leor/menu_service.hpp"
 #include "leor/mochi_eyes_engine.hpp"
 #include "leor/power_service.hpp"
@@ -50,6 +51,9 @@ private:
   uint32_t ble_window_duration_ms_ = 60000;
   uint32_t ble_window_deadline_ms_ = 0;
   uint32_t last_short_press_ms_ = 0;
+  HardwareStatus hw_{};
+  bool boot_summary_shown_ = false;
+  uint32_t boot_summary_until_ms_ = 0;
   static constexpr uint32_t kDoubleTapThresholdMs = 400;
 };
 
