@@ -266,7 +266,7 @@ esp_err_t Application::start() {
   commands_ = std::make_unique<CommandRouter>(preferences_, config_.display,
                                                *display_, *eyes_, gesture_,
                                                shuffle_, clock_, power_, ble_,
-                                               buzzer_);
+                                               buzzer_, hw_);
   commands_->set_notif_overlay(&notif_);
   commands_->set_buzzer_callback([this](bool on) {
       if (on) buzzer_.play_toggle_on();

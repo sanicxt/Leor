@@ -51,7 +51,8 @@ CommandRouter::CommandRouter(Preferences& preferences,
                              ClockService& clock,
                              PowerService& power,
                              BleService& ble,
-                             BuzzerService& buzzer)
+                             BuzzerService& buzzer,
+                             const HardwareStatus& hw)
     : preferences_(preferences),
       display_config_(display_config),
       display_(display),
@@ -61,7 +62,8 @@ CommandRouter::CommandRouter(Preferences& preferences,
       clock_(clock),
       power_(power),
       ble_(ble),
-      buzzer_(buzzer) {
+      buzzer_(buzzer),
+      hw_(hw) {
     notif_duration_ms_ = preferences_.getUInt("notif_nd", 5000);
 }
 
@@ -95,7 +97,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
         "\"shuffle\":{\"emin\":%u,\"emax\":%u,\"nmin\":%u,\"nmax\":%u},"
         "\"breathing\":{\"on\":%d,\"i\":\"%.2f\",\"s\":\"%.2f\"},"
         "\"ble\":{\"win\":%u},"
-        "\"gesture\":%s}",
+        "\"gesture\":%s,\"hardware\":{\"display\":%d,\"gyro\":%d,\"buzzer\":%d,\"touch\":%d,\"power\":%d}}",
         eyes_.eye_width(), eyes_.eye_height(), eyes_.space_between(), eyes_.border_radius(), eyes_.mouth_width(),
         static_cast<int>(preferences_.getInt("bi", 3)), static_cast<int>(preferences_.getInt("gs", 6)), static_cast<int>(preferences_.getInt("os", 12)), static_cast<int>(preferences_.getInt("ss", 10)),
         static_cast<unsigned>(preferences_.getUInt("disp_con", 0x7f)),
@@ -106,7 +108,20 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
         clock_.enabled() ? 1 : 0, clock_.tz_offset(), static_cast<unsigned>(clock_.seconds_of_day()), clock_.use_24_hour() ? 24 : 12,
         static_cast<unsigned>(shuffle_.expr_min_ms() / 1000U), static_cast<unsigned>(shuffle_.expr_max_ms() / 1000U), static_cast<unsigned>(shuffle_.neutral_min_ms() / 1000U), static_cast<unsigned>(shuffle_.neutral_max_ms() / 1000U),
         eyes_.get_breathing_enabled() ? 1 : 0, eyes_.get_breathing_intensity(), eyes_.get_breathing_speed(),
-        ble_window_ms, gestures_.settings_json().c_str());
+        ble_window_ms, gestures_.settings_json().c_str(),
+        static_cast<int>(hw_.display), static_cast<int>(hw_.gyro),
+        static_cast<int>(hw_.buzzer), static_cast<int>(hw_.touch),
+        static_cast<int>(hw_.power));
+    return buf;
+}
+
+std::string CommandRouter::hw_json() const {
+    char buf[128];
+    std::snprintf(buf, sizeof(buf),
+                  "{\"type\":\"hw\",\"display\":%d,\"gyro\":%d,\"buzzer\":%d,\"touch\":%d,\"power\":%d}",
+                  static_cast<int>(hw_.display), static_cast<int>(hw_.gyro),
+                  static_cast<int>(hw_.buzzer), static_cast<int>(hw_.touch),
+                  static_cast<int>(hw_.power));
     return buf;
 }
 
@@ -637,6 +652,7 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
     }
     if (cmd == "restart" || cmd == "reboot") { esp_restart(); return "Restarting..."; }
     if (cmd == "music") { buzzer_.play_melody(); return "Playing: Ode to Joy (Beethoven)"; }
+    if (cmd == "hw:status") return hw_json();
     if (cmd == "help" || cmd == "?") return "help";
     return "Unknown: " + cmd;
 }
