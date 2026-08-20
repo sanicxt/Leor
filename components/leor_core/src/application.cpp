@@ -60,7 +60,7 @@ void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const 
     display.fill_box(2, 2, 124, 11);
     display.set_color(0);
     const int tw = display.text_width("CRITICAL ERROR");
-    display.draw_text((display.width() - tw) / 2, 11, "CRITICAL ERROR");
+    display.draw_text((display.width() - tw) / 2, 9, "CRITICAL ERROR");
     display.set_color(1);
     display.set_font_medium();
     const char* msg = line2 ? line2 : "UNKNOWN";
@@ -119,8 +119,8 @@ void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const 
 void draw_hw_summary_screen(DisplayBackend& display, const HardwareStatus& hw) {
   display.clear();
   display.set_font_small();
-  display.draw_text(4, 6, "HARDWARE CHECK");
-  display.draw_hline(4, 12, 124);
+  display.draw_text(4, 10, "HARDWARE CHECK");
+  display.draw_hline(4, 14, 124);
   display.set_font_medium();
   const std::string summary = hw.summary();
   const int tw = display.text_width(summary.c_str());
@@ -132,24 +132,24 @@ enum class BootStage { kDisplay, kGyro, kTouch, kBuzzer, kPower, kDone };
 
 void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatus& hw,
                       int gyro_pct, bool touch_waiting, uint32_t now_ms) {
+  (void)now_ms;
   disp.clear();
 
   const int stage_count = static_cast<int>(BootStage::kDone);
-  const int overall_pct = (static_cast<int>(stage) * 100) / stage_count;
+  const int overall_pct = ((static_cast<int>(stage) + 1) * 100) / stage_count;
 
   disp.set_font_small();
-  disp.draw_text(2, 2, "LEOR");
-  char pct_s[8];
+  disp.draw_text(2, 10, "LEOR");
+  char pct_s[24];
   std::snprintf(pct_s, sizeof(pct_s), "%d%%", overall_pct);
   const int pw = disp.text_width(pct_s);
-  disp.draw_text(disp.width() - 2 - pw, 2, pct_s);
+  disp.draw_text(disp.width() - 2 - pw, 10, pct_s);
 
-  disp.draw_frame(2, 12, 124, 6);
+  disp.draw_frame(2, 14, 124, 10);
   const int fill_w = (120 * overall_pct) / 100;
-  if (fill_w > 0) disp.fill_box(4, 14, fill_w, 2);
+  if (fill_w > 0) disp.fill_box(4, 16, fill_w, 6);
 
   const char* label = "";
-  const char* hint = "";
   switch (stage) {
     case BootStage::kDisplay: label = "DISPLAY"; break;
     case BootStage::kGyro:    label = "GYRO";    break;
@@ -160,25 +160,26 @@ void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatu
   }
   disp.set_font_medium();
   const int lw = disp.text_width(label);
-  disp.draw_text((disp.width() - lw) / 2, 28, label);
+  disp.draw_text((disp.width() - lw) / 2, 40, label);
   disp.set_font_small();
 
-  if (touch_waiting) {
-    hint = "press touch";
+  if (touch_waiting && stage == BootStage::kGyro) {
+    std::snprintf(pct_s, sizeof(pct_s), "CAL %d%%  PRESS", gyro_pct);
+  } else if (touch_waiting) {
+    std::snprintf(pct_s, sizeof(pct_s), "PRESS TOUCH");
   } else if (stage == BootStage::kGyro) {
-    std::snprintf(pct_s, sizeof(pct_s), "%d%%", gyro_pct);
-    hint = pct_s;
+    std::snprintf(pct_s, sizeof(pct_s), "CAL %d%%", gyro_pct);
   } else if (stage == BootStage::kDisplay) {
-    hint = hw.display == HwState::kPresent ? "OK" : "FAIL";
+    std::snprintf(pct_s, sizeof(pct_s), "%s", hw.display == HwState::kPresent ? "OK" : "FAIL");
   } else if (stage == BootStage::kBuzzer) {
-    hint = hw.buzzer == HwState::kPresent ? "OK" : "ABSENT";
+    std::snprintf(pct_s, sizeof(pct_s), "%s", hw.buzzer == HwState::kPresent ? "OK" : "ABSENT");
   } else if (stage == BootStage::kPower) {
-    hint = hw.power == HwState::kPresent ? "OK" : "ABSENT";
+    std::snprintf(pct_s, sizeof(pct_s), "%s", hw.power == HwState::kPresent ? "OK" : "ABSENT");
   } else if (stage == BootStage::kTouch) {
-    hint = hw.touch == HwState::kPresent ? "OK" : "ABSENT";
+    std::snprintf(pct_s, sizeof(pct_s), "%s", hw.touch == HwState::kPresent ? "OK" : "ABSENT");
   }
-  const int hint_w = disp.text_width(hint);
-  disp.draw_text((disp.width() - hint_w) / 2, 52, hint);
+  const int hint_w = disp.text_width(pct_s);
+  disp.draw_text((disp.width() - hint_w) / 2, 58, pct_s);
 
   disp.send_buffer();
 }
@@ -347,6 +348,7 @@ esp_err_t Application::start() {
   hw_.display = display_ok ? HwState::kPresent : HwState::kProbeFailed;
   const uint32_t boot_now = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
   if (display_ok) draw_boot_screen(*display_, BootStage::kDisplay, hw_, 0, false, boot_now);
+  if (display_ok) vTaskDelay(pdMS_TO_TICKS(150));
 
   // Gyro calibration and touch auto-detection run concurrently in one 5s
   // window. The touch_probe callback is polled each IMU calibration iteration;
@@ -425,9 +427,11 @@ esp_err_t Application::start() {
   if (display_ok)
     draw_boot_screen(*display_, BootStage::kGyro, hw_, 100, false,
                      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+  if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
   if (display_ok)
     draw_boot_screen(*display_, BootStage::kTouch, hw_, 100, false,
                      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+  if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
 
   eyes_ = std::make_unique<MochiEyesEngine>(*display_);
   eyes_->begin();
@@ -456,10 +460,12 @@ esp_err_t Application::start() {
   if (display_ok)
     draw_boot_screen(*display_, BootStage::kBuzzer, hw_, 100, false,
                      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+  if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
 
   if (display_ok)
     draw_boot_screen(*display_, BootStage::kPower, hw_, 100, false,
                      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+  if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
 
   shuffle_.restore(preferences_.getBool("shuf_en", true),
                    preferences_.getUInt("shuf_emin", 2000),
@@ -694,7 +700,7 @@ void Application::tick() {
       // Title
       const char* title = "CALIBRATING";
       int tw = display_->text_width(title);
-      display_->draw_text((display_->width() - tw) / 2, 6, title);
+      display_->draw_text((display_->width() - tw) / 2, 10, title);
 
       // Gesture name
       tw = display_->text_width(gesture_name);
