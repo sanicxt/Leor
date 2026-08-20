@@ -23,6 +23,7 @@
   import BreathingControl from "$lib/components/BreathingControl.svelte";
   import ClockSettings from "$lib/components/ClockSettings.svelte";
   import NotificationSettings from "$lib/components/NotificationSettings.svelte";
+  import HardwareStatusPanel from "$lib/components/HardwareStatusPanel.svelte";
   import OtaPanel from "$lib/components/OtaPanel.svelte";
   
   import {
@@ -232,6 +233,7 @@
               <PowerSettings />
               <NotificationSettings />
               <GestureSettings />
+              <HardwareStatusPanel />
             </div>
           {/if}
         </div>
