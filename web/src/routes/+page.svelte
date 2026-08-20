@@ -31,7 +31,6 @@
     getLastStatus,
     getLastGesture,
     connect,
-    reconnect,
     disconnect,
     bleState,
   } from "$lib/ble.svelte";
@@ -64,9 +63,7 @@
     if (getConnected()) {
       await disconnect();
     } else {
-      if (!(await reconnect())) {
-        await connect();
-      }
+      await connect();
     }
   }
 </script>

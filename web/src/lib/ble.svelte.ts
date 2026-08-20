@@ -183,17 +183,17 @@ export function setClockSeconds(val: number) { bleState.clockSeconds = val; }
 export function setClockTimezoneOffset(val: number) { bleState.clockTimezoneOffset = val; }
 export function setClock24Hour(val: boolean) { bleState.clock24Hour = val; }
 
-export async function connect(deviceToUse?: BluetoothDevice): Promise<boolean> {
+export async function connect(): Promise<boolean> {
     try {
         // Use the main Service UUID for filtering.
         // This allows the device to have any user-configured name,
-        // as long as it carries this Service UUID in its primary packet.
-        device = deviceToUse ?? (await navigator.bluetooth.requestDevice({
+        // as long as the firmware advertises this UUID in its primary packet.
+        device = await navigator.bluetooth.requestDevice({
             filters: [
                 { services: [BLE_CONFIG.SERVICE_UUID] }
             ],
             optionalServices: [BLE_CONFIG.SERVICE_UUID, BLE_CONFIG.OTA_SERVICE_UUID],
-        }));
+        });
 
         const server = await device.gatt!.connect();
         const service = await server.getPrimaryService(BLE_CONFIG.SERVICE_UUID);
@@ -465,16 +465,6 @@ export async function disconnect(): Promise<void> {
         device.gatt.disconnect();
     }
     bleState.connected = false;
-}
-
-// Reconnect to a previously-paired device without requiring it to be
-// advertising right now. getDevices() returns every device this browser
-// has paired with, so the user can reconnect even when the firmware has
-// stopped advertising (e.g. a touch-present device whose BLE window lapsed).
-export async function reconnect(): Promise<boolean> {
-    const devices = await navigator.bluetooth.getDevices();
-    if (devices.length === 0) return false;
-    return connect(devices[0]);
 }
 
 export async function sendCommand(cmd: string): Promise<void> {
