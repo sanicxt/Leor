@@ -116,18 +116,6 @@ void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const 
   display.send_buffer();
 }
 
-void draw_hw_summary_screen(DisplayBackend& display, const HardwareStatus& hw) {
-  display.clear();
-  display.set_font_small();
-  display.draw_text(4, 10, "HARDWARE CHECK");
-  display.draw_hline(4, 14, 124);
-  display.set_font_medium();
-  const std::string summary = hw.summary();
-  const int tw = display.text_width(summary.c_str());
-  display.draw_text((display.width() - tw) / 2, 40, summary.c_str());
-  display.send_buffer();
-}
-
 enum class BootStage { kDisplay, kGyro, kTouch, kBuzzer, kPower, kDone };
 
 void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatus& hw,
@@ -503,13 +491,6 @@ esp_err_t Application::start() {
   open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
   display_->set_contrast(static_cast<uint8_t>(preferences_.getUInt("disp_con", 0x7f)));
 
-  if (hw_.any_failure() && display_ && display_ok) {
-    const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
-    boot_summary_until_ms_ = now_ms + 3000;
-    boot_summary_shown_ = true;
-    ESP_LOGW(kTag, "hardware check: %s", hw_.summary().c_str());
-  }
-
   ESP_LOGI(kTag, "application started");
   return ESP_OK;
 }
@@ -569,15 +550,6 @@ void Application::tick() {
     return;
   }
   // ---------------------------
-
-  if (boot_summary_shown_) {
-    if (now_ms < boot_summary_until_ms_) {
-      draw_hw_summary_screen(*display_, hw_);
-      vTaskDelay(pdMS_TO_TICKS(33));
-      return;
-    }
-    boot_summary_shown_ = false;
-  }
 
   ButtonEvent btn = power_.poll(now_ms);
   if (btn == ButtonEvent::kShortPress) {
