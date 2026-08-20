@@ -170,6 +170,11 @@ ButtonEvent PowerService::poll(uint32_t now_ms) {
 }
 
 void PowerService::do_sleep() {
+  if (pwr_ctrl_pin_ < 0) {
+    ESP_LOGW(kTag, "power control pin absent, sleep is a no-op");
+    return;
+  }
+
   // ================================================================
   // ACQUIRE A PM LOCK TO PREVENT TICKLESS IDLE (LIGHT SLEEP)
   // ================================================================
