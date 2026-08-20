@@ -50,7 +50,8 @@ CommandRouter::CommandRouter(Preferences& preferences,
                              ShuffleService& shuffle,
                              ClockService& clock,
                              PowerService& power,
-                             BleService& ble)
+                             BleService& ble,
+                             BuzzerService& buzzer)
     : preferences_(preferences),
       display_config_(display_config),
       display_(display),
@@ -59,7 +60,8 @@ CommandRouter::CommandRouter(Preferences& preferences,
       shuffle_(shuffle),
       clock_(clock),
       power_(power),
-      ble_(ble) {
+      ble_(ble),
+      buzzer_(buzzer) {
     notif_duration_ms_ = preferences_.getUInt("notif_nd", 5000);
 }
 
@@ -634,6 +636,7 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         return "notify: unknown type (use msg, call, or cal)";
     }
     if (cmd == "restart" || cmd == "reboot") { esp_restart(); return "Restarting..."; }
+    if (cmd == "music") { buzzer_.play_melody(); return "Playing: Ode to Joy (Beethoven)"; }
     if (cmd == "help" || cmd == "?") return "help";
     return "Unknown: " + cmd;
 }

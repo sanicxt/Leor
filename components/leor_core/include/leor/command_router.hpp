@@ -1,6 +1,7 @@
 #pragma once
 
 #include "leor/ble_service.hpp"
+#include "leor/buzzer_service.hpp"
 #include "leor/clock_service.hpp"
 #include "leor/gesture_service.hpp"
 #include "leor/mochi_eyes_engine.hpp"
@@ -26,7 +27,8 @@ class CommandRouter {
                   ShuffleService& shuffle,
                   ClockService& clock,
                   PowerService& power,
-                  BleService& ble);
+                  BleService& ble,
+                  BuzzerService& buzzer);
 
     std::string handle(std::string cmd, uint32_t now_ms, bool is_manual = true);
     void set_notif_overlay(NotificationOverlay* notif);
@@ -50,6 +52,7 @@ class CommandRouter {
     ClockService& clock_;
     PowerService& power_;
     BleService& ble_;
+    BuzzerService& buzzer_;
     bool mpu_verbose_ = false;
     bool reacting_ = false;
     NotificationOverlay* notif_overlay_ = nullptr;

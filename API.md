@@ -106,6 +106,7 @@ Common keys:
 
 - `restart` / `reboot`
 - `help` / `?`
+- `music` — plays Beethoven's "Ode to Joy" on the buzzer
 
 ## OTA Notes
 

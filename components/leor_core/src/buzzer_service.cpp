@@ -16,6 +16,23 @@ static const BuzzerService::Note kToggleOff[] = {{1800, 60}};
 static const BuzzerService::Note kPowerOn[]   = {{2800, 70}, {3500, 70}, {4200, 100}};
 static const BuzzerService::Note kPowerOff[]  = {{2800, 100}, {1800, 150}};
 
+// Ode to Joy — Beethoven (Symphony No. 9)
+// Tempo: quarter note ≈ 300ms, half note ≈ 600ms
+static constexpr uint32_t Q = 300;  // quarter note
+static constexpr uint32_t H = 600;  // half note
+static constexpr uint32_t C4 = 262;
+static constexpr uint32_t D4 = 294;
+static constexpr uint32_t E4 = 330;
+static constexpr uint32_t F4 = 349;
+static constexpr uint32_t G4 = 392;
+
+static const BuzzerService::Note kOdeToJoy[] = {
+    {E4, Q}, {E4, Q}, {F4, Q}, {G4, Q}, {G4, Q}, {F4, Q}, {E4, Q}, {D4, Q},
+    {C4, Q}, {C4, Q}, {D4, Q}, {E4, Q}, {E4, H}, {D4, Q}, {D4, H},
+    {E4, Q}, {E4, Q}, {F4, Q}, {G4, Q}, {G4, Q}, {F4, Q}, {E4, Q}, {D4, Q},
+    {C4, Q}, {C4, Q}, {D4, Q}, {E4, Q}, {D4, H}, {C4, Q}, {C4, H},
+};
+
 void BuzzerService::init(int pin) {
     if (pin < 0) { ESP_LOGW(kTag, "no pin, disabled"); return; }
     pin_ = pin;
@@ -82,6 +99,24 @@ void BuzzerService::play_toggle_on()  { play_seq(kToggleOn, 1); }
 void BuzzerService::play_toggle_off() { play_seq(kToggleOff, 1); }
 void BuzzerService::play_power_on()   { play_seq(kPowerOn, 3); }
 void BuzzerService::play_power_off()  { play_seq(kPowerOff, 2); }
+
+void BuzzerService::melody_task_fn(void* arg) {
+    auto* self = static_cast<BuzzerService*>(arg);
+    self->play_seq(kOdeToJoy, sizeof(kOdeToJoy) / sizeof(kOdeToJoy[0]));
+    self->melody_task_ = nullptr;
+    vTaskDelete(nullptr);
+}
+
+void BuzzerService::play_melody() {
+    if (!initialized_) return;
+    // If a melody is already playing, kill it and restart
+    if (melody_task_ != nullptr) {
+        vTaskDelete(melody_task_);
+        melody_task_ = nullptr;
+        stop();
+    }
+    xTaskCreate(melody_task_fn, "buzzer_melody", 2048, this, tskIDLE_PRIORITY + 1, &melody_task_);
+}
 
 void BuzzerService::prepare_sleep() {
     if (!initialized_ || pin_ < 0) return;
