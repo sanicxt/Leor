@@ -148,6 +148,10 @@ bool WifiTimeSyncService::bring_up() {
   wifi_config_t wc = {};
   std::strncpy(reinterpret_cast<char*>(wc.sta.ssid), ssid_.c_str(), sizeof(wc.sta.ssid) - 1);
   std::strncpy(reinterpret_cast<char*>(wc.sta.password), pass_.c_str(), sizeof(wc.sta.password) - 1);
+  // WPA2/WPA3 mixed-mode APs cause AUTH_EXPIRE (reason=2) because the driver
+  // tries SAE first and the handshake stalls. Force WPA2 auth threshold so
+  // the driver uses the WPA2 (PSK) path instead of SAE transition.
+  wc.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
   const esp_err_t setcfg_rc = esp_wifi_set_config(WIFI_IF_STA, &wc);
   ESP_LOGI(kTag, "esp_wifi_set_config rc=0x%x ssid=%s pass=%s", setcfg_rc, ssid_.c_str(), pass_.c_str());
   esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, nullptr);
