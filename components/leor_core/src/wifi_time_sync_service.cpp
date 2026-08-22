@@ -82,6 +82,7 @@ bool WifiTimeSyncService::sync_blocking(uint32_t timeout_ms) {
   if (esp_wifi_init(&cfg) != ESP_OK) {
     last_status_ = "wifi init failed";
     esp_netif_deinit();
+    esp_event_loop_delete_default();
     syncing_ = false;
     return false;
   }
@@ -110,6 +111,7 @@ bool WifiTimeSyncService::sync_blocking(uint32_t timeout_ms) {
     esp_wifi_stop();
     esp_wifi_deinit();
     esp_netif_deinit();
+    esp_event_loop_delete_default();
     syncing_ = false;
     return false;
   }
