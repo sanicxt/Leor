@@ -29,6 +29,9 @@ idf_component_register(
         nvs_flash
         nixy4__u8g2
         freertos
+        esp_wifi
+        esp_netif
+        lwip
 )
 
 # ── Auto-generate icon C headers from SVG assets ──────────────────────────────
