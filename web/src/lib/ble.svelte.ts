@@ -59,6 +59,7 @@ export const bleState = $state({
     hardware: {
         display: 0, gyro: 0, buzzer: 0, touch: 0, power: 0
     },
+    wifi: { ssid: '', status: '' },
     // Gesture calibration state (synced from device)
     calPhase: 'idle' as 'idle' | 'wait' | 'capturing' | 'complete' | 'timeout',
     calGesture: '' as string,
@@ -129,6 +130,14 @@ export function getClockTimezoneOffset() { return bleState.clockTimezoneOffset; 
 export function getClock24Hour() { return bleState.clock24Hour; }
 export function getHardware() { return bleState.hardware; }
 
+export function getWifiSsid() {
+    return bleState.wifi.ssid;
+}
+
+export function getWifiStatus() {
+    return bleState.wifi.status;
+}
+
 // Setters
 export function setShuffleEnabled(val: boolean) { bleState.shuffleEnabled = val; }
 export function setShuffleExprMin(val: number) { bleState.shuffleExprMin = val; }
@@ -164,6 +173,15 @@ export function setTouchMode(mode: number) {
 export function setBuzzerMode(mode: number) {
     bleState.settings.buzzerMode = mode;
     sendCommand(`set:bm=${mode}`);
+}
+
+export async function saveWifiCredentials(ssid: string, pass: string) {
+    await sendCommand(`wifi:ssid=${ssid}`);
+    await sendCommand(`wifi:pass=${pass}`);
+}
+
+export async function sendWifiSync() {
+    await sendCommand('wifi:sync');
 }
 
 export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
@@ -295,6 +313,10 @@ export async function connect(): Promise<boolean> {
                                 if ('buzzer' in data.hardware) bleState.hardware.buzzer = data.hardware.buzzer;
                                 if ('touch' in data.hardware) bleState.hardware.touch = data.hardware.touch;
                                 if ('power' in data.hardware) bleState.hardware.power = data.hardware.power;
+                            }
+                            if (data.wifi) {
+                                if ('ssid' in data.wifi) bleState.wifi.ssid = data.wifi.ssid;
+                                if ('status' in data.wifi) bleState.wifi.status = data.wifi.status;
                             }
                         }
 
