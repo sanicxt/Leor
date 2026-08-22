@@ -35,6 +35,7 @@ struct ScanContext {
 
 volatile bool s_sta_started = false;
 volatile int s_disconnect_reason = 0;
+static bool s_wifi_infra_inited = false;
 
 void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
   if (event_base == WIFI_EVENT) {
@@ -113,8 +114,11 @@ bool WifiTimeSyncService::bring_up() {
   esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "wifi_sync", &pm_lock_);
   if (pm_lock_) esp_pm_lock_acquire(pm_lock_);
 
-  esp_netif_init();
-  esp_event_loop_create_default();
+  if (!s_wifi_infra_inited) {
+    esp_netif_init();
+    esp_event_loop_create_default();
+    s_wifi_infra_inited = true;
+  }
   netif_ = esp_netif_create_default_wifi_sta();
 
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -125,8 +129,6 @@ bool WifiTimeSyncService::bring_up() {
       esp_netif_destroy_default_wifi(netif_);
       netif_ = nullptr;
     }
-    esp_netif_deinit();
-    esp_event_loop_delete_default();
     if (pm_lock_) {
       esp_pm_lock_release(pm_lock_);
       esp_pm_lock_delete(pm_lock_);
@@ -141,10 +143,30 @@ bool WifiTimeSyncService::bring_up() {
   std::strncpy(reinterpret_cast<char*>(wc.sta.password), pass_.c_str(), sizeof(wc.sta.password) - 1);
   wc.sta.pmf_cfg.capable = true;
   esp_wifi_set_config(WIFI_IF_STA, &wc);
-  esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, nullptr);
-  esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, nullptr);
-  esp_wifi_start();
+  if (esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, nullptr) != ESP_OK) {
+    ESP_LOGW(kTag, "failed to register WIFI_EVENT handler");
+  }
+  if (esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, nullptr) != ESP_OK) {
+    ESP_LOGW(kTag, "failed to register IP_EVENT handler");
+  }
+  if (esp_wifi_start() != ESP_OK) {
+    last_status_ = "wifi start failed";
+    esp_wifi_deinit();
+    if (netif_) {
+      esp_netif_destroy_default_wifi(netif_);
+      netif_ = nullptr;
+    }
+    if (pm_lock_) {
+      esp_pm_lock_release(pm_lock_);
+      esp_pm_lock_delete(pm_lock_);
+      pm_lock_ = nullptr;
+    }
+    return false;
+  }
 
+  // esp_coex_preference_set is deprecated in IDF v6.0.2, but the replacement
+  // esp_coex_status_bit_set/clear only expose BLE/BT status bits (no WIFI
+  // equivalent), so there is no non-deprecated way to prefer wifi here.
   esp_coex_preference_set(ESP_COEX_PREFER_WIFI);
 
   const uint32_t start_deadline = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) + 3000;
@@ -161,8 +183,6 @@ void WifiTimeSyncService::bring_down() {
     esp_netif_destroy_default_wifi(netif_);
     netif_ = nullptr;
   }
-  esp_event_loop_delete_default();
-  esp_netif_deinit();
   if (pm_lock_) {
     esp_pm_lock_release(pm_lock_);
     esp_pm_lock_delete(pm_lock_);

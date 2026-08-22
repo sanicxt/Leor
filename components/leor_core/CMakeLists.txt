@@ -21,7 +21,8 @@ idf_component_register(
         "include"
     REQUIRES
         bt
-        driver
+        esp_driver_gpio
+        esp_driver_i2c
         esp_driver_rmt
         esp_hw_support
         esp_timer
@@ -34,6 +35,8 @@ idf_component_register(
         esp_netif
         lwip
         esp_coex
+        esp_pm
+        esp_event
 )
 
 # ── Auto-generate icon C headers from SVG assets ──────────────────────────────
