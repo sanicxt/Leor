@@ -688,7 +688,7 @@ export async function sendOTA(
     // CREDIT_BATCH packets so the browser can send the next burst without waiting
     // for a per-packet ATT response. This is 10-20× faster than writeValueWithResponse.
     const packetSize = 509;
-    const CREDIT_BATCH = 32;  // must match OTA_CREDIT_BATCH in ota_manager.h
+    const CREDIT_BATCH = 128;  // must match OTA_CREDIT_BATCH in ota_manager.h
 
     // ── Disconnection watchdog ────────────────────────────────────────────────
     let aborted = false;

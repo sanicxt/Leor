@@ -10,7 +10,7 @@ namespace leor {
 namespace {
 
 static const char* kTag = "leor_ota";
-static constexpr uint32_t kCreditBatch = 32;
+static constexpr uint32_t kCreditBatch = 128;
 static constexpr uint8_t kMetaMagic0 = 0x4c; // 'L'
 static constexpr uint8_t kMetaMagic1 = 0x52; // 'R'
 

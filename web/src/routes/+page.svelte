@@ -65,6 +65,8 @@
   }
 
   async function handleConnect() {
+    // Never allow disconnect while an OTA flash is in progress.
+    if (getOtaRunning()) return;
     if (getConnected()) {
       await disconnect();
     } else {
@@ -72,6 +74,19 @@
       await connect();
     }
   }
+
+  // Warn before refresh/close while OTA flashing is in progress, so the
+  // user can't accidentally abort a firmware update mid-transfer.
+  onMount(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (getOtaRunning()) {
+        e.preventDefault();
+        e.returnValue = 'Firmware update in progress. Leave the page?';
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  });
 </script>
 
 <svelte:head>
@@ -83,7 +98,7 @@
 
   <main class="relative z-10 min-h-screen overflow-y-auto pb-32">
     <div class="p-4 md:p-8 max-w-7xl mx-auto relative">
-      {#if getOtaRunning()}
+      {#if getOtaRunning() && activeTab !== "ota"}
         <div class="absolute inset-0 z-30 bg-paper/80 backdrop-blur-sm rounded-3xl flex items-center justify-center">
           <div class="text-center space-y-3 p-8">
             <svg class="w-12 h-12 mx-auto animate-spin text-bento-blue" fill="none" viewBox="0 0 24 24">
@@ -143,10 +158,13 @@
                     <Moon class="w-5 h-5" />
                 {/if}
             </button>
-            <button onclick={handleConnect} disabled={getConnecting()} class="bento-button rounded-xl bg-bento-peach px-4 sm:px-6 h-11 sm:h-12 flex items-center justify-center gap-2 text-ink flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onclick={handleConnect} disabled={getConnecting() || getOtaRunning()} class="bento-button rounded-xl bg-bento-peach px-4 sm:px-6 h-11 sm:h-12 flex items-center justify-center gap-2 text-ink flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed">
                 {#if getConnecting()}
                     <span class="w-4 h-4 sm:w-5 sm:h-5 border-2 border-ink border-t-transparent rounded-full animate-spin"></span>
                     <span class="font-bold text-sm sm:text-base uppercase tracking-wide">Connecting…</span>
+                {:else if getOtaRunning()}
+                    <span class="w-4 h-4 sm:w-5 sm:h-5 border-2 border-ink border-t-transparent rounded-full animate-spin"></span>
+                    <span class="font-bold text-sm sm:text-base uppercase tracking-wide">Flashing…</span>
                 {:else}
                     <Wifi class="w-4 h-4 sm:w-5 sm:h-5" />
                     <span class="font-bold text-sm sm:text-base uppercase tracking-wide">{getConnected() ? 'Connected' : 'Connect'}</span>
