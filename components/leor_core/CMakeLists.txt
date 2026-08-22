@@ -42,10 +42,18 @@ idf_component_register(
 # ── Auto-generate icon C headers from SVG assets ──────────────────────────────
 set(ICON_OUT_DIR "${CMAKE_CURRENT_LIST_DIR}/include/leor/icons")
 file(GLOB ICON_SVG_SRGS "${CMAKE_SOURCE_DIR}/assets/icons/icons8-*.svg")
+# Prefer the repo venv (has PIL/cairosvg), fall back to system python3 (CI).
+set(ICON_PYTHON "${CMAKE_SOURCE_DIR}/.venv/bin/python3")
+if(NOT EXISTS "${ICON_PYTHON}")
+    find_program(ICON_PYTHON_FOUND NAMES python3)
+    if(ICON_PYTHON_FOUND)
+        set(ICON_PYTHON "${ICON_PYTHON_FOUND}")
+    endif()
+endif()
 add_custom_command(
     OUTPUT  ${ICON_OUT_DIR}/icons.h
     DEPENDS ${ICON_SVG_SRGS}
-    COMMAND ${CMAKE_SOURCE_DIR}/.venv/bin/python3
+    COMMAND ${ICON_PYTHON}
             ${CMAKE_CURRENT_SOURCE_DIR}/../../tools/convert_icons.py
             --input ${CMAKE_SOURCE_DIR}/assets/icons
             --output ${ICON_OUT_DIR}
