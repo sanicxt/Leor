@@ -103,16 +103,11 @@
 
     async function applySettings() {
         await sendCommand(`s:ew=${getSettingsEw()},eh=${getSettingsEh()}`);
-        await new Promise((r) => setTimeout(r, 50));
         await sendCommand(`s:es=${getSettingsEs()},er=${getSettingsEr()}`);
-        await new Promise((r) => setTimeout(r, 50));
-        await sendCommand(`s:mw=${getSettingsMw()},bi=${getSettingsBi()}`);
-        await new Promise((r) => setTimeout(r, 50));
+        await sendCommand(`s:mw=${getSettingsMw()}`);
+        await sendCommand(`s:bi=${getSettingsBi()}`);
         await sendCommand(`s:lt=${getSettingsLt()},vt=${getSettingsVt()}`);
-        await new Promise((r) => setTimeout(r, 50));
-        await sendCommand(
-            `s:gs=${getSettingsGs()},os=${getSettingsOs()},ss=${getSettingsSs()}`,
-        );
+        await sendCommand(`s:gs=${getSettingsGs()},os=${getSettingsOs()},ss=${getSettingsSs()}`);
     }
 
     async function syncSettings() {

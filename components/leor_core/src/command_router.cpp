@@ -240,7 +240,7 @@ std::string CommandRouter::handle_settings(const std::string& params, uint32_t n
             }
         }
     }
-    return sync_json(now_ms);
+    return "OK";
 }
 
 std::string CommandRouter::handle_shuffle(const std::string& params) {
@@ -661,7 +661,10 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         return "ble:name=" + name + " saved. Reconnect now; restart if not visible.";
     }
     if (cmd == "tw:") return "tw:pin=" + std::to_string(preferences_.getUInt("wake_pin", 0)) + " active=high hold=" + std::to_string(power_.hold_ms()) + "ms";
-    if (starts_with(cmd, "sh:") || starts_with(cmd, "shuffle:")) return handle_shuffle(cmd.substr(cmd[2] == '?' ? 3 : 8));
+    if (starts_with(cmd, "sh:") || starts_with(cmd, "shuffle:")) {
+        const size_t prefix_len = starts_with(cmd, "shuffle:") ? 8 : 3;
+        return handle_shuffle(cmd.substr(prefix_len));
+    }
     if (starts_with(cmd, "display:")) return handle_display(trim(cmd.substr(8)));
     if (starts_with(cmd, "clock:")) return handle_clock(trim(cmd.substr(6)), now_ms);
     if (starts_with(cmd, "notify:")) {

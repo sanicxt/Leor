@@ -34,6 +34,7 @@ struct ScanContext {
 };
 
 volatile bool s_sta_started = false;
+volatile bool s_got_ip = false;
 volatile int s_disconnect_reason = 0;
 static bool s_wifi_infra_inited = false;
 
@@ -51,6 +52,8 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
       default:
         break;
     }
+  } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+    s_got_ip = true;
   }
 }
 
@@ -107,6 +110,7 @@ void WifiTimeSyncService::set_time_callback(std::function<void(uint64_t)> cb) {
 
 bool WifiTimeSyncService::bring_up() {
   s_sta_started = false;
+  s_got_ip = false;
   s_disconnect_reason = 0;
 
   // Light sleep (CONFIG_PM_ENABLE) stalls the wifi task mid-start while the
@@ -192,17 +196,15 @@ void WifiTimeSyncService::bring_down() {
 }
 
 bool WifiTimeSyncService::sync_locked(uint32_t timeout_ms) {
-  esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-  esp_netif_ip_info_t ip{};
   const uint32_t deadline = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) + timeout_ms;
   bool got_ip = false;
 
   for (int attempt = 0; attempt < 5 && !got_ip; ++attempt) {
     s_disconnect_reason = 0;
+    s_got_ip = false;
     const esp_err_t connect_rc = esp_wifi_connect();
     if (connect_rc == ESP_OK) {
-    // Scan runs at full power; drop to 15dBm for auth so we don't desense the AP.
-    esp_wifi_set_max_tx_power(60);
+      esp_wifi_set_max_tx_power(60);
     }
     if (connect_rc != ESP_OK) {
       vTaskDelay(pdMS_TO_TICKS(500));
@@ -211,13 +213,12 @@ bool WifiTimeSyncService::sync_locked(uint32_t timeout_ms) {
     const uint32_t attempt_deadline = std::min(
         static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) + 6000, deadline);
     while (static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) < attempt_deadline) {
-      esp_netif_get_ip_info(netif, &ip);
-      if (ip.ip.addr != 0) {
+      if (s_got_ip) {
         got_ip = true;
         break;
       }
       if (s_disconnect_reason != 0) break;
-      vTaskDelay(pdMS_TO_TICKS(100));
+      vTaskDelay(pdMS_TO_TICKS(50));
     }
     if (got_ip) break;
     if (static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) >= deadline) break;
