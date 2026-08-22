@@ -19,7 +19,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image
+try:
+    from PIL import Image
+    _HAS_PIL = True
+except ImportError:
+    _HAS_PIL = False
 
 try:
     import cairosvg
@@ -145,6 +149,14 @@ def main() -> None:
     svgs = sorted(input_dir.glob("*.svg"))
     if not svgs:
         print("No SVG files found.")
+        sys.exit(0)
+
+    # CI containers (esp-idf-ci-action) do not ship PIL/cairosvg/rsvg-convert.
+    # The generated headers are committed, so skip regeneration when the
+    # renderer toolchain is unavailable instead of failing the build.
+    if not _HAS_PIL or (not _RSVG_CONVERT and not _HAS_CAIROSVG):
+        print("Warning: SVG renderer toolchain unavailable (PIL/rsvg/cairosvg); "
+              "using committed icon headers (skipping regeneration).")
         sys.exit(0)
 
     generated: list[str] = []
