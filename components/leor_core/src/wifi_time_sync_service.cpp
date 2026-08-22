@@ -155,6 +155,9 @@ bool WifiTimeSyncService::bring_up() {
   ESP_LOGI(kTag, "esp_wifi_set_config rc=0x%x ssid=%s pass=%s", setcfg_rc, ssid_.c_str(), pass_.c_str());
   esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, nullptr);
   esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, nullptr);
+  // Reduce TX power to avoid desensing nearby APs — high TX power can cause
+  // the AP to miss/drop auth frames, resulting in AUTH_EXPIRE (reason=2).
+  esp_wifi_set_max_tx_power(85);  // 8.5 dBm
   const esp_err_t start_rc = esp_wifi_start();
   ESP_LOGI(kTag, "esp_wifi_start rc=0x%x", start_rc);
 
