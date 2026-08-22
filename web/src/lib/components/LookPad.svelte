@@ -14,6 +14,18 @@
         se: "↘",
     };
 
+    const directionLabels: Record<string, string> = {
+        nw: "Look up-left",
+        n: "Look up",
+        ne: "Look up-right",
+        w: "Look left",
+        center: "Look center",
+        e: "Look right",
+        sw: "Look down-left",
+        s: "Look down",
+        se: "Look down-right",
+    };
+
     const directions = [
         ["nw", "n", "ne"],
         ["w", "center", "e"],
@@ -28,6 +40,7 @@
                 class="bento-button w-14 h-14 text-xl flex items-center justify-center {dir === 'center' ? 'bg-ink text-paper scale-105 hover:bg-paper hover:text-ink' : 'bg-paper text-ink hover:bg-ink hover:text-bento-border'} disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-paper disabled:hover:text-ink"
                 onclick={() => sendCommand(dir)}
                 disabled={!bleState.connected}
+                aria-label={directionLabels[dir]}
             >
                 {directionIcons[dir]}
             </button>

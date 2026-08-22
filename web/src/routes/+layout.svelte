@@ -1,5 +1,7 @@
 <script lang="ts">
   import '../app.css';
+
+  let { children } = $props();
 </script>
 
 <svelte:head>
@@ -11,4 +13,4 @@
   />
 </svelte:head>
 
-<slot />
+{@render children()}

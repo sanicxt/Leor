@@ -1,8 +1,12 @@
 <script lang="ts">
     import { Motion, AnimateSharedLayout } from "svelte-motion";
 
-    export let tabs: { id: string; title: string }[] = [];
-    export let activeTab: string = "";
+    interface Props {
+        tabs: { id: string; title: string }[];
+        activeTab?: string;
+    }
+
+    let { tabs = [], activeTab = $bindable("") }: Props = $props();
 </script>
 
 <div
@@ -15,7 +19,7 @@
                 class="group relative z-[1] rounded-full px-5 py-2.5 transition-colors duration-300 font-bold uppercase tracking-wider text-xs {isActive
                     ? 'z-0'
                     : ''}"
-                on:click={() => (activeTab = item.id)}
+                onclick={() => (activeTab = item.id)}
             >
                 {#if isActive}
                     <Motion

@@ -178,6 +178,7 @@
           <!-- Appearance -->
           <button
             onclick={() => settingsToggle('appearance')}
+            aria-expanded={settingsActive === 'appearance'}
             class="bento-card w-full flex items-center justify-between px-5 py-3 bg-paper hover:shadow-[2px_2px_0px_0px_var(--color-bento-border)] transition-all"
           >
             <div class="flex items-center gap-3">
@@ -203,6 +204,7 @@
           <!-- Display & System -->
           <button
             onclick={() => settingsToggle('system')}
+            aria-expanded={settingsActive === 'system'}
             class="bento-card w-full flex items-center justify-between px-5 py-3 bg-paper hover:shadow-[2px_2px_0px_0px_var(--color-bento-border)] transition-all"
           >
             <div class="flex items-center gap-3">

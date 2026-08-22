@@ -74,9 +74,14 @@ export const bleState = $state({
 // BLE device and characteristics
 let device: BluetoothDevice | null = null;
 let commandChar: BluetoothRemoteGATTCharacteristic | null = null;
+let statusChar: BluetoothRemoteGATTCharacteristic | null = null;
+let gestureChar: BluetoothRemoteGATTCharacteristic | null = null;
 // OTA characteristics (populated on connect if OTA service is present)
 let otaControlChar: BluetoothRemoteGATTCharacteristic | null = null;
 let otaDataChar: BluetoothRemoteGATTCharacteristic | null = null;
+
+let statusListener: ((e: Event) => void) | null = null;
+let gestureListener: ((e: Event) => void) | null = null;
 
 // Getters
 export function getConnected() { return bleState.connected; }
@@ -244,8 +249,8 @@ export async function connect(): Promise<boolean> {
 
         // Get main characteristics
         commandChar = await service.getCharacteristic(BLE_CONFIG.COMMAND_CHAR_UUID);
-        const statusChar = await service.getCharacteristic(BLE_CONFIG.STATUS_CHAR_UUID);
-        const gestureChar = await service.getCharacteristic(BLE_CONFIG.GESTURE_CHAR_UUID);
+        statusChar = await service.getCharacteristic(BLE_CONFIG.STATUS_CHAR_UUID);
+        gestureChar = await service.getCharacteristic(BLE_CONFIG.GESTURE_CHAR_UUID);
 
         // Try to get OTA service (non-fatal if not present)
         try {
@@ -264,7 +269,7 @@ export async function connect(): Promise<boolean> {
 
         // Subscribe to status notifications
         await statusChar.startNotifications();
-        statusChar.addEventListener('characteristicvaluechanged', (e: Event) => {
+        statusListener = (e: Event) => {
             const chunk = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
             console.log('[BLE RX Chunk]', chunk);
 
@@ -489,18 +494,20 @@ export async function connect(): Promise<boolean> {
             if (clockFmtMatch) {
                 bleState.clock24Hour = (clockFmtMatch[1] === '24');
             }
-        });
+        };
+        statusChar.addEventListener('characteristicvaluechanged', statusListener);
 
         // Subscribe to gesture notifications
         await gestureChar.startNotifications();
-        gestureChar.addEventListener('characteristicvaluechanged', (e: Event) => {
+        gestureListener = (e: Event) => {
             const value = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
             bleState.lastGesture = value;
-        });
+        };
+        gestureChar.addEventListener('characteristicvaluechanged', gestureListener);
 
         // Handle disconnect
         device.addEventListener('gattserverdisconnected', () => {
-            bleState.connected = false;
+            cleanup();
         });
 
         bleState.connected = true;
@@ -520,11 +527,25 @@ export async function connect(): Promise<boolean> {
     }
 }
 
+function cleanup() {
+    statusChar?.removeEventListener('characteristicvaluechanged', statusListener!);
+    gestureChar?.removeEventListener('characteristicvaluechanged', gestureListener!);
+    try { statusChar?.stopNotifications(); } catch (_) { }
+    try { gestureChar?.stopNotifications(); } catch (_) { }
+    bleState.connected = false;
+    commandChar = null;
+    statusChar = null;
+    gestureChar = null;
+    device = null;
+    statusListener = null;
+    gestureListener = null;
+}
+
 export async function disconnect(): Promise<void> {
     if (device?.gatt?.connected) {
         device.gatt.disconnect();
     }
-    bleState.connected = false;
+    cleanup();
 }
 
 export async function sendCommand(cmd: string): Promise<void> {

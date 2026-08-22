@@ -85,6 +85,10 @@
         clearTimer = setTimeout(() => {
             lastDetectedGesture = "";
         }, 3000);
+
+        return () => {
+            if (clearTimer) clearTimeout(clearTimer);
+        };
     });
 
     // Sync gesture actions from BLE when mappings are received
