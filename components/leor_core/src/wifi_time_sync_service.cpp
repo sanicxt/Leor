@@ -24,6 +24,7 @@ constexpr uint16_t kMaxScanAps = 20;
 struct SyncContext {
   WifiTimeSyncService* self;
   std::function<void(const std::string&)> on_done;
+  std::function<void()> pre_sync;
 };
 
 struct ScanContext {
@@ -60,6 +61,7 @@ void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id
 
 void sync_task(void* arg) {
   auto* ctx = static_cast<SyncContext*>(arg);
+  if (ctx->pre_sync) ctx->pre_sync();
   const bool ok = ctx->self->sync_blocking(10000);
   if (ctx->on_done) {
     ctx->on_done(ok ? "wifi sync ok" : "wifi sync failed");
@@ -334,8 +336,9 @@ void WifiTimeSyncService::scan_async(std::function<void(const std::vector<WifiAp
   xTaskCreate(scan_task, "wifi_scan", kSyncTaskStack, ctx, tskIDLE_PRIORITY + 1, nullptr);
 }
 
-void WifiTimeSyncService::sync_async(std::function<void(const std::string&)> on_done) {
-  auto* ctx = new SyncContext{this, std::move(on_done)};
+void WifiTimeSyncService::sync_async(std::function<void(const std::string&)> on_done,
+                                     std::function<void()> pre_sync) {
+  auto* ctx = new SyncContext{this, std::move(on_done), std::move(pre_sync)};
   xTaskCreate(sync_task, "wifi_sync", kSyncTaskStack, ctx, tskIDLE_PRIORITY + 1, nullptr);
 }
 

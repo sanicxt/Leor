@@ -23,7 +23,8 @@ class WifiTimeSyncService {
   void init(Preferences& prefs);
   bool configured() const;
   bool sync_blocking(uint32_t timeout_ms);
-  void sync_async(std::function<void(const std::string&)> on_done);
+  void sync_async(std::function<void(const std::string&)> on_done,
+                  std::function<void()> pre_sync = nullptr);
   void set_ssid(const std::string& ssid);
   void set_pass(const std::string& pass);
   std::string ssid() const;

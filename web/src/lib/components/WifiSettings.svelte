@@ -7,9 +7,9 @@
 		getWifiAps,
 		setWifiMode,
 		saveWifiCredentials,
-		sendWifiSync,
 		sendWifiScan,
-		fetchWifiCredentials
+		fetchWifiCredentials,
+		sendCommand
 	} from '$lib/ble.svelte';
 	import { bleState } from '$lib/ble.svelte';
 
@@ -20,7 +20,6 @@
 	let selectedSsid = $state('');
 	let passInput = $state('');
 	let saving = $state(false);
-	let syncing = $state(false);
 	let scanning = $state(false);
 	let showPass = $state(false);
 
@@ -41,9 +40,10 @@
 	}
 
 	async function syncNow() {
-		syncing = true;
-		await sendWifiSync();
-		setTimeout(() => (syncing = false), 3000);
+		if (wifiMode !== 1) {
+			setWifiMode(1);
+		}
+		await sendCommand('restart');
 	}
 
 	async function revealPass() {
@@ -148,9 +148,9 @@
 			<button
 				class="bento-button bg-bento-peach px-4 py-2 text-sm font-bold uppercase"
 				onclick={syncNow}
-				disabled={syncing || !bleState.connected}
+				disabled={!bleState.connected}
 			>
-				{syncing ? 'Syncing...' : 'Sync now'}
+				Restart & sync
 			</button>
 		</div>
 		<p class="text-xs font-bold uppercase tracking-widest opacity-80">

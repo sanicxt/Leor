@@ -725,7 +725,12 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         return "pass saved";
     }
     if (cmd == "wifi:sync") {
-        wifi_.sync_async([this](const std::string& status) { ble_.notify_status(status); });
+        wifi_.sync_async(
+            [this](const std::string& status) {
+                ble_.notify_status(status);
+                ble_.start_advertising();
+            },
+            [this]() { ble_.stop(true); });
         return "wifi sync started";
     }
     if (cmd == "wifi:scan") {
