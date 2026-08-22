@@ -25,12 +25,14 @@
   import NotificationSettings from "$lib/components/NotificationSettings.svelte";
   import HardwareStatusPanel from "$lib/components/HardwareStatusPanel.svelte";
   import WifiSettings from "$lib/components/WifiSettings.svelte";
+  import Alert from "$lib/components/Alert.svelte";
   import OtaPanel from "$lib/components/OtaPanel.svelte";
   
   import {
     getConnected,
     getConnecting,
     getConnectError,
+    getOtaRunning,
     getLastStatus,
     getLastGesture,
     connect,
@@ -80,7 +82,19 @@
   <MasterBackground />
 
   <main class="relative z-10 min-h-screen overflow-y-auto pb-32">
-    <div class="p-4 md:p-8 max-w-7xl mx-auto">
+    <div class="p-4 md:p-8 max-w-7xl mx-auto relative">
+      {#if getOtaRunning()}
+        <div class="absolute inset-0 z-30 bg-paper/80 backdrop-blur-sm rounded-3xl flex items-center justify-center">
+          <div class="text-center space-y-3 p-8">
+            <svg class="w-12 h-12 mx-auto animate-spin text-bento-blue" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>
+            <p class="font-display text-lg uppercase">Flashing Firmware</p>
+            <p class="text-sm font-bold opacity-70">Keep this page open until the device reboots</p>
+          </div>
+        </div>
+      {/if}
       
       <!-- Top Bento Header -->
       <header class="bento-card bg-bento-pink p-4 sm:p-5 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -113,11 +127,6 @@
                 <span class="text-xs sm:text-sm font-bold opacity-70">Disconnected</span>
               {/if}
             </div>
-            {#if getConnectError()}
-              <p class="text-xs text-red-600 dark:text-red-400 font-bold mt-0.5 truncate max-w-[140px] sm:max-w-[200px]" title={getConnectError()}>
-                {getConnectError()}
-              </p>
-            {/if}
           </div>
         </div>
 
@@ -268,6 +277,7 @@
     <div class="pointer-events-auto">
       <AnimatedTabs
         bind:activeTab
+        disabled={getOtaRunning()}
         tabs={[
           { id: "home", title: "Home" },
           { id: "settings", title: "Settings" },
@@ -278,3 +288,11 @@
     </div>
   </div>
 </div>
+
+{#if getConnectError()}
+  <div class="fixed bottom-4 right-4 z-50 max-w-[calc(100vw-2rem)] sm:max-w-sm" transition:slide="{{ duration: 200 }}">
+    <Alert variant="error" ondismiss={() => bleState.connectError = ''}>
+      <p class="text-sm font-bold text-ink break-words">{getConnectError()}</p>
+    </Alert>
+  </div>
+{/if}

@@ -4,9 +4,10 @@
     interface Props {
         tabs: { id: string; title: string }[];
         activeTab?: string;
+        disabled?: boolean;
     }
 
-    let { tabs = [], activeTab = $bindable("") }: Props = $props();
+    let { tabs = [], activeTab = $bindable(""), disabled = false }: Props = $props();
 </script>
 
 <div
@@ -18,8 +19,9 @@
             <button
                 class="group relative z-[1] rounded-full px-5 py-2.5 transition-colors duration-300 font-bold uppercase tracking-wider text-xs {isActive
                     ? 'z-0'
-                    : ''}"
-                onclick={() => (activeTab = item.id)}
+                    : ''} {disabled ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}"
+                onclick={() => { if (!disabled) activeTab = item.id; }}
+                disabled={disabled}
             >
                 {#if isActive}
                     <Motion

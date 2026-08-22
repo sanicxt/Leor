@@ -20,6 +20,7 @@ export const bleState = $state({
     connected: false,
     connecting: false,
     connectError: '',
+    otaRunning: false,
     lastStatus: '',
     lastGesture: '',
     shuffleEnabled: true,
@@ -89,6 +90,7 @@ let gestureListener: ((e: Event) => void) | null = null;
 export function getConnected() { return bleState.connected; }
 export function getConnecting() { return bleState.connecting; }
 export function getConnectError() { return bleState.connectError; }
+export function getOtaRunning() { return bleState.otaRunning; }
 export function getLastStatus() { return bleState.lastStatus; }
 export function getLastGesture() { return bleState.lastGesture; }
 export function getShuffleEnabled() { return bleState.shuffleEnabled; }
@@ -240,68 +242,106 @@ export async function connect(): Promise<boolean> {
     bleState.connecting = true;
     bleState.connectError = '';
     try {
-        // Use the main Service UUID for filtering.
-        // This allows the device to have any user-configured name,
-        // as long as the firmware advertises this UUID in its primary packet.
+        if (typeof navigator.bluetooth === 'undefined') {
+            throw new Error('Web Bluetooth not supported in this browser');
+        }
+
         device = await navigator.bluetooth.requestDevice({
-            filters: [
-                { services: [BLE_CONFIG.SERVICE_UUID] }
-            ],
+            filters: [{ services: [BLE_CONFIG.SERVICE_UUID] }],
             optionalServices: [BLE_CONFIG.SERVICE_UUID, BLE_CONFIG.OTA_SERVICE_UUID],
         });
 
-        const server = await device.gatt!.connect();
-        const service = await server.getPrimaryService(BLE_CONFIG.SERVICE_UUID);
+        await setupConnection();
+        return true;
+    } catch (error: any) {
+        console.error('BLE connection failed:', error);
+        bleState.connecting = false;
+        bleState.connectError = error?.name === 'NotFoundError'
+            ? 'No device selected'
+            : error?.message || 'Connection failed';
+        setTimeout(() => { if (bleState.connectError === (error?.message || '')) bleState.connectError = ''; }, 10000);
+        return false;
+    }
+}
 
-        // Get main characteristics
-        commandChar = await service.getCharacteristic(BLE_CONFIG.COMMAND_CHAR_UUID);
-        statusChar = await service.getCharacteristic(BLE_CONFIG.STATUS_CHAR_UUID);
-        gestureChar = await service.getCharacteristic(BLE_CONFIG.GESTURE_CHAR_UUID);
-
-        // Try to get OTA service (non-fatal if not present)
-        try {
-            const otaService = await server.getPrimaryService(BLE_CONFIG.OTA_SERVICE_UUID);
-            otaControlChar = await otaService.getCharacteristic(BLE_CONFIG.OTA_CONTROL_UUID);
-            otaDataChar = await otaService.getCharacteristic(BLE_CONFIG.OTA_DATA_UUID);
-            console.log('[BLE] OTA service ready');
-        } catch (_) {
-            otaControlChar = null;
-            otaDataChar = null;
-            console.warn('[BLE] OTA service not available on this firmware');
+export async function reconnect(): Promise<boolean> {
+    bleState.connecting = true;
+    bleState.connectError = '';
+    try {
+        if (typeof navigator.bluetooth === 'undefined') {
+            throw new Error('Web Bluetooth not supported in this browser');
         }
 
-        // Buffer for chunked status data
-        let statusBuffer = '';
+        const devices = await navigator.bluetooth.getDevices();
+        const leorDevice = devices.find(d =>
+            d.name?.includes('Testkit') ||
+            d.gatt?.connected === false
+        );
 
-        // Subscribe to status notifications
-        await statusChar.startNotifications();
-        statusListener = (e: Event) => {
-            const chunk = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
-            console.log('[BLE RX Chunk]', chunk);
+        if (!leorDevice) {
+            throw new Error('No paired Leor device found');
+        }
 
-            // If it starts with '{' or we have stuff in the buffer, we are in a chunked JSON message
-            if (chunk.startsWith('{') || (statusBuffer.startsWith('{') && !statusBuffer.endsWith('}'))) {
-                statusBuffer += chunk;
+        device = leorDevice;
+        await setupConnection();
+        return true;
+    } catch (error: any) {
+        console.error('BLE reconnect failed:', error);
+        bleState.connecting = false;
+        bleState.connectError = error?.message || 'Reconnect failed';
+        setTimeout(() => { if (bleState.connectError === (error?.message || '')) bleState.connectError = ''; }, 10000);
+        return false;
+    }
+}
 
-                // Try to parse if it looks complete
-                if (statusBuffer.endsWith('}')) {
-                    try {
-                        const data = JSON.parse(statusBuffer);
-                        console.log('[BLE RX JSON Sync]', data);
+async function setupConnection(): Promise<void> {
+  try {
+    const server = await device.gatt!.connect();
+    const service = await server.getPrimaryService(BLE_CONFIG.SERVICE_UUID);
 
-                        if (data.type === 'sync') {
-                            if (data.settings) {
-                                Object.keys(data.settings).forEach(key => {
-                                    if (key in bleState.settings) {
-                                        (bleState.settings as any)[key] = data.settings[key];
-                                    }
-                                });
-                                if ('tm' in data.settings) bleState.settings.touchMode = data.settings.tm;
-                                if ('bm' in data.settings) bleState.settings.buzzerMode = data.settings.bm;
-                                if ('wm' in data.settings) bleState.settings.wifiMode = data.settings.wm;
-                            }
-                            if (data.display) {
-                                if (data.display.type) bleState.display.type = data.display.type;
+    commandChar = await service.getCharacteristic(BLE_CONFIG.COMMAND_CHAR_UUID);
+    statusChar = await service.getCharacteristic(BLE_CONFIG.STATUS_CHAR_UUID);
+    gestureChar = await service.getCharacteristic(BLE_CONFIG.GESTURE_CHAR_UUID);
+
+    try {
+        const otaService = await server.getPrimaryService(BLE_CONFIG.OTA_SERVICE_UUID);
+        otaControlChar = await otaService.getCharacteristic(BLE_CONFIG.OTA_CONTROL_UUID);
+        otaDataChar = await otaService.getCharacteristic(BLE_CONFIG.OTA_DATA_UUID);
+        console.log('[BLE] OTA service ready');
+    } catch (_) {
+        otaControlChar = null;
+        otaDataChar = null;
+        console.warn('[BLE] OTA service not available on this firmware');
+    }
+
+    let statusBuffer = '';
+
+    await statusChar.startNotifications();
+    statusListener = (e: Event) => {
+        const chunk = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
+        console.log('[BLE RX Chunk]', chunk);
+
+        if (chunk.startsWith('{') || (statusBuffer.startsWith('{') && !statusBuffer.endsWith('}'))) {
+            statusBuffer += chunk;
+
+            if (statusBuffer.endsWith('}')) {
+                try {
+                    const data = JSON.parse(statusBuffer);
+                    console.log('[BLE RX JSON Sync]', data);
+
+                    if (data.type === 'sync') {
+                        if (data.settings) {
+                            Object.keys(data.settings).forEach(key => {
+                                if (key in bleState.settings) {
+                                    (bleState.settings as any)[key] = data.settings[key];
+                                }
+                            });
+                            if ('tm' in data.settings) bleState.settings.touchMode = data.settings.tm;
+                            if ('bm' in data.settings) bleState.settings.buzzerMode = data.settings.bm;
+                            if ('wm' in data.settings) bleState.settings.wifiMode = data.settings.wm;
+                        }
+                        if (data.display) {
+                            if (data.display.type) bleState.display.type = data.display.type;
                                 if (data.display.addr) bleState.display.addr = data.display.addr;
                             }
                             if (data.state) {
@@ -519,30 +559,26 @@ export async function connect(): Promise<boolean> {
         bleState.connected = true;
         bleState.connecting = false;
 
-        // Single unified sync — device returns all state in one JSON payload
         setTimeout(async () => {
+            if (!device?.gatt?.connected) return;
             console.log('Requesting full device sync...');
             await sendCommand('s:');
             await new Promise(r => setTimeout(r, 120));
             await sendCommand(`clock:sync=${Date.now()},${new Date().getTimezoneOffset()}`);
         }, 300);
-
-        return true;
     } catch (error: any) {
-        console.error('BLE connection failed:', error);
-        bleState.connecting = false;
-        bleState.connectError = error?.name === 'NotFoundError'
-            ? 'No device selected'
-            : error?.message || 'Connection failed';
-        return false;
+        cleanup();
+        throw error;
     }
 }
 
 function cleanup() {
     statusChar?.removeEventListener('characteristicvaluechanged', statusListener!);
     gestureChar?.removeEventListener('characteristicvaluechanged', gestureListener!);
-    try { statusChar?.stopNotifications(); } catch (_) { }
-    try { gestureChar?.stopNotifications(); } catch (_) { }
+    if (device?.gatt?.connected) {
+        statusChar?.stopNotifications?.().catch(() => {});
+        gestureChar?.stopNotifications?.().catch(() => {});
+    }
     bleState.connected = false;
     bleState.connecting = false;
     commandChar = null;
@@ -560,13 +596,29 @@ export async function disconnect(): Promise<void> {
     cleanup();
 }
 
+let writeQueue: Promise<void> = Promise.resolve();
+
 export async function sendCommand(cmd: string): Promise<void> {
-    if (!commandChar) {
-        console.error('Not connected');
-        return;
+    if (!commandChar || !device?.gatt?.connected) {
+        if (commandChar) cleanup();
+        throw new Error('Not connected');
     }
-    await commandChar.writeValue(new TextEncoder().encode(cmd));
-    console.log('[BLE TX]', cmd);
+    writeQueue = writeQueue.then(async () => {
+        if (!commandChar || !device?.gatt?.connected) {
+            throw new Error('Not connected');
+        }
+        try {
+            await commandChar.writeValue(new TextEncoder().encode(cmd));
+            console.log('[BLE TX]', cmd);
+        } catch (e) {
+            cleanup();
+            const msg = e instanceof Error ? e.message : 'Connection lost';
+            bleState.connectError = msg;
+            setTimeout(() => { if (bleState.connectError === msg) bleState.connectError = ''; }, 10000);
+            throw e;
+        }
+    }).catch(() => {});
+    return writeQueue;
 }
 
 // Check if Web Bluetooth is supported
@@ -628,6 +680,8 @@ export async function sendOTA(
         onProgress(0, 'OTA service not available — flash firmware first.');
         return false;
     }
+
+    bleState.otaRunning = true;
 
     // 509 = ATT_MTU(512) - 3 byte ATT header — maximum per-packet payload.
     // Flow control uses OTA_CTRL_CREDIT (0x07) notifications: device ACKs every
@@ -760,6 +814,7 @@ export async function sendOTA(
         if (reqAck !== OTA_CTRL_REQUEST_ACK) {
             onProgress(0, `OTA request rejected (code ${reqAck}).`);
             await cleanup();
+            bleState.otaRunning = false;
             return false;
         }
         onProgress(2, 'Acknowledged. Sending firmware…');
@@ -814,15 +869,18 @@ export async function sendOTA(
 
         if (doneAck === OTA_CTRL_DONE_ACK) {
             onProgress(100, 'OTA complete — device rebooting…');
+            bleState.otaRunning = false;
             return true;
         } else {
             onProgress(96, `Validation failed on device (code ${doneAck}).`);
+            bleState.otaRunning = false;
             return false;
         }
 
     } catch (err: any) {
         await cleanup();
         onProgress(0, `OTA error: ${err?.message ?? err}`);
+        bleState.otaRunning = false;
         return false;
     }
 }

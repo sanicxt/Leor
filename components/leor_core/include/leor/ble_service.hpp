@@ -31,6 +31,8 @@ class BleService {
     void ota_consume_pending_notify();
     void on_connected(uint16_t conn_handle);
     void on_disconnected();
+    void set_fast_connection_params();
+    void restore_connection_params();
     bool connected() const { return connected_; }
     OtaService& ota() { return ota_; }
     const OtaService& ota() const { return ota_; }
