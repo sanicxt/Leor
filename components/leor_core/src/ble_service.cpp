@@ -203,10 +203,6 @@ void advertise() {
     struct ble_gap_adv_params adv = {};
     adv.conn_mode = BLE_GAP_CONN_MODE_UND;
     adv.disc_mode = BLE_GAP_DISC_MODE_GEN;
-    // Fixed 10ms advertising interval: default random interval made
-    // Web Bluetooth connect attempts flaky on the central side.
-    adv.itvl_min = BLE_GAP_ADV_ITVL_MS(10);
-    adv.itvl_max = BLE_GAP_ADV_ITVL_MS(10);
     rc = ble_gap_adv_start(s_own_addr_type, nullptr, BLE_HS_FOREVER, &adv, gap_event, nullptr);
     if (rc != 0) {
         ESP_LOGW(kTag, "adv start failed rc=%d", rc);
