@@ -32,7 +32,8 @@ export const bleState = $state({
         ew: 36, eh: 36, es: 10, er: 8,
         mw: 20, lt: 1000, vt: 2000, bi: 3,
         gs: 6, os: 12, ss: 10, td: 3000, // gaze speed, openness speed, squish speed, touch hold delay (ms)
-        wp: 0, pp: 1, ct: 127, nd: 5000 // wake GPIO pin, power-control GPIO pin, contrast (0-255), notification duration (ms)
+        wp: 0, pp: 1, ct: 127, nd: 5000, // wake GPIO pin, power-control GPIO pin, contrast (0-255), notification duration (ms)
+        touchMode: 2, buzzerMode: 0 // 0=off,1=on,2=detect; 0=off,1=on
     },
     display: {
         type: 'sh1106',  // sh1106 or ssd1306
@@ -55,6 +56,10 @@ export const bleState = $state({
     clockTimezoneOffset: 0,
     clockSeconds: 0,
     clock24Hour: true,
+    hardware: {
+        display: 0, gyro: 0, buzzer: 0, touch: 0, power: 0
+    },
+    wifi: { ssid: '', status: '' },
     // Gesture calibration state (synced from device)
     calPhase: 'idle' as 'idle' | 'wait' | 'capturing' | 'complete' | 'timeout',
     calGesture: '' as string,
@@ -103,6 +108,9 @@ export function getSettingsPp() { return bleState.settings.pp; }
 export function getSettingsCt() { return bleState.settings.ct; }
 export function getSettingsNd() { return bleState.settings.nd; }
 
+export function getTouchMode() { return bleState.settings.touchMode; }
+export function getBuzzerMode() { return bleState.settings.buzzerMode; }
+
 export function getGestureMatching() { return bleState.gestureMatching; }
 export function getGestureInverted() { return bleState.gestureInverted; }
 export function getGestureReactionTime() { return bleState.gestureReactionTime; }
@@ -120,6 +128,15 @@ export function getClockEnabled() { return bleState.clockEnabled; }
 export function getClockSeconds() { return bleState.clockSeconds; }
 export function getClockTimezoneOffset() { return bleState.clockTimezoneOffset; }
 export function getClock24Hour() { return bleState.clock24Hour; }
+export function getHardware() { return bleState.hardware; }
+
+export function getWifiSsid() {
+    return bleState.wifi.ssid;
+}
+
+export function getWifiStatus() {
+    return bleState.wifi.status;
+}
 
 // Setters
 export function setShuffleEnabled(val: boolean) { bleState.shuffleEnabled = val; }
@@ -148,6 +165,24 @@ export function setSettingsWp(val: number) { bleState.settings.wp = val; }
 export function setSettingsPp(val: number) { bleState.settings.pp = val; }
 export function setSettingsCt(val: number) { bleState.settings.ct = val; }
 export function setSettingsNd(val: number) { bleState.settings.nd = val; }
+
+export function setTouchMode(mode: number) {
+    bleState.settings.touchMode = mode;
+    sendCommand(`set:tm=${mode}`);
+}
+export function setBuzzerMode(mode: number) {
+    bleState.settings.buzzerMode = mode;
+    sendCommand(`set:bm=${mode}`);
+}
+
+export async function saveWifiCredentials(ssid: string, pass: string) {
+    await sendCommand(`wifi:ssid=${ssid}`);
+    await sendCommand(`wifi:pass=${pass}`);
+}
+
+export async function sendWifiSync() {
+    await sendCommand('wifi:sync');
+}
 
 export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
 export function setGestureInverted(val: boolean) { bleState.gestureInverted = val; }
@@ -224,6 +259,8 @@ export async function connect(): Promise<boolean> {
                                         (bleState.settings as any)[key] = data.settings[key];
                                     }
                                 });
+                                if ('tm' in data.settings) bleState.settings.touchMode = data.settings.tm;
+                                if ('bm' in data.settings) bleState.settings.buzzerMode = data.settings.bm;
                             }
                             if (data.display) {
                                 if (data.display.type) bleState.display.type = data.display.type;
@@ -270,6 +307,17 @@ export async function connect(): Promise<boolean> {
                                 if ('sec' in data.clock) bleState.clockSeconds = data.clock.sec;
                                 if ('fmt' in data.clock) bleState.clock24Hour = (data.clock.fmt === 24);
                             }
+                            if (data.hardware) {
+                                if ('display' in data.hardware) bleState.hardware.display = data.hardware.display;
+                                if ('gyro' in data.hardware) bleState.hardware.gyro = data.hardware.gyro;
+                                if ('buzzer' in data.hardware) bleState.hardware.buzzer = data.hardware.buzzer;
+                                if ('touch' in data.hardware) bleState.hardware.touch = data.hardware.touch;
+                                if ('power' in data.hardware) bleState.hardware.power = data.hardware.power;
+                            }
+                            if (data.wifi) {
+                                if ('ssid' in data.wifi) bleState.wifi.ssid = data.wifi.ssid;
+                                if ('status' in data.wifi) bleState.wifi.status = data.wifi.status;
+                            }
                         }
 
                         if (data.type === 'cal') {
@@ -281,6 +329,14 @@ export async function connect(): Promise<boolean> {
                             bleState.calCaptureMs = data.capture_ms || 0;
                             bleState.calSamples = data.samples || 0;
                             console.log('[BLE RX Cal]', bleState.calPhase, bleState.calGesture, 'peak:', bleState.calPeak);
+                        }
+
+                        if (data.type === 'hw') {
+                            if ('display' in data) bleState.hardware.display = data.display;
+                            if ('gyro' in data) bleState.hardware.gyro = data.gyro;
+                            if ('buzzer' in data) bleState.hardware.buzzer = data.buzzer;
+                            if ('touch' in data) bleState.hardware.touch = data.touch;
+                            if ('power' in data) bleState.hardware.power = data.power;
                         }
 
                         bleState.lastStatus = 'Sync complete';

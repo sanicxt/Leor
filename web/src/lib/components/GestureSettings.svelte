@@ -100,7 +100,7 @@
 <div class="bento-card bg-bento-pink p-6 space-y-6" style="--slider-thumb: var(--color-bento-pink)">
     <!-- Header -->
     <div class="mb-4 border-b-2 border-bento-border pb-2">
-        <h2 class="text-xl font-black uppercase">Gesture Tuning</h2>
+        <h2 class="font-display text-xl uppercase">Gesture Tuning</h2>
         <p class="text-sm font-bold opacity-80">Fine-tune detection parameters</p>
     </div>
 

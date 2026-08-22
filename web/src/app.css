@@ -1,16 +1,44 @@
 @import 'tailwindcss';
 
 @theme {
-    --color-ink: #2D2424;
-    --color-bento-border: #2D2424;
-    --color-paper: #FDFBF7;
+    --color-ink: #2d2424;
+    --color-bento-border: #2d2424;
+    --color-paper: #fdfbf7;
     --color-bento-pink: #fbc6d0;
     --color-bento-blue: #a3d9ff;
     --color-bento-green: #b9e6a0;
     --color-bento-yellow: #fae188;
     --color-bento-peach: #ffc9b5;
 
+    --font-display: "Gasoek One", "Bricolage Grotesque", "Archivo", ui-sans-serif, system-ui, sans-serif;
+
     --animate-blob: blob 10s infinite;
+    --animate-pulse-scale: pulse-scale 1.6s ease-in-out infinite;
+    --animate-nudge-x: nudge-x 1.2s ease-in-out infinite;
+
+    @keyframes pulse-scale {
+        0%,
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        50% {
+            transform: scale(1.35);
+            opacity: 0.7;
+        }
+    }
+
+    @keyframes nudge-x {
+        0%,
+        100% {
+            transform: translateX(0);
+        }
+
+        50% {
+            transform: translateX(4px);
+        }
+    }
 
     @keyframes blob {
         0% {
@@ -116,11 +144,11 @@
 }
 
 @utility bento-card {
-    @apply rounded-3xl border-4 border-bento-border shadow-[4px_4px_0px_0px_var(--color-bento-border)] overflow-hidden transition-all duration-300;
+    @apply rounded-2xl border-2 border-bento-border bg-bento-pink shadow-[4px_4px_0px_0px_var(--color-bento-border)] overflow-hidden transition-all duration-300 hover:-translate-x-px hover:-translate-y-px hover:shadow-[6px_6px_0px_0px_var(--color-bento-border)];
 }
 
 @utility bento-button {
-    @apply rounded-2xl border-4 border-bento-border shadow-[4px_4px_0px_0px_var(--color-bento-border)] active:shadow-none active:translate-y-[4px] active:translate-x-[4px] transition-all duration-150 font-bold;
+    @apply rounded-xl border-2 border-bento-border shadow-[4px_4px_0px_0px_var(--color-bento-border)] hover:-translate-x-px hover:-translate-y-px hover:shadow-[6px_6px_0px_0px_var(--color-bento-border)] active:translate-x-px active:translate-y-px active:shadow-[1px_1px_0px_0px_var(--color-bento-border)] transition-all duration-150 font-bold;
 }
 
 @layer base {
@@ -133,7 +161,8 @@
         transition-duration: 300ms;
     }
 
-    /* Dark mode override */
+    /* Dark mode override — only applied when the user toggles it.
+       The app defaults to the light cream look; the OS color scheme is ignored. */
     :root.dark {
         --color-ink: #f2eedc;
         --color-bento-border: #111111;
@@ -143,20 +172,6 @@
         --color-bento-green: #1b4830;
         --color-bento-yellow: #4a3b10;
         --color-bento-peach: #6b2d18;
-    }
-
-    /* System dark mode fallback if no explicit class is set */
-    @media (prefers-color-scheme: dark) {
-        :root:not(.light) {
-            --color-ink: #f2eedc;
-            --color-bento-border: #111111;
-            --color-paper: #201c1a;
-            --color-bento-pink: #6e1c3b;
-            --color-bento-blue: #163a5f;
-            --color-bento-green: #1b4830;
-            --color-bento-yellow: #4a3b10;
-            --color-bento-peach: #6b2d18;
-        }
     }
 }
 

@@ -40,6 +40,39 @@ std::vector<std::string> split(const std::string& text, char delim) {
     return out;
 }
 
+int touch_mode_int(const std::string& mode) {
+    if (mode == "on") return 1;
+    if (mode == "detect") return 2;
+    return 0;
+}
+
+std::string touch_mode_str(int value) {
+    switch (value) {
+        case 1: return "on";
+        case 2: return "detect";
+        default: return "off";
+    }
+}
+
+int buzzer_mode_int(const std::string& mode) {
+    return mode == "on" ? 1 : 0;
+}
+
+std::string buzzer_mode_str(int value) {
+    return value == 1 ? "on" : "off";
+}
+
+std::string json_escape(const std::string& in) {
+    std::string out;
+    out.reserve(in.size() + 4);
+    for (char c : in) {
+        if (c == '"') out += "\\\"";
+        else if (c == '\\') out += "\\\\";
+        else out += c;
+    }
+    return out;
+}
+
 }  // namespace
 
 CommandRouter::CommandRouter(Preferences& preferences,
@@ -51,7 +84,9 @@ CommandRouter::CommandRouter(Preferences& preferences,
                              ClockService& clock,
                              PowerService& power,
                              BleService& ble,
-                             BuzzerService& buzzer)
+                             BuzzerService& buzzer,
+                             const HardwareStatus& hw,
+                             WifiTimeSyncService& wifi)
     : preferences_(preferences),
       display_config_(display_config),
       display_(display),
@@ -61,7 +96,9 @@ CommandRouter::CommandRouter(Preferences& preferences,
       clock_(clock),
       power_(power),
       ble_(ble),
-      buzzer_(buzzer) {
+      buzzer_(buzzer),
+      hw_(hw),
+      wifi_(wifi) {
     notif_duration_ms_ = preferences_.getUInt("notif_nd", 5000);
 }
 
@@ -86,27 +123,46 @@ void CommandRouter::reset_effects() {
 std::string CommandRouter::sync_json(uint32_t now_ms) const {
     char buf[2048];
     const unsigned ble_window_ms = static_cast<unsigned>(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
+    const std::string ssid_safe = json_escape(wifi_.ssid());
+    const std::string status_safe = json_escape(wifi_.last_status());
     std::snprintf(
         buf, sizeof(buf),
-        "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"ct\":%u,\"td\":%u,\"wp\":%u,\"pp\":%u,\"nd\":%u},"
+        "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"ct\":%u,\"td\":%u,\"wp\":%u,\"pp\":%u,\"nd\":%u,\"tm\":%d,\"bm\":%d},"
         "\"display\":{\"type\":\"%s\",\"addr\":\"0x%02X\"},"
         "\"state\":{\"shuf\":%d,\"mpu\":%d,\"clk\":%d},"
         "\"clock\":{\"on\":%d,\"tz\":%d,\"sec\":%u,\"fmt\":%d},"
         "\"shuffle\":{\"emin\":%u,\"emax\":%u,\"nmin\":%u,\"nmax\":%u},"
         "\"breathing\":{\"on\":%d,\"i\":\"%.2f\",\"s\":\"%.2f\"},"
         "\"ble\":{\"win\":%u},"
-        "\"gesture\":%s}",
+        "\"gesture\":%s,\"hardware\":{\"display\":%d,\"gyro\":%d,\"buzzer\":%d,\"touch\":%d,\"power\":%d},"
+        "\"wifi\":{\"ssid\":\"%s\",\"status\":\"%s\"}}",
         eyes_.eye_width(), eyes_.eye_height(), eyes_.space_between(), eyes_.border_radius(), eyes_.mouth_width(),
         static_cast<int>(preferences_.getInt("bi", 3)), static_cast<int>(preferences_.getInt("gs", 6)), static_cast<int>(preferences_.getInt("os", 12)), static_cast<int>(preferences_.getInt("ss", 10)),
         static_cast<unsigned>(preferences_.getUInt("disp_con", 0x7f)),
         static_cast<unsigned>(power_.hold_ms()), static_cast<unsigned>(preferences_.getUInt("wake_pin", 0)), static_cast<unsigned>(preferences_.getUInt("pwr_pin", 1)),
         static_cast<unsigned>(notif_duration_ms_),
+        touch_mode_int(preferences_.getString("touch_mode", "detect")),
+        buzzer_mode_int(preferences_.getString("buzzer_mode", "off")),
         display_config_.controller == DisplayController::kSsd1306 ? "ssd1306" : "sh1106", display_config_.i2c_address,
         shuffle_.enabled() ? 1 : 0, mpu_verbose_ ? 1 : 0, clock_.enabled() ? 1 : 0,
         clock_.enabled() ? 1 : 0, clock_.tz_offset(), static_cast<unsigned>(clock_.seconds_of_day()), clock_.use_24_hour() ? 24 : 12,
         static_cast<unsigned>(shuffle_.expr_min_ms() / 1000U), static_cast<unsigned>(shuffle_.expr_max_ms() / 1000U), static_cast<unsigned>(shuffle_.neutral_min_ms() / 1000U), static_cast<unsigned>(shuffle_.neutral_max_ms() / 1000U),
         eyes_.get_breathing_enabled() ? 1 : 0, eyes_.get_breathing_intensity(), eyes_.get_breathing_speed(),
-        ble_window_ms, gestures_.settings_json().c_str());
+        ble_window_ms, gestures_.settings_json().c_str(),
+        static_cast<int>(hw_.display), static_cast<int>(hw_.gyro),
+        static_cast<int>(hw_.buzzer), static_cast<int>(hw_.touch),
+        static_cast<int>(hw_.power),
+        ssid_safe.c_str(), status_safe.c_str());
+    return buf;
+}
+
+std::string CommandRouter::hw_json() const {
+    char buf[128];
+    std::snprintf(buf, sizeof(buf),
+                  "{\"type\":\"hw\",\"display\":%d,\"gyro\":%d,\"buzzer\":%d,\"touch\":%d,\"power\":%d}",
+                  static_cast<int>(hw_.display), static_cast<int>(hw_.gyro),
+                  static_cast<int>(hw_.buzzer), static_cast<int>(hw_.touch),
+                  static_cast<int>(hw_.power));
     return buf;
 }
 
@@ -161,9 +217,17 @@ std::string CommandRouter::handle_settings(const std::string& params, uint32_t n
         } else if (key == "nd") {
             notif_duration_ms_ = static_cast<uint32_t>(std::max(1000, value));
             preferences_.putUInt("notif_nd", notif_duration_ms_);
+        } else if (key == "tm") {
+            if (value >= 0 && value <= 2) {
+                preferences_.putString("touch_mode", touch_mode_str(value).c_str());
+            }
+        } else if (key == "bm") {
+            if (value == 0 || value == 1) {
+                preferences_.putString("buzzer_mode", buzzer_mode_str(value).c_str());
+            }
         }
     }
-    return "Settings applied & saved";
+    return sync_json(now_ms);
 }
 
 std::string CommandRouter::handle_shuffle(const std::string& params) {
@@ -637,6 +701,19 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
     }
     if (cmd == "restart" || cmd == "reboot") { esp_restart(); return "Restarting..."; }
     if (cmd == "music") { buzzer_.play_melody(); return "Playing: Ode to Joy (Beethoven)"; }
+    if (cmd == "hw:status") return hw_json();
+    if (starts_with(cmd, "wifi:ssid=")) {
+        wifi_.set_ssid(cmd.substr(10));
+        return "ssid saved";
+    }
+    if (starts_with(cmd, "wifi:pass=")) {
+        wifi_.set_pass(cmd.substr(10));
+        return "pass saved";
+    }
+    if (cmd == "wifi:sync") {
+        wifi_.sync_async([this](const std::string& status) { ble_.notify_status(status); });
+        return "wifi sync started";
+    }
     if (cmd == "help" || cmd == "?") return "help";
     return "Unknown: " + cmd;
 }

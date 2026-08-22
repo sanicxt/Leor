@@ -83,7 +83,7 @@
 <div class="bento-card bg-bento-blue p-6 space-y-6">
     <!-- Header -->
     <div class="mb-4 border-b-2 border-bento-border pb-2">
-        <h2 class="text-xl font-black uppercase">Gesture Calibration</h2>
+        <h2 class="font-display text-xl uppercase">Gesture Calibration</h2>
         <p class="text-sm font-bold opacity-80">Auto-tune thresholds from real data</p>
     </div>
 

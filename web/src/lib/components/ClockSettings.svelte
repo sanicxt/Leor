@@ -84,7 +84,7 @@
 <div class="bento-card bg-bento-yellow p-6 space-y-5">
     <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between gap-3">
         <div>
-            <h2 class="text-xl font-black uppercase tracking-tight">Clock</h2>
+            <h2 class="font-display text-xl uppercase tracking-tight">Clock</h2>
             <p class="text-sm font-bold opacity-80">Browser sync for the OLED clock</p>
         </div>
         <div class="px-3 py-1 rounded-full border-2 border-bento-border bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)] text-[10px] font-black uppercase tracking-wider text-ink">

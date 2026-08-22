@@ -107,6 +107,10 @@ Common keys:
 - `restart` / `reboot`
 - `help` / `?`
 - `music` — plays Beethoven's "Ode to Joy" on the buzzer
+- `hw:status` — returns a JSON object `{"type":"hw","display":N,"gyro":N,"buzzer":N,"touch":N,"power":N}` where N is 0=present, 1=absent, 2=probe-failed
+- `wifi:ssid=<ssid>` — stores the WiFi SSID in NVS (used for time sync)
+- `wifi:pass=<password>` — stores the WiFi password in NVS
+- `wifi:sync` — one-shot WiFi connect + NTP sync (pool.ntp.org), sets the clock, then disconnects WiFi
 
 ## OTA Notes
 

@@ -16,6 +16,7 @@ idf_component_register(
         "src/power_service.cpp"
         "src/preferences.cpp"
         "src/shuffle_service.cpp"
+        "src/wifi_time_sync_service.cpp"
     INCLUDE_DIRS
         "include"
     REQUIRES
@@ -29,6 +30,9 @@ idf_component_register(
         nvs_flash
         nixy4__u8g2
         freertos
+        esp_wifi
+        esp_netif
+        lwip
 )
 
 # ── Auto-generate icon C headers from SVG assets ──────────────────────────────

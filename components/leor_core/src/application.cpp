@@ -21,6 +21,7 @@ constexpr uint32_t kPowerOffMessageMs = 320;
 constexpr uint32_t kOtaUiFrameMs = 33;
 constexpr uint32_t kBleWindowMinMs = 20000;
 constexpr uint32_t kBleWindowDefaultMs = 60000;
+constexpr uint32_t kTouchDetectWindowMs = 5000;
 
 bool conflicts_with_display_i2c(int pin, const DisplayConfig &display) {
   return pin == display.sda_pin || pin == display.scl_pin;
@@ -59,7 +60,7 @@ void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const 
     display.fill_box(2, 2, 124, 11);
     display.set_color(0);
     const int tw = display.text_width("CRITICAL ERROR");
-    display.draw_text((display.width() - tw) / 2, 11, "CRITICAL ERROR");
+    display.draw_text((display.width() - tw) / 2, 9, "CRITICAL ERROR");
     display.set_color(1);
     display.set_font_medium();
     const char* msg = line2 ? line2 : "UNKNOWN";
@@ -115,6 +116,131 @@ void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const 
   display.send_buffer();
 }
 
+enum class BootStage { kDisplay, kGyro, kTouch, kBuzzer, kPower, kWifi, kDone };
+
+void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatus& hw,
+                      int gyro_pct, bool touch_waiting, bool wifi_waiting, bool wifi_ok,
+                      uint32_t now_ms) {
+  (void)now_ms;
+  disp.clear();
+
+  const int stage_count = static_cast<int>(BootStage::kDone);
+  const int overall_pct = ((static_cast<int>(stage) + 1) * 100) / stage_count;
+
+  disp.set_font_small();
+  disp.draw_text(2, 10, "LEOR");
+  char pct_s[24];
+  std::snprintf(pct_s, sizeof(pct_s), "%d%%", overall_pct);
+  const int pw = disp.text_width(pct_s);
+  disp.draw_text(disp.width() - 2 - pw, 10, pct_s);
+
+  disp.draw_frame(2, 14, 124, 10);
+  const int fill_w = (120 * overall_pct) / 100;
+  if (fill_w > 0) disp.fill_box(4, 16, fill_w, 6);
+
+  const char* label = "";
+  switch (stage) {
+    case BootStage::kDisplay: label = "DISPLAY"; break;
+    case BootStage::kGyro:    label = "GYRO";    break;
+    case BootStage::kTouch:   label = "TOUCH";   break;
+    case BootStage::kBuzzer:  label = "BUZZER";  break;
+    case BootStage::kPower:   label = "POWER";   break;
+    case BootStage::kWifi:    label = "WIFI";    break;
+    default: break;
+  }
+  disp.set_font_medium();
+  const int lw = disp.text_width(label);
+  disp.draw_text((disp.width() - lw) / 2, 40, label);
+  disp.set_font_small();
+
+  if (touch_waiting && stage == BootStage::kGyro) {
+    std::snprintf(pct_s, sizeof(pct_s), "CAL %d%%  PRESS", gyro_pct);
+  } else if (touch_waiting) {
+    std::snprintf(pct_s, sizeof(pct_s), "PRESS TOUCH");
+  } else if (stage == BootStage::kGyro) {
+    std::snprintf(pct_s, sizeof(pct_s), "CAL %d%%", gyro_pct);
+  } else if (stage == BootStage::kDisplay) {
+    std::snprintf(pct_s, sizeof(pct_s), "%s", hw.display == HwState::kPresent ? "OK" : "FAIL");
+  } else if (stage == BootStage::kBuzzer) {
+    std::snprintf(pct_s, sizeof(pct_s), "%s", hw.buzzer == HwState::kPresent ? "OK" : "ABSENT");
+  } else if (stage == BootStage::kPower) {
+    std::snprintf(pct_s, sizeof(pct_s), "%s", hw.power == HwState::kPresent ? "OK" : "ABSENT");
+  } else if (stage == BootStage::kTouch) {
+    std::snprintf(pct_s, sizeof(pct_s), "%s", hw.touch == HwState::kPresent ? "OK" : "ABSENT");
+  } else if (stage == BootStage::kWifi) {
+    std::snprintf(pct_s, sizeof(pct_s), "%s", wifi_waiting ? "SYNC..." : (wifi_ok ? "OK" : "FAIL"));
+  }
+  const int hint_w = disp.text_width(pct_s);
+  disp.draw_text((disp.width() - hint_w) / 2, 58, pct_s);
+
+  disp.send_buffer();
+}
+
+constexpr size_t kTouchCandidatesCount = 10;
+constexpr uint8_t kTouchCandidates[kTouchCandidatesCount] = {0, 1, 3, 4, 5, 6, 7, 10, 20, 21};
+
+bool pin_in_use(int pin, const DisplayConfig& display, int buzzer_pin,
+                int pwr_ctrl_pin) {
+  if (pin == display.sda_pin || pin == display.scl_pin) return true;
+  if (pin == buzzer_pin) return true;
+  if (pin == pwr_ctrl_pin) return true;
+  return false;
+}
+
+// poll() is invoked from inside the gyro calibration loop so one 5s window
+// runs both concurrently. Pull resistor is set opposite to active_level so
+// unwired pins read inactive; a pin needs kDebounceSamples consecutive active
+// reads to be accepted (prevents floating-pin false detects).
+struct TouchProbe {
+  // 255 = not detected yet. GPIO 0 is a valid touch pin, so it cannot be
+  // the 'no detection' sentinel.
+  static constexpr uint8_t kNotDetected = 255;
+  uint8_t active_level = 1;
+  bool configured[kTouchCandidatesCount] = {};
+  uint8_t stable[kTouchCandidatesCount] = {};
+  uint8_t detected_pin = kNotDetected;
+
+  void setup(const DisplayConfig& display, int buzzer_pin, int pwr_ctrl_pin,
+             uint8_t level) {
+    active_level = level;
+    for (size_t i = 0; i < kTouchCandidatesCount; ++i) {
+      const int pin = kTouchCandidates[i];
+      if (pin_in_use(pin, display, buzzer_pin, pwr_ctrl_pin)) continue;
+      gpio_config_t io = {};
+      io.pin_bit_mask = (1ULL << pin);
+      io.mode = GPIO_MODE_INPUT;
+      io.intr_type = GPIO_INTR_DISABLE;
+      if (active_level == 1) {
+        io.pull_up_en = GPIO_PULLUP_DISABLE;
+        io.pull_down_en = GPIO_PULLDOWN_ENABLE;
+      } else {
+        io.pull_up_en = GPIO_PULLUP_ENABLE;
+        io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+      }
+      if (gpio_config(&io) == ESP_OK) configured[i] = true;
+    }
+  }
+
+  uint8_t poll() {
+    if (detected_pin != kNotDetected) return detected_pin;
+    constexpr uint32_t kDebounceSamples = 5;
+    for (size_t i = 0; i < kTouchCandidatesCount; ++i) {
+      if (!configured[i]) continue;
+      const int pin = kTouchCandidates[i];
+      if (gpio_get_level(static_cast<gpio_num_t>(pin)) ==
+          static_cast<int>(active_level)) {
+        if (++stable[i] >= kDebounceSamples) {
+          detected_pin = static_cast<uint8_t>(pin);
+          return detected_pin;
+        }
+      } else {
+        stable[i] = 0;
+      }
+    }
+    return kNotDetected;
+  }
+};
+
 Application::Application() = default;
 
 esp_err_t Application::start() {
@@ -145,20 +271,35 @@ esp_err_t Application::start() {
   config_.display.i2c_address =
       static_cast<uint8_t>(preferences_.getUInt("disp_addr", 0x3c));
   config_.touch_wake_pin =
-      static_cast<uint8_t>(preferences_.getUInt("wake_pin", 0));
+      static_cast<uint8_t>(preferences_.getUInt("wake_pin", 255));
   config_.touch_active_level = 1;
   config_.touch_hold_ms = preferences_.getUInt("touch_ms", 3000);
   config_.pwr_ctrl_pin = static_cast<int>(preferences_.getUInt("pwr_pin", 1));
 
-  if (conflicts_with_display_i2c(static_cast<int>(config_.touch_wake_pin),
+  const std::string touch_mode = preferences_.getString("touch_mode", "detect");
+  const std::string buzzer_mode = preferences_.getString("buzzer_mode", "off");
+
+  if (touch_mode == "off" || touch_mode == "detect") {
+    config_.touch_wake_pin = 255;
+  }
+
+  if (buzzer_mode == "off") {
+    config_.buzzer_pin = -1;
+  } else {
+    config_.buzzer_pin =
+        static_cast<int>(preferences_.getUInt("buz_pin", config_.buzzer_pin));
+  }
+
+  if (config_.touch_wake_pin != 255 &&
+      conflicts_with_display_i2c(static_cast<int>(config_.touch_wake_pin),
                                  config_.display)) {
     ESP_LOGW(kTag,
              "wake pin %d conflicts with display I2C pins (SDA=%d, SCL=%d), "
-             "reverting to 0",
+             "reverting to disabled",
              static_cast<int>(config_.touch_wake_pin), config_.display.sda_pin,
              config_.display.scl_pin);
-    config_.touch_wake_pin = 0;
-    preferences_.putUInt("wake_pin", 0);
+    config_.touch_wake_pin = 255;
+    preferences_.putUInt("wake_pin", 255);
   }
 
   if (conflicts_with_display_i2c(config_.pwr_ctrl_pin, config_.display)) {
@@ -180,8 +321,12 @@ esp_err_t Application::start() {
   power_.set_i2c_pins(config_.display.sda_pin, config_.display.scl_pin);
   power_.arm(1000, 0);
 
+  hw_.touch = power_.touch_enabled() ? HwState::kPresent : HwState::kAbsent;
+  hw_.power = power_.power_control_enabled() ? HwState::kPresent : HwState::kAbsent;
+
   display_ = std::make_unique<U8g2DisplayBackend>();
-  if (!display_->init(config_.display)) {
+  const bool display_ok = display_->init(config_.display);
+  if (!display_ok) {
     ESP_LOGW(kTag,
              "display init failed, falling back to null backend (%s, SDA=%d, "
              "SCL=%d, addr=0x%02x)",
@@ -193,6 +338,93 @@ esp_err_t Application::start() {
     display_ = std::make_unique<NullDisplayBackend>();
     display_->init(config_.display);
   }
+  hw_.display = display_ok ? HwState::kPresent : HwState::kProbeFailed;
+  const uint32_t boot_now = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+  if (display_ok) draw_boot_screen(*display_, BootStage::kDisplay, hw_, 0, false, false, false, boot_now);
+  if (display_ok) vTaskDelay(pdMS_TO_TICKS(150));
+
+  // Gyro calibration and touch auto-detection run concurrently in one 5s
+  // window. The touch_probe callback is polled each IMU calibration iteration;
+  // a display=nullptr suppresses init_mpu's internal screen so the LEOR boot
+  // screen stays visible. Running them together avoids a separate 10s touch
+  // window and the earlier race where MPU I2C traffic was misread as a press.
+  TouchProbe touch_probe{};
+  const bool want_touch_detect = (touch_mode == "detect");
+  if (want_touch_detect) {
+    touch_probe.setup(config_.display, config_.buzzer_pin,
+                      config_.pwr_ctrl_pin, config_.touch_active_level);
+  }
+
+  const uint32_t touch_window_start_ms =
+      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+  if (display_ok)
+    draw_boot_screen(*display_, BootStage::kGyro, hw_, 0, want_touch_detect,
+                     false, false, touch_window_start_ms);
+
+  std::function<uint8_t(int)> probe_cb;
+  if (want_touch_detect) {
+    probe_cb = [this, &touch_probe, display_ok, last = 0](int pct) mutable -> uint8_t {
+      if (display_ok && (pct >= last + 4 || pct >= 100)) {
+        last = pct;
+        draw_boot_screen(*display_, BootStage::kGyro, hw_, pct, true, false, false,
+                         static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+      }
+      return touch_probe.poll();
+    };
+  }
+  gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
+                 config_.display.scl_pin, nullptr, probe_cb);
+  hw_.gyro = gesture_.mpu_available() ? HwState::kPresent : HwState::kProbeFailed;
+  gesture_.restore(preferences_.getBool("gm", true),
+                    preferences_.getUInt("grt", 1500),
+                    preferences_.getUInt("gcf", 70),
+                    preferences_.getUInt("gcd", 1500),
+                    preferences_.getString("ga", "happy,angry,curious,neutral"));
+  gesture_.set_inverted(preferences_.getBool("ginv", false));
+  gesture_.set_shake_threshold(preferences_.getFloat("gst", 200.0f));
+  gesture_.set_pat_threshold(preferences_.getFloat("gpt", 0.32f));
+  gesture_.set_swipe_threshold(preferences_.getFloat("gvt", 0.45f));
+  gesture_.set_touch_threshold(preferences_.getFloat("gtt", 0.05f));
+  gesture_.set_pickup_tilt_deg(preferences_.getFloat("gtd", 30.0f));
+
+  if (want_touch_detect && touch_probe.detected_pin == TouchProbe::kNotDetected) {
+    const uint32_t window_deadline_ms = touch_window_start_ms + kTouchDetectWindowMs;
+    uint32_t last_draw_ms = 0;
+    while (touch_probe.detected_pin == TouchProbe::kNotDetected) {
+      const uint32_t now_ms =
+          static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+      if (now_ms >= window_deadline_ms) break;
+      if (display_ok && now_ms - last_draw_ms >= 100) {
+        last_draw_ms = now_ms;
+        draw_boot_screen(*display_, BootStage::kTouch, hw_, 100, true, false, false, now_ms);
+      }
+      touch_probe.poll();
+      vTaskDelay(pdMS_TO_TICKS(20));
+    }
+  }
+
+  if (want_touch_detect) {
+    const uint8_t detected = touch_probe.detected_pin;
+    if (detected != TouchProbe::kNotDetected) {
+      config_.touch_wake_pin = detected;
+      preferences_.putUInt("wake_pin", detected);
+      ESP_LOGW(kTag, "auto-detected touch pin %u", detected);
+      power_.init(detected, config_.touch_active_level, config_.touch_hold_ms,
+                  config_.pwr_ctrl_pin, config_.led_pin);
+      power_.set_i2c_pins(config_.display.sda_pin, config_.display.scl_pin);
+      power_.arm(1000, 0);
+      hw_.touch = HwState::kPresent;
+    }
+  }
+
+  if (display_ok)
+    draw_boot_screen(*display_, BootStage::kGyro, hw_, 100, false, false, false,
+                     static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+  if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
+  if (display_ok)
+    draw_boot_screen(*display_, BootStage::kTouch, hw_, 100, false, false, false,
+                     static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+  if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
 
   eyes_ = std::make_unique<MochiEyesEngine>(*display_);
   eyes_->begin();
@@ -211,27 +443,35 @@ esp_err_t Application::start() {
                        preferences_.getFloat("br_int", 0.08f),
                        preferences_.getFloat("br_spd", 0.3f));
 
-  gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
-                 config_.display.scl_pin, display_.get());
-  gesture_.restore(preferences_.getBool("gm", true),
-                    preferences_.getUInt("grt", 1500),
-                    preferences_.getUInt("gcf", 70),
-                    preferences_.getUInt("gcd", 1500),
-                    preferences_.getString("ga", "happy,angry,curious,neutral"));
-  gesture_.set_inverted(preferences_.getBool("ginv", false));
-  gesture_.set_shake_threshold(preferences_.getFloat("gst", 200.0f));
-  gesture_.set_pat_threshold(preferences_.getFloat("gpt", 0.32f));
-  gesture_.set_swipe_threshold(preferences_.getFloat("gvt", 0.45f));
-  gesture_.set_touch_threshold(preferences_.getFloat("gtt", 0.05f));
-  gesture_.set_pickup_tilt_deg(preferences_.getFloat("gtd", 30.0f));
-
-  config_.buzzer_pin = static_cast<int>(preferences_.getUInt("buz_pin", config_.buzzer_pin));
   if (conflicts_with_display_i2c(config_.buzzer_pin, config_.display)) {
     ESP_LOGW(kTag, "buzzer pin %d conflicts with I2C, disabling buzzer", config_.buzzer_pin);
     config_.buzzer_pin = -1;
   }
   buzzer_.init(config_.buzzer_pin);
+  hw_.buzzer = buzzer_.initialized() ? HwState::kPresent : HwState::kAbsent;
   buzzer_.play_power_on();
+  if (display_ok)
+    draw_boot_screen(*display_, BootStage::kBuzzer, hw_, 100, false, false, false,
+                     static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+  if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
+
+  if (display_ok)
+    draw_boot_screen(*display_, BootStage::kPower, hw_, 100, false, false, false,
+                     static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
+  if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
+
+  wifi_.init(preferences_);
+  wifi_.set_time_callback([this](uint64_t epoch_ms) {
+    clock_.set_from_epoch_ms(epoch_ms, static_cast<int16_t>(preferences_.getInt("clk_tz", 0)));
+  });
+
+  if (wifi_.configured()) {
+    const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+    draw_boot_screen(*display_, BootStage::kWifi, hw_, 100, false, true, false, now_ms);
+    const bool wifi_ok = wifi_.sync_blocking(10000);
+    draw_boot_screen(*display_, BootStage::kWifi, hw_, 100, false, false, wifi_ok, now_ms);
+    vTaskDelay(pdMS_TO_TICKS(200));
+  }
 
   shuffle_.restore(preferences_.getBool("shuf_en", true),
                    preferences_.getUInt("shuf_emin", 2000),
@@ -248,7 +488,7 @@ esp_err_t Application::start() {
   commands_ = std::make_unique<CommandRouter>(preferences_, config_.display,
                                                *display_, *eyes_, gesture_,
                                                shuffle_, clock_, power_, ble_,
-                                               buzzer_);
+                                               buzzer_, hw_, wifi_);
   commands_->set_notif_overlay(&notif_);
   commands_->set_buzzer_callback([this](bool on) {
       if (on) buzzer_.play_toggle_on();
@@ -266,7 +506,14 @@ esp_err_t Application::start() {
         static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
     return commands_->handle(cmd, now_ms);
   }));
-  open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
+  // With touch present, don't arm the BLE window at boot — a touch
+  // (short press) opens it for the configured window. With touch absent
+  // the tick loop keeps advertising continuously.
+  if (hw_.touch != HwState::kAbsent) {
+    ble_window_open_ = false;
+  } else {
+    open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
+  }
   display_->set_contrast(static_cast<uint8_t>(preferences_.getUInt("disp_con", 0x7f)));
 
   ESP_LOGI(kTag, "application started");
@@ -286,7 +533,12 @@ void Application::tick() {
     }
   }
 
-  if (ble_window_open_ && !ota_active && now_ms >= ble_window_deadline_ms_) {
+  if (hw_.touch == HwState::kAbsent) {
+    if (!ble_.advertising_enabled()) {
+      ble_window_open_ = true;
+      ble_.start_advertising();
+    }
+  } else if (ble_window_open_ && !ota_active && now_ms >= ble_window_deadline_ms_) {
     ble_.stop(false);
     ble_window_open_ = false;
   }
@@ -445,7 +697,7 @@ void Application::tick() {
       // Title
       const char* title = "CALIBRATING";
       int tw = display_->text_width(title);
-      display_->draw_text((display_->width() - tw) / 2, 6, title);
+      display_->draw_text((display_->width() - tw) / 2, 10, title);
 
       // Gesture name
       tw = display_->text_width(gesture_name);

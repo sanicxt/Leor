@@ -23,6 +23,8 @@
   import BreathingControl from "$lib/components/BreathingControl.svelte";
   import ClockSettings from "$lib/components/ClockSettings.svelte";
   import NotificationSettings from "$lib/components/NotificationSettings.svelte";
+  import HardwareStatusPanel from "$lib/components/HardwareStatusPanel.svelte";
+  import WifiSettings from "$lib/components/WifiSettings.svelte";
   import OtaPanel from "$lib/components/OtaPanel.svelte";
   
   import {
@@ -43,29 +45,19 @@
   }
 
   onMount(() => {
-    // Initialize dark mode based on existing class or system preference
-    isDarkMode = document.documentElement.classList.contains("dark") || 
-      (!document.documentElement.classList.contains("light") && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    
-    // Apply explicitly on mount to ensure variables are set
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
-    }
+    // Default to the light cream look. Dark is opt-in via the toggle, persisted
+    // in localStorage; the OS color scheme is intentionally ignored.
+    const saved = localStorage.getItem("leor-theme");
+    isDarkMode = saved === "dark";
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    document.documentElement.classList.toggle("light", !isDarkMode);
   });
 
   function toggleDarkMode() {
     isDarkMode = !isDarkMode;
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
-    }
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    document.documentElement.classList.toggle("light", !isDarkMode);
+    localStorage.setItem("leor-theme", isDarkMode ? "dark" : "light");
   }
 
   async function handleConnect() {
@@ -88,9 +80,9 @@
     <div class="p-4 md:p-8 max-w-7xl mx-auto">
       
       <!-- Top Bento Header -->
-      <header class="bento-card bg-paper p-4 sm:p-5 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <header class="bento-card bg-bento-pink p-4 sm:p-5 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div class="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
-          <div class="w-12 h-12 sm:w-14 sm:h-14 shrink-0 bg-bento-peach border-4 border-bento-border rounded-2xl flex items-center justify-center shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
+          <div class="w-12 h-12 sm:w-14 sm:h-14 shrink-0 bg-bento-peach border-2 border-bento-border rounded-2xl flex items-center justify-center shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
              <!-- Simplified smiling robot avatar -->
              <svg class="w-7 h-7 sm:w-8 sm:h-8 text-ink" viewBox="0 0 24 24">
                 <!-- Antennae -->
@@ -105,10 +97,10 @@
              </svg>
           </div>
           <div>
-            <h1 class="text-xl sm:text-2xl font-black uppercase tracking-tight leading-none mb-1">Leor OS</h1>
+            <h1 class="font-display text-2xl sm:text-3xl uppercase tracking-tight leading-none mb-1">Leor OS</h1>
             <div class="flex items-center gap-2">
               {#if getConnected()}
-                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-bento-green border-2 border-bento-border rounded-full animate-pulse"></span>
+                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-bento-green border-2 border-bento-border rounded-full animate-pulse-scale"></span>
                 <span class="text-xs sm:text-sm font-bold">Connected</span>
               {:else}
                 <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-bento-pink border-2 border-bento-border rounded-full"></span>
@@ -120,7 +112,7 @@
 
         <div class="flex items-center gap-3 w-full sm:w-auto">
             {#if getConnected() && getLastGesture()}
-                <div class="hidden sm:flex bg-bento-yellow border-2 border-bento-border px-3 py-1 rounded-xl mr-auto sm:mr-0">
+                <div class="hidden sm:flex bg-bento-yellow border-2 border-bento-border px-3 py-1 rounded-full">
                     <span class="font-bold text-sm">Gaze: {getLastGesture()}</span>
                 </div>
             {/if}
@@ -131,9 +123,9 @@
                     <Moon class="w-5 h-5" />
                 {/if}
             </button>
-            <button onclick={handleConnect} class="bento-button rounded-xl bg-bento-blue px-4 sm:px-6 h-11 sm:h-12 flex items-center justify-center gap-2 text-ink flex-1 sm:flex-none">
+            <button onclick={handleConnect} class="bento-button rounded-xl bg-bento-peach px-4 sm:px-6 h-11 sm:h-12 flex items-center justify-center gap-2 text-ink flex-1 sm:flex-none">
                 <Wifi class="w-4 h-4 sm:w-5 sm:h-5" />
-                <span class="font-bold text-sm sm:text-base">{getConnected() ? 'Connected' : 'Connect'}</span>
+                <span class="font-bold text-sm sm:text-base uppercase tracking-wide">{getConnected() ? 'Connected' : 'Connect'}</span>
             </button>
         </div>
       </header>
@@ -144,7 +136,7 @@
           <!-- Expressions (Spans 2 columns) -->
           <div class="bento-card bg-bento-pink p-6 lg:col-span-2">
              <div class="mb-4 border-b-2 border-bento-border pb-2">
-                <h2 class="text-xl font-black uppercase">Expressions</h2>
+                <h2 class="font-display text-xl uppercase">Expressions</h2>
                 <p class="text-sm font-bold opacity-80">Tap to trigger</p>
              </div>
              <!-- The nested component will be updated next to remove its inner backgrounds -->
@@ -154,7 +146,7 @@
           <!-- Quick Actions -->
           <div class="bento-card bg-bento-yellow p-6 md:col-span-1">
              <div class="mb-4 border-b-2 border-bento-border pb-2">
-                 <h2 class="text-xl font-black uppercase">Quick Actions</h2>
+                 <h2 class="font-display text-xl uppercase">Quick Actions</h2>
                  <p class="text-sm font-bold opacity-80">Overrides</p>
              </div>
              <ActionButtons />
@@ -163,7 +155,7 @@
           <!-- Gaze Control -->
           <div class="bento-card bg-bento-green p-6 md:col-span-1 lg:row-span-2 flex flex-col">
              <div class="mb-4 border-b-2 border-bento-border pb-2">
-                 <h2 class="text-xl font-black uppercase">Gaze Control</h2>
+                 <h2 class="font-display text-xl uppercase">Gaze Control</h2>
                  <p class="text-sm font-bold opacity-80">Drag to look</p>
              </div>
              <div class="flex-1 flex items-center justify-center">
@@ -174,7 +166,7 @@
           <!-- Mouth Control Array -->
           <div class="bento-card bg-bento-blue p-6 lg:col-span-3">
              <div class="mb-4 border-b-2 border-bento-border pb-2">
-                 <h2 class="text-xl font-black uppercase">Mouth Control</h2>
+                 <h2 class="font-display text-xl uppercase">Mouth Control</h2>
                  <p class="text-sm font-bold opacity-80">Shape & Type</p>
              </div>
              <MouthControls />
@@ -189,7 +181,7 @@
             class="bento-card w-full flex items-center justify-between px-5 py-3 bg-paper hover:shadow-[2px_2px_0px_0px_var(--color-bento-border)] transition-all"
           >
             <div class="flex items-center gap-3">
-              <span class="text-sm font-black uppercase">Appearance</span>
+              <span class="font-display text-sm uppercase tracking-widest">Appearance</span>
               {#if settingsActive !== 'appearance'}
                 <span class="text-[10px] font-bold text-ink/30 uppercase">Shuffle · Eyes · Breathing</span>
               {/if}
@@ -214,7 +206,7 @@
             class="bento-card w-full flex items-center justify-between px-5 py-3 bg-paper hover:shadow-[2px_2px_0px_0px_var(--color-bento-border)] transition-all"
           >
             <div class="flex items-center gap-3">
-              <span class="text-sm font-black uppercase">Display & System</span>
+              <span class="font-display text-sm uppercase tracking-widest">Display & System</span>
               {#if settingsActive !== 'system'}
                 <span class="text-[10px] font-bold text-ink/30 uppercase">OLED · Clock · Power</span>
               {/if}
@@ -232,6 +224,8 @@
               <PowerSettings />
               <NotificationSettings />
               <GestureSettings />
+              <HardwareStatusPanel />
+              <WifiSettings />
             </div>
           {/if}
         </div>

@@ -51,7 +51,7 @@
     <!-- Header with Main Toggle -->
     <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between">
         <div>
-            <h2 class="text-xl font-black uppercase">Breathing Effect</h2>
+            <h2 class="font-display text-xl uppercase">Breathing Effect</h2>
             <p class="text-sm font-bold opacity-80">Living eye animation</p>
         </div>
         <button

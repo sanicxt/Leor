@@ -50,7 +50,7 @@
     <!-- Header -->
     <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between">
         <div>
-            <h2 class="text-xl font-black uppercase">Shuffle Mode</h2>
+            <h2 class="font-display text-xl uppercase">Shuffle Mode</h2>
             <p class="text-sm font-bold opacity-80">Auto-cycle expressions</p>
         </div>
         <button
