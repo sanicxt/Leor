@@ -12,6 +12,7 @@
 #include "leor/shuffle_service.hpp"
 #include "leor/display_backend.hpp"
 #include "leor/config.hpp"
+#include "leor/wifi_time_sync_service.hpp"
 
 #include <functional>
 #include <string>
@@ -30,7 +31,8 @@ class CommandRouter {
                   PowerService& power,
                   BleService& ble,
                   BuzzerService& buzzer,
-                  const HardwareStatus& hw);
+                  const HardwareStatus& hw,
+                  WifiTimeSyncService& wifi);
 
     std::string handle(std::string cmd, uint32_t now_ms, bool is_manual = true);
     void set_notif_overlay(NotificationOverlay* notif);
@@ -57,6 +59,7 @@ class CommandRouter {
     BleService& ble_;
     BuzzerService& buzzer_;
     const HardwareStatus& hw_;
+    WifiTimeSyncService& wifi_;
     bool mpu_verbose_ = false;
     bool reacting_ = false;
     NotificationOverlay* notif_overlay_ = nullptr;
