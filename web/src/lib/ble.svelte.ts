@@ -18,6 +18,8 @@ export type GestureMapping = { name: string; action: string };
 // Reactive state object
 export const bleState = $state({
     connected: false,
+    connecting: false,
+    connectError: '',
     lastStatus: '',
     lastGesture: '',
     shuffleEnabled: true,
@@ -85,6 +87,8 @@ let gestureListener: ((e: Event) => void) | null = null;
 
 // Getters
 export function getConnected() { return bleState.connected; }
+export function getConnecting() { return bleState.connecting; }
+export function getConnectError() { return bleState.connectError; }
 export function getLastStatus() { return bleState.lastStatus; }
 export function getLastGesture() { return bleState.lastGesture; }
 export function getShuffleEnabled() { return bleState.shuffleEnabled; }
@@ -233,6 +237,8 @@ export function setClockTimezoneOffset(val: number) { bleState.clockTimezoneOffs
 export function setClock24Hour(val: boolean) { bleState.clock24Hour = val; }
 
 export async function connect(): Promise<boolean> {
+    bleState.connecting = true;
+    bleState.connectError = '';
     try {
         // Use the main Service UUID for filtering.
         // This allows the device to have any user-configured name,
@@ -511,6 +517,7 @@ export async function connect(): Promise<boolean> {
         });
 
         bleState.connected = true;
+        bleState.connecting = false;
 
         // Single unified sync — device returns all state in one JSON payload
         setTimeout(async () => {
@@ -521,8 +528,12 @@ export async function connect(): Promise<boolean> {
         }, 300);
 
         return true;
-    } catch (error) {
+    } catch (error: any) {
         console.error('BLE connection failed:', error);
+        bleState.connecting = false;
+        bleState.connectError = error?.name === 'NotFoundError'
+            ? 'No device selected'
+            : error?.message || 'Connection failed';
         return false;
     }
 }
@@ -533,6 +544,7 @@ function cleanup() {
     try { statusChar?.stopNotifications(); } catch (_) { }
     try { gestureChar?.stopNotifications(); } catch (_) { }
     bleState.connected = false;
+    bleState.connecting = false;
     commandChar = null;
     statusChar = null;
     gestureChar = null;

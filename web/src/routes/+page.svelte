@@ -29,6 +29,8 @@
   
   import {
     getConnected,
+    getConnecting,
+    getConnectError,
     getLastStatus,
     getLastGesture,
     connect,
@@ -64,6 +66,7 @@
     if (getConnected()) {
       await disconnect();
     } else {
+      bleState.connectError = '';
       await connect();
     }
   }
@@ -102,11 +105,19 @@
               {#if getConnected()}
                 <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-bento-green border-2 border-bento-border rounded-full animate-pulse-scale"></span>
                 <span class="text-xs sm:text-sm font-bold">Connected</span>
+              {:else if getConnecting()}
+                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 border-2 border-bento-border rounded-full animate-spin border-t-transparent"></span>
+                <span class="text-xs sm:text-sm font-bold">Connecting…</span>
               {:else}
                 <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-bento-pink border-2 border-bento-border rounded-full"></span>
                 <span class="text-xs sm:text-sm font-bold opacity-70">Disconnected</span>
               {/if}
             </div>
+            {#if getConnectError()}
+              <p class="text-xs text-red-600 dark:text-red-400 font-bold mt-0.5 truncate max-w-[140px] sm:max-w-[200px]" title={getConnectError()}>
+                {getConnectError()}
+              </p>
+            {/if}
           </div>
         </div>
 
@@ -123,9 +134,14 @@
                     <Moon class="w-5 h-5" />
                 {/if}
             </button>
-            <button onclick={handleConnect} class="bento-button rounded-xl bg-bento-peach px-4 sm:px-6 h-11 sm:h-12 flex items-center justify-center gap-2 text-ink flex-1 sm:flex-none">
-                <Wifi class="w-4 h-4 sm:w-5 sm:h-5" />
-                <span class="font-bold text-sm sm:text-base uppercase tracking-wide">{getConnected() ? 'Connected' : 'Connect'}</span>
+            <button onclick={handleConnect} disabled={getConnecting()} class="bento-button rounded-xl bg-bento-peach px-4 sm:px-6 h-11 sm:h-12 flex items-center justify-center gap-2 text-ink flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed">
+                {#if getConnecting()}
+                    <span class="w-4 h-4 sm:w-5 sm:h-5 border-2 border-ink border-t-transparent rounded-full animate-spin"></span>
+                    <span class="font-bold text-sm sm:text-base uppercase tracking-wide">Connecting…</span>
+                {:else}
+                    <Wifi class="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span class="font-bold text-sm sm:text-base uppercase tracking-wide">{getConnected() ? 'Connected' : 'Connect'}</span>
+                {/if}
             </button>
         </div>
       </header>
