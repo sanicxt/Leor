@@ -16,6 +16,7 @@ idf_component_register(
         "src/power_service.cpp"
         "src/preferences.cpp"
         "src/shuffle_service.cpp"
+        "src/wifi_time_sync_service.cpp"
     INCLUDE_DIRS
         "include"
     REQUIRES

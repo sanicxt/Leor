@@ -116,10 +116,11 @@ void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const 
   display.send_buffer();
 }
 
-enum class BootStage { kDisplay, kGyro, kTouch, kBuzzer, kPower, kDone };
+enum class BootStage { kDisplay, kGyro, kTouch, kBuzzer, kPower, kWifi, kDone };
 
 void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatus& hw,
-                      int gyro_pct, bool touch_waiting, uint32_t now_ms) {
+                      int gyro_pct, bool touch_waiting, bool wifi_waiting, bool wifi_ok,
+                      uint32_t now_ms) {
   (void)now_ms;
   disp.clear();
 
@@ -144,6 +145,7 @@ void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatu
     case BootStage::kTouch:   label = "TOUCH";   break;
     case BootStage::kBuzzer:  label = "BUZZER";  break;
     case BootStage::kPower:   label = "POWER";   break;
+    case BootStage::kWifi:    label = "WIFI";    break;
     default: break;
   }
   disp.set_font_medium();
@@ -165,6 +167,8 @@ void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatu
     std::snprintf(pct_s, sizeof(pct_s), "%s", hw.power == HwState::kPresent ? "OK" : "ABSENT");
   } else if (stage == BootStage::kTouch) {
     std::snprintf(pct_s, sizeof(pct_s), "%s", hw.touch == HwState::kPresent ? "OK" : "ABSENT");
+  } else if (stage == BootStage::kWifi) {
+    std::snprintf(pct_s, sizeof(pct_s), "%s", wifi_waiting ? "SYNC..." : (wifi_ok ? "OK" : "FAIL"));
   }
   const int hint_w = disp.text_width(pct_s);
   disp.draw_text((disp.width() - hint_w) / 2, 58, pct_s);
@@ -336,7 +340,7 @@ esp_err_t Application::start() {
   }
   hw_.display = display_ok ? HwState::kPresent : HwState::kProbeFailed;
   const uint32_t boot_now = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
-  if (display_ok) draw_boot_screen(*display_, BootStage::kDisplay, hw_, 0, false, boot_now);
+  if (display_ok) draw_boot_screen(*display_, BootStage::kDisplay, hw_, 0, false, false, false, boot_now);
   if (display_ok) vTaskDelay(pdMS_TO_TICKS(150));
 
   // Gyro calibration and touch auto-detection run concurrently in one 5s
@@ -355,14 +359,14 @@ esp_err_t Application::start() {
       static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
   if (display_ok)
     draw_boot_screen(*display_, BootStage::kGyro, hw_, 0, want_touch_detect,
-                     touch_window_start_ms);
+                     false, false, touch_window_start_ms);
 
   std::function<uint8_t(int)> probe_cb;
   if (want_touch_detect) {
     probe_cb = [this, &touch_probe, display_ok, last = 0](int pct) mutable -> uint8_t {
       if (display_ok && (pct >= last + 4 || pct >= 100)) {
         last = pct;
-        draw_boot_screen(*display_, BootStage::kGyro, hw_, pct, true,
+        draw_boot_screen(*display_, BootStage::kGyro, hw_, pct, true, false, false,
                          static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
       }
       return touch_probe.poll();
@@ -392,7 +396,7 @@ esp_err_t Application::start() {
       if (now_ms >= window_deadline_ms) break;
       if (display_ok && now_ms - last_draw_ms >= 100) {
         last_draw_ms = now_ms;
-        draw_boot_screen(*display_, BootStage::kTouch, hw_, 100, true, now_ms);
+        draw_boot_screen(*display_, BootStage::kTouch, hw_, 100, true, false, false, now_ms);
       }
       touch_probe.poll();
       vTaskDelay(pdMS_TO_TICKS(20));
@@ -414,11 +418,11 @@ esp_err_t Application::start() {
   }
 
   if (display_ok)
-    draw_boot_screen(*display_, BootStage::kGyro, hw_, 100, false,
+    draw_boot_screen(*display_, BootStage::kGyro, hw_, 100, false, false, false,
                      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
   if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
   if (display_ok)
-    draw_boot_screen(*display_, BootStage::kTouch, hw_, 100, false,
+    draw_boot_screen(*display_, BootStage::kTouch, hw_, 100, false, false, false,
                      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
   if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
 
@@ -447,14 +451,27 @@ esp_err_t Application::start() {
   hw_.buzzer = buzzer_.initialized() ? HwState::kPresent : HwState::kAbsent;
   buzzer_.play_power_on();
   if (display_ok)
-    draw_boot_screen(*display_, BootStage::kBuzzer, hw_, 100, false,
+    draw_boot_screen(*display_, BootStage::kBuzzer, hw_, 100, false, false, false,
                      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
   if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
 
   if (display_ok)
-    draw_boot_screen(*display_, BootStage::kPower, hw_, 100, false,
+    draw_boot_screen(*display_, BootStage::kPower, hw_, 100, false, false, false,
                      static_cast<uint32_t>(esp_timer_get_time() / 1000ULL));
   if (display_ok) vTaskDelay(pdMS_TO_TICKS(200));
+
+  wifi_.init(preferences_);
+  wifi_.set_time_callback([this](uint64_t epoch_ms) {
+    clock_.set_from_epoch_ms(epoch_ms, static_cast<int16_t>(preferences_.getInt("clk_tz", 0)));
+  });
+
+  if (wifi_.configured()) {
+    const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+    draw_boot_screen(*display_, BootStage::kWifi, hw_, 100, false, true, false, now_ms);
+    const bool wifi_ok = wifi_.sync_blocking(10000);
+    draw_boot_screen(*display_, BootStage::kWifi, hw_, 100, false, false, wifi_ok, now_ms);
+    vTaskDelay(pdMS_TO_TICKS(200));
+  }
 
   shuffle_.restore(preferences_.getBool("shuf_en", true),
                    preferences_.getUInt("shuf_emin", 2000),
