@@ -62,6 +62,17 @@ std::string buzzer_mode_str(int value) {
     return value == 1 ? "on" : "off";
 }
 
+std::string json_escape(const std::string& in) {
+    std::string out;
+    out.reserve(in.size() + 4);
+    for (char c : in) {
+        if (c == '"') out += "\\\"";
+        else if (c == '\\') out += "\\\\";
+        else out += c;
+    }
+    return out;
+}
+
 }  // namespace
 
 CommandRouter::CommandRouter(Preferences& preferences,
@@ -112,6 +123,8 @@ void CommandRouter::reset_effects() {
 std::string CommandRouter::sync_json(uint32_t now_ms) const {
     char buf[2048];
     const unsigned ble_window_ms = static_cast<unsigned>(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
+    const std::string ssid_safe = json_escape(wifi_.ssid());
+    const std::string status_safe = json_escape(wifi_.last_status());
     std::snprintf(
         buf, sizeof(buf),
         "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"ct\":%u,\"td\":%u,\"wp\":%u,\"pp\":%u,\"nd\":%u,\"tm\":%d,\"bm\":%d},"
@@ -139,7 +152,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
         static_cast<int>(hw_.display), static_cast<int>(hw_.gyro),
         static_cast<int>(hw_.buzzer), static_cast<int>(hw_.touch),
         static_cast<int>(hw_.power),
-        wifi_.ssid().c_str(), wifi_.last_status().c_str());
+        ssid_safe.c_str(), status_safe.c_str());
     return buf;
 }
 
