@@ -16,14 +16,16 @@ namespace {
 
 namespace leor {
 
-void GestureService::start(bool dummy_enabled, int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* display) {
+void GestureService::start(bool dummy_enabled, int i2c_sda_pin, int i2c_scl_pin,
+                           DisplayBackend* display,
+                           std::function<uint8_t(int)> touch_probe) {
     dummy_enabled_ = dummy_enabled;
     last_emit_ms_ = 0;
     i2c_sda_pin_ = i2c_sda_pin;
     i2c_scl_pin_ = i2c_scl_pin;
 
     if (!dummy_enabled_) {
-        mpu_available_ = init_mpu(i2c_sda_pin_, i2c_scl_pin_, display);
+        mpu_available_ = init_mpu(i2c_sda_pin_, i2c_scl_pin_, display, touch_probe);
         mpu_calibrated_ = mpu_available_;
     }
 }
@@ -349,7 +351,8 @@ std::string GestureService::calibration_status_json() const {
     return buf;
 }
 
-bool GestureService::init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* display) {
+bool GestureService::init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* display,
+                              std::function<uint8_t(int)>& touch_probe) {
     if (!mpu_.begin(i2c_sda_pin, i2c_scl_pin, 400000, I2C_NUM_0)) {
         return false;
     }
@@ -358,12 +361,15 @@ bool GestureService::init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* 
     int last_drawn_pct = -1;
     while (!mpu_.is_calibrated() && guard < 5000) {
         const bool updated = mpu_.update();
+        const int pct = (static_cast<int>(mpu_.calibration_progress()) * 100) / 500;
         if (display != nullptr) {
-            const int pct = (static_cast<int>(mpu_.calibration_progress()) * 100) / 500;
             if (last_drawn_pct < 0 || pct >= last_drawn_pct + 4 || pct == 100) {
                 draw_calibration(display, pct, false);
                 last_drawn_pct = pct;
             }
+        }
+        if (touch_probe) {
+            touch_probe(pct);
         }
         if (!updated) {
             vTaskDelay(pdMS_TO_TICKS(2));

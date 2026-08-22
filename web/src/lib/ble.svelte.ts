@@ -18,6 +18,9 @@ export type GestureMapping = { name: string; action: string };
 // Reactive state object
 export const bleState = $state({
     connected: false,
+    connecting: false,
+    connectError: '',
+    otaRunning: false,
     lastStatus: '',
     lastGesture: '',
     shuffleEnabled: true,
@@ -32,7 +35,8 @@ export const bleState = $state({
         ew: 36, eh: 36, es: 10, er: 8,
         mw: 20, lt: 1000, vt: 2000, bi: 3,
         gs: 6, os: 12, ss: 10, td: 3000, // gaze speed, openness speed, squish speed, touch hold delay (ms)
-        wp: 0, pp: 1, ct: 127 // wake GPIO pin, power-control GPIO pin, contrast (0-255)
+        wp: 0, pp: 1, ct: 127, nd: 5000, // wake GPIO pin, power-control GPIO pin, contrast (0-255), notification duration (ms)
+        touchMode: 2, buzzerMode: 0, wifiMode: 0 // 0=off,1=on,2=detect; 0=off,1=on; 0=off,1=on
     },
     display: {
         type: 'sh1106',  // sh1106 or ssd1306
@@ -55,6 +59,11 @@ export const bleState = $state({
     clockTimezoneOffset: 0,
     clockSeconds: 0,
     clock24Hour: true,
+    hardware: {
+        display: 0, gyro: 0, buzzer: 0, touch: 0, power: 0
+    },
+    wifi: { ssid: '', status: '', pass: '' },
+    wifiAps: [] as { ssid: string; rssi: number; auth: number }[],
     // Gesture calibration state (synced from device)
     calPhase: 'idle' as 'idle' | 'wait' | 'capturing' | 'complete' | 'timeout',
     calGesture: '' as string,
@@ -68,12 +77,20 @@ export const bleState = $state({
 // BLE device and characteristics
 let device: BluetoothDevice | null = null;
 let commandChar: BluetoothRemoteGATTCharacteristic | null = null;
+let statusChar: BluetoothRemoteGATTCharacteristic | null = null;
+let gestureChar: BluetoothRemoteGATTCharacteristic | null = null;
 // OTA characteristics (populated on connect if OTA service is present)
 let otaControlChar: BluetoothRemoteGATTCharacteristic | null = null;
 let otaDataChar: BluetoothRemoteGATTCharacteristic | null = null;
 
+let statusListener: ((e: Event) => void) | null = null;
+let gestureListener: ((e: Event) => void) | null = null;
+
 // Getters
 export function getConnected() { return bleState.connected; }
+export function getConnecting() { return bleState.connecting; }
+export function getConnectError() { return bleState.connectError; }
+export function getOtaRunning() { return bleState.otaRunning; }
 export function getLastStatus() { return bleState.lastStatus; }
 export function getLastGesture() { return bleState.lastGesture; }
 export function getShuffleEnabled() { return bleState.shuffleEnabled; }
@@ -101,6 +118,10 @@ export function getSettingsTd() { return bleState.settings.td; }
 export function getSettingsWp() { return bleState.settings.wp; }
 export function getSettingsPp() { return bleState.settings.pp; }
 export function getSettingsCt() { return bleState.settings.ct; }
+export function getSettingsNd() { return bleState.settings.nd; }
+
+export function getTouchMode() { return bleState.settings.touchMode; }
+export function getBuzzerMode() { return bleState.settings.buzzerMode; }
 
 export function getGestureMatching() { return bleState.gestureMatching; }
 export function getGestureInverted() { return bleState.gestureInverted; }
@@ -119,6 +140,27 @@ export function getClockEnabled() { return bleState.clockEnabled; }
 export function getClockSeconds() { return bleState.clockSeconds; }
 export function getClockTimezoneOffset() { return bleState.clockTimezoneOffset; }
 export function getClock24Hour() { return bleState.clock24Hour; }
+export function getHardware() { return bleState.hardware; }
+
+export function getWifiSsid() {
+    return bleState.wifi.ssid;
+}
+
+export function getWifiStatus() {
+    return bleState.wifi.status;
+}
+
+export function getWifiPass() {
+    return bleState.wifi.pass;
+}
+
+export function getWifiMode() {
+    return bleState.settings.wifiMode;
+}
+
+export function getWifiAps() {
+    return bleState.wifiAps;
+}
 
 // Setters
 export function setShuffleEnabled(val: boolean) { bleState.shuffleEnabled = val; }
@@ -146,6 +188,38 @@ export function setSettingsTd(val: number) { bleState.settings.td = val; }
 export function setSettingsWp(val: number) { bleState.settings.wp = val; }
 export function setSettingsPp(val: number) { bleState.settings.pp = val; }
 export function setSettingsCt(val: number) { bleState.settings.ct = val; }
+export function setSettingsNd(val: number) { bleState.settings.nd = val; }
+
+export function setTouchMode(mode: number) {
+    bleState.settings.touchMode = mode;
+    sendCommand(`set:tm=${mode}`);
+}
+export function setBuzzerMode(mode: number) {
+    bleState.settings.buzzerMode = mode;
+    sendCommand(`set:bm=${mode}`);
+}
+
+export async function saveWifiCredentials(ssid: string, pass: string) {
+    await sendCommand(`wifi:ssid=${ssid}`);
+    await sendCommand(`wifi:pass=${pass}`);
+}
+
+export async function sendWifiSync() {
+    await sendCommand('wifi:sync');
+}
+
+export function setWifiMode(mode: number) {
+    bleState.settings.wifiMode = mode;
+    sendCommand(`set:wm=${mode}`);
+}
+
+export async function fetchWifiCredentials() {
+    await sendCommand('wifi:get');
+}
+
+export async function sendWifiScan() {
+    await sendCommand('wifi:scan');
+}
 
 export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
 export function setGestureInverted(val: boolean) { bleState.gestureInverted = val; }
@@ -165,66 +239,109 @@ export function setClockTimezoneOffset(val: number) { bleState.clockTimezoneOffs
 export function setClock24Hour(val: boolean) { bleState.clock24Hour = val; }
 
 export async function connect(): Promise<boolean> {
+    bleState.connecting = true;
+    bleState.connectError = '';
     try {
-        // Use the main Service UUID for filtering.
-        // This allows the device to have any user-configured name,
-        // as long as the firmware advertises this UUID in its primary packet.
+        if (typeof navigator.bluetooth === 'undefined') {
+            throw new Error('Web Bluetooth not supported in this browser');
+        }
+
         device = await navigator.bluetooth.requestDevice({
-            filters: [
-                { services: [BLE_CONFIG.SERVICE_UUID] }
-            ],
+            filters: [{ services: [BLE_CONFIG.SERVICE_UUID] }],
             optionalServices: [BLE_CONFIG.SERVICE_UUID, BLE_CONFIG.OTA_SERVICE_UUID],
         });
 
-        const server = await device.gatt!.connect();
-        const service = await server.getPrimaryService(BLE_CONFIG.SERVICE_UUID);
+        await setupConnection();
+        return true;
+    } catch (error: any) {
+        console.error('BLE connection failed:', error);
+        bleState.connecting = false;
+        bleState.connectError = error?.name === 'NotFoundError'
+            ? 'No device selected'
+            : error?.message || 'Connection failed';
+        setTimeout(() => { if (bleState.connectError === (error?.message || '')) bleState.connectError = ''; }, 10000);
+        return false;
+    }
+}
 
-        // Get main characteristics
-        commandChar = await service.getCharacteristic(BLE_CONFIG.COMMAND_CHAR_UUID);
-        const statusChar = await service.getCharacteristic(BLE_CONFIG.STATUS_CHAR_UUID);
-        const gestureChar = await service.getCharacteristic(BLE_CONFIG.GESTURE_CHAR_UUID);
-
-        // Try to get OTA service (non-fatal if not present)
-        try {
-            const otaService = await server.getPrimaryService(BLE_CONFIG.OTA_SERVICE_UUID);
-            otaControlChar = await otaService.getCharacteristic(BLE_CONFIG.OTA_CONTROL_UUID);
-            otaDataChar = await otaService.getCharacteristic(BLE_CONFIG.OTA_DATA_UUID);
-            console.log('[BLE] OTA service ready');
-        } catch (_) {
-            otaControlChar = null;
-            otaDataChar = null;
-            console.warn('[BLE] OTA service not available on this firmware');
+export async function reconnect(): Promise<boolean> {
+    bleState.connecting = true;
+    bleState.connectError = '';
+    try {
+        if (typeof navigator.bluetooth === 'undefined') {
+            throw new Error('Web Bluetooth not supported in this browser');
         }
 
-        // Buffer for chunked status data
-        let statusBuffer = '';
+        const devices = await navigator.bluetooth.getDevices();
+        const leorDevice = devices.find(d =>
+            d.name?.includes('Testkit') ||
+            d.gatt?.connected === false
+        );
 
-        // Subscribe to status notifications
-        await statusChar.startNotifications();
-        statusChar.addEventListener('characteristicvaluechanged', (e: Event) => {
-            const chunk = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
-            console.log('[BLE RX Chunk]', chunk);
+        if (!leorDevice) {
+            throw new Error('No paired Leor device found');
+        }
 
-            // If it starts with '{' or we have stuff in the buffer, we are in a chunked JSON message
-            if (chunk.startsWith('{') || (statusBuffer.startsWith('{') && !statusBuffer.endsWith('}'))) {
-                statusBuffer += chunk;
+        device = leorDevice;
+        await setupConnection();
+        return true;
+    } catch (error: any) {
+        console.error('BLE reconnect failed:', error);
+        bleState.connecting = false;
+        bleState.connectError = error?.message || 'Reconnect failed';
+        setTimeout(() => { if (bleState.connectError === (error?.message || '')) bleState.connectError = ''; }, 10000);
+        return false;
+    }
+}
 
-                // Try to parse if it looks complete
-                if (statusBuffer.endsWith('}')) {
-                    try {
-                        const data = JSON.parse(statusBuffer);
-                        console.log('[BLE RX JSON Sync]', data);
+async function setupConnection(): Promise<void> {
+  try {
+    const server = await device.gatt!.connect();
+    const service = await server.getPrimaryService(BLE_CONFIG.SERVICE_UUID);
 
-                        if (data.type === 'sync') {
-                            if (data.settings) {
-                                Object.keys(data.settings).forEach(key => {
-                                    if (key in bleState.settings) {
-                                        (bleState.settings as any)[key] = data.settings[key];
-                                    }
-                                });
-                            }
-                            if (data.display) {
-                                if (data.display.type) bleState.display.type = data.display.type;
+    commandChar = await service.getCharacteristic(BLE_CONFIG.COMMAND_CHAR_UUID);
+    statusChar = await service.getCharacteristic(BLE_CONFIG.STATUS_CHAR_UUID);
+    gestureChar = await service.getCharacteristic(BLE_CONFIG.GESTURE_CHAR_UUID);
+
+    try {
+        const otaService = await server.getPrimaryService(BLE_CONFIG.OTA_SERVICE_UUID);
+        otaControlChar = await otaService.getCharacteristic(BLE_CONFIG.OTA_CONTROL_UUID);
+        otaDataChar = await otaService.getCharacteristic(BLE_CONFIG.OTA_DATA_UUID);
+        console.log('[BLE] OTA service ready');
+    } catch (_) {
+        otaControlChar = null;
+        otaDataChar = null;
+        console.warn('[BLE] OTA service not available on this firmware');
+    }
+
+    let statusBuffer = '';
+
+    await statusChar.startNotifications();
+    statusListener = (e: Event) => {
+        const chunk = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
+        console.log('[BLE RX Chunk]', chunk);
+
+        if (chunk.startsWith('{') || (statusBuffer.startsWith('{') && !statusBuffer.endsWith('}'))) {
+            statusBuffer += chunk;
+
+            if (statusBuffer.endsWith('}')) {
+                try {
+                    const data = JSON.parse(statusBuffer);
+                    console.log('[BLE RX JSON Sync]', data);
+
+                    if (data.type === 'sync') {
+                        if (data.settings) {
+                            Object.keys(data.settings).forEach(key => {
+                                if (key in bleState.settings) {
+                                    (bleState.settings as any)[key] = data.settings[key];
+                                }
+                            });
+                            if ('tm' in data.settings) bleState.settings.touchMode = data.settings.tm;
+                            if ('bm' in data.settings) bleState.settings.buzzerMode = data.settings.bm;
+                            if ('wm' in data.settings) bleState.settings.wifiMode = data.settings.wm;
+                        }
+                        if (data.display) {
+                            if (data.display.type) bleState.display.type = data.display.type;
                                 if (data.display.addr) bleState.display.addr = data.display.addr;
                             }
                             if (data.state) {
@@ -268,6 +385,17 @@ export async function connect(): Promise<boolean> {
                                 if ('sec' in data.clock) bleState.clockSeconds = data.clock.sec;
                                 if ('fmt' in data.clock) bleState.clock24Hour = (data.clock.fmt === 24);
                             }
+                            if (data.hardware) {
+                                if ('display' in data.hardware) bleState.hardware.display = data.hardware.display;
+                                if ('gyro' in data.hardware) bleState.hardware.gyro = data.hardware.gyro;
+                                if ('buzzer' in data.hardware) bleState.hardware.buzzer = data.hardware.buzzer;
+                                if ('touch' in data.hardware) bleState.hardware.touch = data.hardware.touch;
+                                if ('power' in data.hardware) bleState.hardware.power = data.hardware.power;
+                            }
+                            if (data.wifi) {
+                                if ('ssid' in data.wifi) bleState.wifi.ssid = data.wifi.ssid;
+                                if ('status' in data.wifi) bleState.wifi.status = data.wifi.status;
+                            }
                         }
 
                         if (data.type === 'cal') {
@@ -279,6 +407,25 @@ export async function connect(): Promise<boolean> {
                             bleState.calCaptureMs = data.capture_ms || 0;
                             bleState.calSamples = data.samples || 0;
                             console.log('[BLE RX Cal]', bleState.calPhase, bleState.calGesture, 'peak:', bleState.calPeak);
+                        }
+
+                        if (data.type === 'hw') {
+                            if ('display' in data) bleState.hardware.display = data.display;
+                            if ('gyro' in data) bleState.hardware.gyro = data.gyro;
+                            if ('buzzer' in data) bleState.hardware.buzzer = data.buzzer;
+                            if ('touch' in data) bleState.hardware.touch = data.touch;
+                            if ('power' in data) bleState.hardware.power = data.power;
+                        }
+
+                        if (data.type === 'wifi') {
+                            if ('ssid' in data) bleState.wifi.ssid = data.ssid;
+                            if ('pass' in data) bleState.wifi.pass = data.pass;
+                        }
+
+                        if (data.type === 'wifi_scan') {
+                            if ('aps' in data && Array.isArray(data.aps)) {
+                                bleState.wifiAps = data.aps;
+                            }
                         }
 
                         bleState.lastStatus = 'Sync complete';
@@ -393,51 +540,85 @@ export async function connect(): Promise<boolean> {
             if (clockFmtMatch) {
                 bleState.clock24Hour = (clockFmtMatch[1] === '24');
             }
-        });
+        };
+        statusChar.addEventListener('characteristicvaluechanged', statusListener);
 
         // Subscribe to gesture notifications
         await gestureChar.startNotifications();
-        gestureChar.addEventListener('characteristicvaluechanged', (e: Event) => {
+        gestureListener = (e: Event) => {
             const value = new TextDecoder().decode((e.target as BluetoothRemoteGATTCharacteristic).value!);
             bleState.lastGesture = value;
-        });
+        };
+        gestureChar.addEventListener('characteristicvaluechanged', gestureListener);
 
         // Handle disconnect
         device.addEventListener('gattserverdisconnected', () => {
-            bleState.connected = false;
+            cleanup();
         });
 
         bleState.connected = true;
+        bleState.connecting = false;
 
-        // Single unified sync — device returns all state in one JSON payload
         setTimeout(async () => {
+            if (!device?.gatt?.connected) return;
             console.log('Requesting full device sync...');
             await sendCommand('s:');
             await new Promise(r => setTimeout(r, 120));
             await sendCommand(`clock:sync=${Date.now()},${new Date().getTimezoneOffset()}`);
         }, 300);
-
-        return true;
-    } catch (error) {
-        console.error('BLE connection failed:', error);
-        return false;
+    } catch (error: any) {
+        cleanup();
+        throw error;
     }
+}
+
+function cleanup() {
+    statusChar?.removeEventListener('characteristicvaluechanged', statusListener!);
+    gestureChar?.removeEventListener('characteristicvaluechanged', gestureListener!);
+    if (device?.gatt?.connected) {
+        statusChar?.stopNotifications?.().catch(() => {});
+        gestureChar?.stopNotifications?.().catch(() => {});
+    }
+    bleState.connected = false;
+    bleState.connecting = false;
+    commandChar = null;
+    statusChar = null;
+    gestureChar = null;
+    device = null;
+    statusListener = null;
+    gestureListener = null;
 }
 
 export async function disconnect(): Promise<void> {
     if (device?.gatt?.connected) {
         device.gatt.disconnect();
     }
-    bleState.connected = false;
+    cleanup();
 }
 
+let writeQueue: Promise<void> = Promise.resolve();
+
 export async function sendCommand(cmd: string): Promise<void> {
-    if (!commandChar) {
-        console.error('Not connected');
-        return;
+    if (!commandChar || !device?.gatt?.connected) {
+        if (commandChar) cleanup();
+        throw new Error('Not connected');
     }
-    await commandChar.writeValue(new TextEncoder().encode(cmd));
-    console.log('[BLE TX]', cmd);
+    writeQueue = writeQueue.then(async () => {
+        if (!commandChar || !device?.gatt?.connected) {
+            throw new Error('Not connected');
+        }
+        try {
+            await commandChar.writeValue(new TextEncoder().encode(cmd));
+            console.log('[BLE TX]', cmd);
+        } catch (e) {
+            cleanup();
+            const msg = e instanceof Error ? e.message : 'Connection lost';
+            bleState.connectError = msg;
+            setTimeout(() => { if (bleState.connectError === msg) bleState.connectError = ''; }, 10000);
+            throw e;
+        }
+    }).catch(() => {});
+    return writeQueue;
 }
 
 // Check if Web Bluetooth is supported
@@ -500,12 +681,14 @@ export async function sendOTA(
         return false;
     }
 
+    bleState.otaRunning = true;
+
     // 509 = ATT_MTU(512) - 3 byte ATT header — maximum per-packet payload.
     // Flow control uses OTA_CTRL_CREDIT (0x07) notifications: device ACKs every
     // CREDIT_BATCH packets so the browser can send the next burst without waiting
     // for a per-packet ATT response. This is 10-20× faster than writeValueWithResponse.
     const packetSize = 509;
-    const CREDIT_BATCH = 32;  // must match OTA_CREDIT_BATCH in ota_manager.h
+    const CREDIT_BATCH = 128;  // must match OTA_CREDIT_BATCH in ota_manager.h
 
     // ── Disconnection watchdog ────────────────────────────────────────────────
     let aborted = false;
@@ -631,6 +814,7 @@ export async function sendOTA(
         if (reqAck !== OTA_CTRL_REQUEST_ACK) {
             onProgress(0, `OTA request rejected (code ${reqAck}).`);
             await cleanup();
+            bleState.otaRunning = false;
             return false;
         }
         onProgress(2, 'Acknowledged. Sending firmware…');
@@ -685,15 +869,18 @@ export async function sendOTA(
 
         if (doneAck === OTA_CTRL_DONE_ACK) {
             onProgress(100, 'OTA complete — device rebooting…');
+            bleState.otaRunning = false;
             return true;
         } else {
             onProgress(96, `Validation failed on device (code ${doneAck}).`);
+            bleState.otaRunning = false;
             return false;
         }
 
     } catch (err: any) {
         await cleanup();
         onProgress(0, `OTA error: ${err?.message ?? err}`);
+        bleState.otaRunning = false;
         return false;
     }
 }

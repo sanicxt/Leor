@@ -1,15 +1,20 @@
 #pragma once
 
 #include "leor/ble_service.hpp"
+#include "leor/buzzer_service.hpp"
 #include "leor/clock_service.hpp"
 #include "leor/gesture_service.hpp"
+#include "leor/hardware_status.hpp"
 #include "leor/mochi_eyes_engine.hpp"
+#include "leor/notification_overlay.hpp"
 #include "leor/power_service.hpp"
 #include "leor/preferences.hpp"
 #include "leor/shuffle_service.hpp"
 #include "leor/display_backend.hpp"
 #include "leor/config.hpp"
+#include "leor/wifi_time_sync_service.hpp"
 
+#include <functional>
 #include <string>
 
 namespace leor {
@@ -24,9 +29,15 @@ class CommandRouter {
                   ShuffleService& shuffle,
                   ClockService& clock,
                   PowerService& power,
-                  BleService& ble);
+                  BleService& ble,
+                  BuzzerService& buzzer,
+                  const HardwareStatus& hw,
+                  WifiTimeSyncService& wifi);
 
     std::string handle(std::string cmd, uint32_t now_ms, bool is_manual = true);
+    void set_notif_overlay(NotificationOverlay* notif);
+    void set_buzzer_callback(std::function<void(bool)> cb) { buzzer_cb_ = std::move(cb); }
+    uint32_t notif_duration_ms() const { return notif_duration_ms_; }
 
   private:
     std::string handle_settings(const std::string& params, uint32_t now_ms);
@@ -34,6 +45,7 @@ class CommandRouter {
     std::string handle_display(const std::string& params);
     std::string handle_clock(const std::string& params, uint32_t now_ms);
     std::string sync_json(uint32_t now_ms) const;
+    std::string hw_json() const;
     void reset_effects();
 
     Preferences& preferences_;
@@ -45,8 +57,14 @@ class CommandRouter {
     ClockService& clock_;
     PowerService& power_;
     BleService& ble_;
+    BuzzerService& buzzer_;
+    const HardwareStatus& hw_;
+    WifiTimeSyncService& wifi_;
     bool mpu_verbose_ = false;
     bool reacting_ = false;
+    NotificationOverlay* notif_overlay_ = nullptr;
+    uint32_t notif_duration_ms_ = 5000;
+    std::function<void(bool)> buzzer_cb_;
 };
 
 }  // namespace leor

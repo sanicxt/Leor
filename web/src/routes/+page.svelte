@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fly } from "svelte/transition";
+  import { fly, slide } from "svelte/transition";
   import { onMount } from "svelte";
   import MasterBackground from "$lib/components/MasterBackground.svelte";
   import AnimatedTabs from "$lib/components/AnimatedTabs.svelte";
@@ -22,10 +22,17 @@
   import PowerSettings from "$lib/components/PowerSettings.svelte";
   import BreathingControl from "$lib/components/BreathingControl.svelte";
   import ClockSettings from "$lib/components/ClockSettings.svelte";
+  import NotificationSettings from "$lib/components/NotificationSettings.svelte";
+  import HardwareStatusPanel from "$lib/components/HardwareStatusPanel.svelte";
+  import WifiSettings from "$lib/components/WifiSettings.svelte";
+  import Alert from "$lib/components/Alert.svelte";
   import OtaPanel from "$lib/components/OtaPanel.svelte";
   
   import {
     getConnected,
+    getConnecting,
+    getConnectError,
+    getOtaRunning,
     getLastStatus,
     getLastGesture,
     connect,
@@ -33,42 +40,53 @@
     bleState,
   } from "$lib/ble.svelte";
 
-  let activeTab = $state("home"); // 'home' | 'settings' | 'gestures'
+  let activeTab = $state("home");
   let isDarkMode = $state(false);
+  let settingsActive = $state('appearance');
+
+  function settingsToggle(id: string) {
+    settingsActive = settingsActive === id ? '' : id;
+  }
 
   onMount(() => {
-    // Initialize dark mode based on existing class or system preference
-    isDarkMode = document.documentElement.classList.contains("dark") || 
-      (!document.documentElement.classList.contains("light") && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    
-    // Apply explicitly on mount to ensure variables are set
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
-    }
+    // Default to the light cream look. Dark is opt-in via the toggle, persisted
+    // in localStorage; the OS color scheme is intentionally ignored.
+    const saved = localStorage.getItem("leor-theme");
+    isDarkMode = saved === "dark";
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    document.documentElement.classList.toggle("light", !isDarkMode);
   });
 
   function toggleDarkMode() {
     isDarkMode = !isDarkMode;
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
-    }
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    document.documentElement.classList.toggle("light", !isDarkMode);
+    localStorage.setItem("leor-theme", isDarkMode ? "dark" : "light");
   }
 
   async function handleConnect() {
+    // Never allow disconnect while an OTA flash is in progress.
+    if (getOtaRunning()) return;
     if (getConnected()) {
       await disconnect();
     } else {
+      bleState.connectError = '';
       await connect();
     }
   }
+
+  // Warn before refresh/close while OTA flashing is in progress, so the
+  // user can't accidentally abort a firmware update mid-transfer.
+  onMount(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (getOtaRunning()) {
+        e.preventDefault();
+        e.returnValue = 'Firmware update in progress. Leave the page?';
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  });
 </script>
 
 <svelte:head>
@@ -79,12 +97,24 @@
   <MasterBackground />
 
   <main class="relative z-10 min-h-screen overflow-y-auto pb-32">
-    <div class="p-4 md:p-8 max-w-7xl mx-auto">
+    <div class="p-4 md:p-8 max-w-7xl mx-auto relative">
+      {#if getOtaRunning() && activeTab !== "ota"}
+        <div class="absolute inset-0 z-30 bg-paper/80 backdrop-blur-sm rounded-3xl flex items-center justify-center">
+          <div class="text-center space-y-3 p-8">
+            <svg class="w-12 h-12 mx-auto animate-spin text-bento-blue" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>
+            <p class="font-display text-lg uppercase">Flashing Firmware</p>
+            <p class="text-sm font-bold opacity-70">Keep this page open until the device reboots</p>
+          </div>
+        </div>
+      {/if}
       
       <!-- Top Bento Header -->
-      <header class="bento-card bg-paper p-4 sm:p-5 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <header class="bento-card bg-bento-pink p-4 sm:p-5 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div class="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
-          <div class="w-12 h-12 sm:w-14 sm:h-14 shrink-0 bg-bento-peach border-4 border-bento-border rounded-2xl flex items-center justify-center shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
+          <div class="w-12 h-12 sm:w-14 sm:h-14 shrink-0 bg-bento-peach border-2 border-bento-border rounded-2xl flex items-center justify-center shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
              <!-- Simplified smiling robot avatar -->
              <svg class="w-7 h-7 sm:w-8 sm:h-8 text-ink" viewBox="0 0 24 24">
                 <!-- Antennae -->
@@ -99,11 +129,14 @@
              </svg>
           </div>
           <div>
-            <h1 class="text-xl sm:text-2xl font-black uppercase tracking-tight leading-none mb-1">Leor OS</h1>
+            <h1 class="font-display text-2xl sm:text-3xl uppercase tracking-tight leading-none mb-1">Leor OS</h1>
             <div class="flex items-center gap-2">
               {#if getConnected()}
-                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-bento-green border-2 border-bento-border rounded-full animate-pulse"></span>
+                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-bento-green border-2 border-bento-border rounded-full animate-pulse-scale"></span>
                 <span class="text-xs sm:text-sm font-bold">Connected</span>
+              {:else if getConnecting()}
+                <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 border-2 border-bento-border rounded-full animate-spin border-t-transparent"></span>
+                <span class="text-xs sm:text-sm font-bold">Connecting…</span>
               {:else}
                 <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-bento-pink border-2 border-bento-border rounded-full"></span>
                 <span class="text-xs sm:text-sm font-bold opacity-70">Disconnected</span>
@@ -114,7 +147,7 @@
 
         <div class="flex items-center gap-3 w-full sm:w-auto">
             {#if getConnected() && getLastGesture()}
-                <div class="hidden sm:flex bg-bento-yellow border-2 border-bento-border px-3 py-1 rounded-xl mr-auto sm:mr-0">
+                <div class="hidden sm:flex bg-bento-yellow border-2 border-bento-border px-3 py-1 rounded-full">
                     <span class="font-bold text-sm">Gaze: {getLastGesture()}</span>
                 </div>
             {/if}
@@ -125,9 +158,17 @@
                     <Moon class="w-5 h-5" />
                 {/if}
             </button>
-            <button onclick={handleConnect} class="bento-button rounded-xl bg-bento-blue px-4 sm:px-6 h-11 sm:h-12 flex items-center justify-center gap-2 text-ink flex-1 sm:flex-none">
-                <Wifi class="w-4 h-4 sm:w-5 sm:h-5" />
-                <span class="font-bold text-sm sm:text-base">{getConnected() ? 'Connected' : 'Connect'}</span>
+            <button onclick={handleConnect} disabled={getConnecting() || getOtaRunning()} class="bento-button rounded-xl bg-bento-peach px-4 sm:px-6 h-11 sm:h-12 flex items-center justify-center gap-2 text-ink flex-1 sm:flex-none disabled:opacity-50 disabled:cursor-not-allowed">
+                {#if getConnecting()}
+                    <span class="w-4 h-4 sm:w-5 sm:h-5 border-2 border-ink border-t-transparent rounded-full animate-spin"></span>
+                    <span class="font-bold text-sm sm:text-base uppercase tracking-wide">Connecting…</span>
+                {:else if getOtaRunning()}
+                    <span class="w-4 h-4 sm:w-5 sm:h-5 border-2 border-ink border-t-transparent rounded-full animate-spin"></span>
+                    <span class="font-bold text-sm sm:text-base uppercase tracking-wide">Flashing…</span>
+                {:else}
+                    <Wifi class="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span class="font-bold text-sm sm:text-base uppercase tracking-wide">{getConnected() ? 'Connected' : 'Connect'}</span>
+                {/if}
             </button>
         </div>
       </header>
@@ -138,7 +179,7 @@
           <!-- Expressions (Spans 2 columns) -->
           <div class="bento-card bg-bento-pink p-6 lg:col-span-2">
              <div class="mb-4 border-b-2 border-bento-border pb-2">
-                <h2 class="text-xl font-black uppercase">Expressions</h2>
+                <h2 class="font-display text-xl uppercase">Expressions</h2>
                 <p class="text-sm font-bold opacity-80">Tap to trigger</p>
              </div>
              <!-- The nested component will be updated next to remove its inner backgrounds -->
@@ -148,7 +189,7 @@
           <!-- Quick Actions -->
           <div class="bento-card bg-bento-yellow p-6 md:col-span-1">
              <div class="mb-4 border-b-2 border-bento-border pb-2">
-                 <h2 class="text-xl font-black uppercase">Quick Actions</h2>
+                 <h2 class="font-display text-xl uppercase">Quick Actions</h2>
                  <p class="text-sm font-bold opacity-80">Overrides</p>
              </div>
              <ActionButtons />
@@ -157,7 +198,7 @@
           <!-- Gaze Control -->
           <div class="bento-card bg-bento-green p-6 md:col-span-1 lg:row-span-2 flex flex-col">
              <div class="mb-4 border-b-2 border-bento-border pb-2">
-                 <h2 class="text-xl font-black uppercase">Gaze Control</h2>
+                 <h2 class="font-display text-xl uppercase">Gaze Control</h2>
                  <p class="text-sm font-bold opacity-80">Drag to look</p>
              </div>
              <div class="flex-1 flex items-center justify-center">
@@ -168,7 +209,7 @@
           <!-- Mouth Control Array -->
           <div class="bento-card bg-bento-blue p-6 lg:col-span-3">
              <div class="mb-4 border-b-2 border-bento-border pb-2">
-                 <h2 class="text-xl font-black uppercase">Mouth Control</h2>
+                 <h2 class="font-display text-xl uppercase">Mouth Control</h2>
                  <p class="text-sm font-bold opacity-80">Shape & Type</p>
              </div>
              <MouthControls />
@@ -176,16 +217,62 @@
 
         </div>
       {:else if activeTab === "settings"}
-        <div in:fly={{ y: 20, duration: 300 }} class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <ShufflePanel />
-            <GestureSettings />
-          </div>
-          <AppearanceSettings />
-          <DisplaySettings />
-          <BreathingControl />
-          <PowerSettings />
-          <ClockSettings />
+        <div in:fly={{ y: 20, duration: 300 }} class="space-y-4">
+          <!-- Appearance -->
+          <button
+            onclick={() => settingsToggle('appearance')}
+            aria-expanded={settingsActive === 'appearance'}
+            class="bento-card w-full flex items-center justify-between px-5 py-3 bg-paper hover:shadow-[2px_2px_0px_0px_var(--color-bento-border)] transition-all"
+          >
+            <div class="flex items-center gap-3">
+              <span class="font-display text-sm uppercase tracking-widest">Appearance</span>
+              {#if settingsActive !== 'appearance'}
+                <span class="text-[10px] font-bold text-ink/30 uppercase">Shuffle · Eyes · Breathing</span>
+              {/if}
+            </div>
+            <svg class="w-4 h-4 text-ink transition-transform duration-200 {settingsActive === 'appearance' ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {#if settingsActive === 'appearance'}
+            <div transition:slide={{ duration: 200 }} class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ShufflePanel />
+                <BreathingControl />
+              </div>
+              <AppearanceSettings />
+            </div>
+          {/if}
+
+          <!-- Display & System -->
+          <button
+            onclick={() => settingsToggle('system')}
+            aria-expanded={settingsActive === 'system'}
+            class="bento-card w-full flex items-center justify-between px-5 py-3 bg-paper hover:shadow-[2px_2px_0px_0px_var(--color-bento-border)] transition-all"
+          >
+            <div class="flex items-center gap-3">
+              <span class="font-display text-sm uppercase tracking-widest">Display & System</span>
+              {#if settingsActive !== 'system'}
+                <span class="text-[10px] font-bold text-ink/30 uppercase">OLED · Clock · Power</span>
+              {/if}
+            </div>
+            <svg class="w-4 h-4 text-ink transition-transform duration-200 {settingsActive === 'system' ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {#if settingsActive === 'system'}
+            <div transition:slide={{ duration: 200 }} class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DisplaySettings />
+                <ClockSettings />
+              </div>
+              <PowerSettings />
+              <NotificationSettings />
+              <GestureSettings />
+              <WifiSettings />
+              <HardwareStatusPanel />
+            </div>
+          {/if}
         </div>
       {:else if activeTab === "gestures"}
         <div in:fly={{ y: 20, duration: 300 }} class="space-y-6">
@@ -208,6 +295,7 @@
     <div class="pointer-events-auto">
       <AnimatedTabs
         bind:activeTab
+        disabled={getOtaRunning()}
         tabs={[
           { id: "home", title: "Home" },
           { id: "settings", title: "Settings" },
@@ -218,3 +306,11 @@
     </div>
   </div>
 </div>
+
+{#if getConnectError()}
+  <div class="fixed bottom-4 right-4 z-50 max-w-[calc(100vw-2rem)] sm:max-w-sm" transition:slide="{{ duration: 200 }}">
+    <Alert variant="error" ondismiss={() => bleState.connectError = ''}>
+      <p class="text-sm font-bold text-ink break-words">{getConnectError()}</p>
+    </Alert>
+  </div>
+{/if}

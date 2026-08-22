@@ -91,7 +91,11 @@ void PowerService::init(uint8_t touch_pin, uint8_t active_level,
   // the deep-sleep hold is still active.
   gpio_deep_sleep_hold_dis();
 
-  gpio_hold_dis(static_cast<gpio_num_t>(touch_pin_));
+  if (touch_pin_ != PowerService::kTouchPinDisabled) {
+    gpio_hold_dis(static_cast<gpio_num_t>(touch_pin_));
+    configure_touch_inactive_level(static_cast<gpio_num_t>(touch_pin_),
+                                   active_level_);
+  }
 
   if (pwr_ctrl_pin_ >= 0) {
     gpio_hold_dis(static_cast<gpio_num_t>(pwr_ctrl_pin_));
@@ -104,8 +108,6 @@ void PowerService::init(uint8_t touch_pin, uint8_t active_level,
 
   vTaskDelay(pdMS_TO_TICKS(20));
 
-  configure_touch_inactive_level(static_cast<gpio_num_t>(touch_pin_),
-                                 active_level_);
   last_state_ = pressed();
 }
 
@@ -133,6 +135,9 @@ void PowerService::set_hold_ms(uint32_t value_ms) {
 }
 
 bool PowerService::pressed() const {
+  if (touch_pin_ == kTouchPinDisabled) {
+    return false;
+  }
   return gpio_get_level(static_cast<gpio_num_t>(touch_pin_)) ==
          static_cast<int>(active_level_);
 }
@@ -170,6 +175,11 @@ ButtonEvent PowerService::poll(uint32_t now_ms) {
 }
 
 void PowerService::do_sleep() {
+  if (pwr_ctrl_pin_ < 0) {
+    ESP_LOGW(kTag, "power control pin absent, sleep is a no-op");
+    return;
+  }
+
   // ================================================================
   // ACQUIRE A PM LOCK TO PREVENT TICKLESS IDLE (LIGHT SLEEP)
   // ================================================================

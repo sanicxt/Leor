@@ -27,3 +27,5 @@ web/.svelte-kit/
 web/dist/
 web/.vite/
 web/.cache/
+
+.worktrees/

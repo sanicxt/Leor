@@ -103,16 +103,11 @@
 
     async function applySettings() {
         await sendCommand(`s:ew=${getSettingsEw()},eh=${getSettingsEh()}`);
-        await new Promise((r) => setTimeout(r, 50));
         await sendCommand(`s:es=${getSettingsEs()},er=${getSettingsEr()}`);
-        await new Promise((r) => setTimeout(r, 50));
-        await sendCommand(`s:mw=${getSettingsMw()},bi=${getSettingsBi()}`);
-        await new Promise((r) => setTimeout(r, 50));
+        await sendCommand(`s:mw=${getSettingsMw()}`);
+        await sendCommand(`s:bi=${getSettingsBi()}`);
         await sendCommand(`s:lt=${getSettingsLt()},vt=${getSettingsVt()}`);
-        await new Promise((r) => setTimeout(r, 50));
-        await sendCommand(
-            `s:gs=${getSettingsGs()},os=${getSettingsOs()},ss=${getSettingsSs()}`,
-        );
+        await sendCommand(`s:gs=${getSettingsGs()},os=${getSettingsOs()},ss=${getSettingsSs()}`);
     }
 
     async function syncSettings() {
@@ -167,7 +162,7 @@
     <!-- Quick Presets -->
     <div class="bento-card bg-bento-yellow p-6 space-y-4">
         <div class="mb-4 border-b-2 border-bento-border pb-2">
-            <h2 class="text-xl font-black uppercase">Quick Presets</h2>
+            <h2 class="font-display text-xl uppercase">Quick Presets</h2>
         </div>
         <div class="grid grid-cols-4 gap-3">
             {#each presets as preset}
@@ -196,11 +191,11 @@
     </div>
 
     <!-- Eye Appearance Card -->
-    <div class="bento-card bg-bento-blue p-6 space-y-6">
+    <div class="bento-card bg-bento-blue p-6 space-y-6" style="--slider-thumb: var(--color-bento-blue)">
         <!-- Header -->
         <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between">
             <div>
-                <h2 class="text-xl font-black uppercase">Eye Appearance</h2>
+                <h2 class="font-display text-xl uppercase">Eye Appearance</h2>
                 <p class="text-sm font-bold opacity-80">
                     Customize geometry & style
                 </p>
@@ -248,21 +243,7 @@
                     oninput={(e) => setSettingsEw(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                    class="slider"
                 />
             </div>
 
@@ -285,21 +266,7 @@
                     oninput={(e) => setSettingsEh(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                    class="slider"
                 />
             </div>
 
@@ -322,21 +289,7 @@
                     oninput={(e) => setSettingsEs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                    class="slider"
                 />
             </div>
 
@@ -359,30 +312,16 @@
                     oninput={(e) => setSettingsEr(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                    class="slider"
                 />
             </div>
         </div>
     </div>
 
     <!-- Mouth & Animations Card -->
-    <div class="bento-card bg-bento-pink p-6 space-y-5">
+    <div class="bento-card bg-bento-pink p-6 space-y-5" style="--slider-thumb: var(--color-bento-pink)">
         <div class="mb-4 border-b-2 border-bento-border pb-2">
-            <h2 class="text-xl font-black uppercase">Mouth & Animations</h2>
+            <h2 class="font-display text-xl uppercase">Mouth & Animations</h2>
             <p class="text-sm font-bold opacity-80">
                 Control expressions & timing
             </p>
@@ -402,21 +341,7 @@
                 oninput={(e) => setSettingsMw(parseInt(e.currentTarget.value))}
                 onchange={applySettings}
                 disabled={!bleState.connected}
-                class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                       [&::-webkit-slider-thumb]:appearance-none
-                       [&::-webkit-slider-thumb]:w-4
-                       [&::-webkit-slider-thumb]:h-4
-                       [&::-webkit-slider-thumb]:rounded-sm
-                       [&::-webkit-slider-thumb]:bg-bento-yellow
-                       [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                       [&::-webkit-slider-thumb]:cursor-pointer
-                       [&::-webkit-slider-thumb]:border-2
-                       [&::-webkit-slider-thumb]:border-bento-border
-                       [&::-webkit-slider-thumb]:transition-transform
-                       [&::-webkit-slider-thumb]:active:scale-125
-                       [&::-webkit-slider-thumb]:active:shadow-none
-                       [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                       [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                class="slider"
             />
         </div>
 
@@ -436,21 +361,7 @@
                     step="100"
                     bind:value={mouthAnimDuration}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                    class="slider"
                 />
             </div>
             <div class="grid grid-cols-3 gap-2">
@@ -497,21 +408,7 @@
                         setSettingsBi(parseFloat(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                    class="slider"
                 />
             </div>
             <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
@@ -527,30 +424,16 @@
                     max="20"
                     bind:value={transitionSpeed}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                    class="slider"
                 />
             </div>
         </div>
     </div>
 
     <!-- Animation Speeds Card -->
-    <div class="bento-card bg-bento-green p-6 space-y-5">
+    <div class="bento-card bg-bento-green p-6 space-y-5" style="--slider-thumb: var(--color-bento-green)">
         <div class="mb-4 border-b-2 border-bento-border pb-2">
-            <h2 class="text-xl font-black uppercase">Animation Speeds</h2>
+            <h2 class="font-display text-xl uppercase">Animation Speeds</h2>
             <p class="text-sm font-bold opacity-80">How fast things move</p>
         </div>
 
@@ -565,21 +448,7 @@
                     oninput={(e) => setSettingsGs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                    class="slider"
                 />
                 <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-bento-border rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getSettingsGs()}</span>
             </div>
@@ -593,21 +462,7 @@
                     oninput={(e) => setSettingsOs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                    class="slider"
                 />
                 <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-bento-border rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getSettingsOs()}</span>
             </div>
@@ -621,21 +476,7 @@
                     oninput={(e) => setSettingsSs(parseInt(e.currentTarget.value))}
                     onchange={applySettings}
                     disabled={!bleState.connected}
-                    class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                           [&::-webkit-slider-thumb]:appearance-none
-                           [&::-webkit-slider-thumb]:w-4
-                           [&::-webkit-slider-thumb]:h-4
-                           [&::-webkit-slider-thumb]:rounded-sm
-                           [&::-webkit-slider-thumb]:bg-bento-yellow
-                           [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                           [&::-webkit-slider-thumb]:cursor-pointer
-                           [&::-webkit-slider-thumb]:border-2
-                           [&::-webkit-slider-thumb]:border-bento-border
-                           [&::-webkit-slider-thumb]:transition-transform
-                           [&::-webkit-slider-thumb]:active:scale-125
-                           [&::-webkit-slider-thumb]:active:shadow-none
-                           [&::-webkit-slider-thumb]:active:translate-y-[2px]
-                           [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+                    class="slider"
                 />
                 <span class="text-ink font-mono text-xs font-bold block bg-paper border-2 border-bento-border rounded-lg py-0.5 mx-auto w-10 shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getSettingsSs()}</span>
             </div>

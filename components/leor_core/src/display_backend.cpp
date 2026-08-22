@@ -268,10 +268,14 @@ void U8g2DisplayBackend::fill_triangle(int x0, int y0, int x1, int y1, int x2, i
 void U8g2DisplayBackend::fill_round_rect(int x, int y, int w, int h, int r) { fill_rbox(x, y, w, h, r); }
 
 void U8g2DisplayBackend::select_font(const uint8_t* font) { u8g2_SetFont(handle_, font); }
-void U8g2DisplayBackend::set_font_small() { select_font(u8g2_font_profont11_tf); }
-void U8g2DisplayBackend::set_font_medium() { select_font(u8g2_font_profont15_tf); }
-void U8g2DisplayBackend::set_font_large() { select_font(u8g2_font_logisoso32_tn); }
+void U8g2DisplayBackend::set_font_small() { select_font(u8g2_font_6x10_tf); }
+void U8g2DisplayBackend::set_font_medium() { select_font(u8g2_font_8x13_tf); }
+void U8g2DisplayBackend::set_font_large() { select_font(u8g2_font_logisoso32_tf); }
 void U8g2DisplayBackend::draw_text(int x, int y, const char* text) { u8g2_DrawStr(handle_, x, y, text); }
 int U8g2DisplayBackend::text_width(const char* text) { return static_cast<int>(u8g2_GetStrWidth(handle_, text)); }
+
+void U8g2DisplayBackend::draw_xbmp(int x, int y, int w, int h, const uint8_t* bitmap) {
+    u8g2_DrawXBMP(handle_, x, y, w, h, bitmap);
+}
 
 }  // namespace leor

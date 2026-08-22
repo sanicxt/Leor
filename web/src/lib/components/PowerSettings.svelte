@@ -10,12 +10,18 @@
         setSettingsPp,
         getBleWindowMs,
         setBleWindowMs,
+        getTouchMode,
+        setTouchMode,
+        getBuzzerMode,
+        setBuzzerMode,
     } from "$lib/ble.svelte";
 
     let touchHoldDelay = $derived(getSettingsTd());
     let wakePin = $derived(getSettingsWp());
     let pwrPin = $derived(getSettingsPp());
     let bleWindowMs = $derived(getBleWindowMs());
+    let touchMode = $derived(getTouchMode());
+    let buzzerMode = $derived(getBuzzerMode());
 
     // ESP32-C3 RTC-capable GPIO pins (0-5)
     const rtcPins = [0, 1, 2, 3, 4, 5];
@@ -87,10 +93,10 @@
     }
 </script>
 
-<div class="bento-card bg-bento-green p-6 space-y-5">
+<div class="bento-card bg-bento-green p-6 space-y-5" style="--slider-thumb: var(--color-bento-green)">
     <!-- Header -->
     <div class="mb-4 border-b-2 border-bento-border pb-2">
-        <h2 class="text-xl font-black uppercase">Power Settings</h2>
+        <h2 class="font-display text-xl uppercase">Power Settings</h2>
         <p class="text-sm font-bold opacity-80">BLE power management</p>
     </div>
 
@@ -164,21 +170,7 @@
             value={touchHoldDelay}
             onchange={(e) => updateTouchHoldDelay(parseInt(e.currentTarget.value))}
             disabled={!bleState.connected}
-            class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                   [&::-webkit-slider-thumb]:appearance-none
-                   [&::-webkit-slider-thumb]:w-4
-                   [&::-webkit-slider-thumb]:h-4
-                   [&::-webkit-slider-thumb]:rounded-sm
-                   [&::-webkit-slider-thumb]:bg-bento-yellow
-                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                   [&::-webkit-slider-thumb]:cursor-pointer
-                   [&::-webkit-slider-thumb]:border-2
-                   [&::-webkit-slider-thumb]:border-bento-border
-                   [&::-webkit-slider-thumb]:transition-transform
-                   [&::-webkit-slider-thumb]:active:scale-125
-                   [&::-webkit-slider-thumb]:active:shadow-none
-                   [&::-webkit-slider-thumb]:active:translate-y-0.5
-                   [&::-webkit-slider-thumb]:active:translate-x-0.5"
+            class="slider"
         />
 
         <div class="flex justify-between text-[10px] text-ink/60 font-bold px-1">
@@ -262,6 +254,61 @@
         </button>
     </div>
 
+    <div class="mt-3 p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-3">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg border-2 border-bento-border bg-bento-green flex items-center justify-center">
+                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div>
+                <div class="text-ink font-black uppercase text-sm">Touch Mode</div>
+                <div class="text-ink/60 font-bold text-xs">How touch input is handled</div>
+            </div>
+        </div>
+
+        <div class="flex gap-1">
+            {#each [
+                { label: 'OFF', value: 0 },
+                { label: 'ON', value: 1 },
+                { label: 'DETECT', value: 2 }
+            ] as mode}
+                <button
+                    class="flex-1 h-9 rounded-lg border-2 border-bento-border text-xs font-black uppercase transition-all disabled:opacity-50 {touchMode === mode.value ? 'bg-bento-green text-ink shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper text-ink hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:shadow-[1px_1px_0px_0px_var(--color-bento-border)]'}"
+                    onclick={() => setTouchMode(mode.value)}
+                    disabled={!bleState.connected}
+                >{mode.label}</button>
+            {/each}
+        </div>
+    </div>
+
+    <div class="mt-3 p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-3">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg border-2 border-bento-border bg-bento-pink flex items-center justify-center">
+                <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                </svg>
+            </div>
+            <div>
+                <div class="text-ink font-black uppercase text-sm">Buzzer Mode</div>
+                <div class="text-ink/60 font-bold text-xs">Enable or disable the buzzer</div>
+            </div>
+        </div>
+
+        <div class="flex gap-1">
+            {#each [
+                { label: 'OFF', value: 0 },
+                { label: 'ON', value: 1 }
+            ] as mode}
+                <button
+                    class="flex-1 h-9 rounded-lg border-2 border-bento-border text-xs font-black uppercase transition-all disabled:opacity-50 {buzzerMode === mode.value ? 'bg-bento-pink text-ink shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper text-ink hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:shadow-[1px_1px_0px_0px_var(--color-bento-border)]'}"
+                    onclick={() => setBuzzerMode(mode.value)}
+                    disabled={!bleState.connected}
+                >{mode.label}</button>
+            {/each}
+        </div>
+    </div>
+
     <!-- BLE Active Window -->
     <div class="mt-3 p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-3">
         <div class="flex items-center justify-between gap-3">
@@ -289,21 +336,7 @@
             value={bleWindowMs}
             onchange={(e) => updateBleWindow(parseInt(e.currentTarget.value))}
             disabled={!bleState.connected}
-            class="w-full h-2 bg-paper border-2 border-bento-border rounded-full appearance-none cursor-pointer disabled:opacity-50
-                   [&::-webkit-slider-thumb]:appearance-none
-                   [&::-webkit-slider-thumb]:w-4
-                   [&::-webkit-slider-thumb]:h-4
-                   [&::-webkit-slider-thumb]:rounded-sm
-                   [&::-webkit-slider-thumb]:bg-bento-green
-                   [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-                   [&::-webkit-slider-thumb]:cursor-pointer
-                   [&::-webkit-slider-thumb]:border-2
-                   [&::-webkit-slider-thumb]:border-bento-border
-                   [&::-webkit-slider-thumb]:transition-transform
-                   [&::-webkit-slider-thumb]:active:scale-125
-                   [&::-webkit-slider-thumb]:active:shadow-none
-                   [&::-webkit-slider-thumb]:active:translate-y-0.5
-                   [&::-webkit-slider-thumb]:active:translate-x-0.5"
+            class="slider"
         />
 
         <div class="flex justify-between text-[10px] text-ink/60 font-bold px-1">

@@ -28,6 +28,7 @@ struct RuntimeConfig {
     uint32_t touch_hold_ms = 3000;
     int pwr_ctrl_pin = 1;
     int led_pin = -1;
+    int buzzer_pin = 3;
 };
 
 }  // namespace leor

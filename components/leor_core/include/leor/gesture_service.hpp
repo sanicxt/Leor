@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 
 #include "leor/display_backend.hpp"
@@ -25,7 +26,9 @@ enum class CalibrationPhase : uint8_t {
 
 class GestureService {
   public:
-    void start(bool dummy_enabled, int i2c_sda_pin = 10, int i2c_scl_pin = 7, DisplayBackend* display = nullptr);
+    void start(bool dummy_enabled, int i2c_sda_pin = 10, int i2c_scl_pin = 7,
+               DisplayBackend* display = nullptr,
+               std::function<uint8_t(int)> touch_probe = nullptr);
     void restore(bool matching, uint32_t rt, uint32_t cf, uint32_t cd, const std::string& actions_csv);
     std::string poll(uint32_t now_ms, bool touch_active);
     void set_matching_enabled(bool enabled);
@@ -76,9 +79,11 @@ class GestureService {
 
     float pitch() const { return inverted_ ? -mpu_.data().pitch : mpu_.data().pitch; }
     float roll() const { return mpu_.data().roll; }
+    bool mpu_available() const { return mpu_available_; }
 
   private:
-    bool init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* display);
+    bool init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* display,
+                  std::function<uint8_t(int)>& touch_probe);
     bool read_mpu_sample();
     void draw_calibration(DisplayBackend* display, int percent, bool done);
 

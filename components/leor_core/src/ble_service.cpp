@@ -331,8 +331,34 @@ void BleService::on_disconnected() {
     }
 }
 
+void BleService::set_fast_connection_params() {
+    if (s_conn_handle == BLE_HS_CONN_HANDLE_NONE) return;
+    struct ble_gap_upd_params params = {};
+    params.itvl_min = 6;
+    params.itvl_max = 12;
+    params.latency = 0;
+    params.supervision_timeout = 180;
+    ble_gap_update_params(s_conn_handle, &params);
+}
+
+void BleService::restore_connection_params() {
+    if (s_conn_handle == BLE_HS_CONN_HANDLE_NONE) return;
+    struct ble_gap_upd_params params = {};
+    params.itvl_min = 24;
+    params.itvl_max = 48;
+    params.latency = 0;
+    params.supervision_timeout = 180;
+    ble_gap_update_params(s_conn_handle, &params);
+}
+
 uint8_t BleService::ota_handle_control(uint8_t opcode) {
-    return ota_.handle_control_write(opcode);
+    const uint8_t code = ota_.handle_control_write(opcode);
+    if (code == OtaService::kCtrlRequestAck) {
+        set_fast_connection_params();
+    } else if (code == OtaService::kCtrlDoneAck || code == OtaService::kCtrlDoneNak) {
+        restore_connection_params();
+    }
+    return code;
 }
 
 uint8_t BleService::ota_handle_data(const uint8_t* data, size_t len) {

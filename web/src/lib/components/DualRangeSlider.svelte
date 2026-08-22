@@ -63,22 +63,7 @@
         value={valueMin}
         oninput={handleMinInput}
         {disabled}
-        class="absolute bottom-0 w-full h-6 appearance-none bg-transparent pointer-events-none
-               [&::-webkit-slider-thumb]:pointer-events-auto
-               [&::-webkit-slider-thumb]:appearance-none
-               [&::-webkit-slider-thumb]:w-4
-               [&::-webkit-slider-thumb]:h-4
-               [&::-webkit-slider-thumb]:rounded-sm
-               [&::-webkit-slider-thumb]:bg-bento-yellow
-               [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-               [&::-webkit-slider-thumb]:cursor-pointer
-               [&::-webkit-slider-thumb]:border-2
-               [&::-webkit-slider-thumb]:border-bento-border
-               [&::-webkit-slider-thumb]:transition-transform
-               [&::-webkit-slider-thumb]:active:scale-125
-               [&::-webkit-slider-thumb]:active:shadow-none
-               [&::-webkit-slider-thumb]:active:translate-y-[2px]
-               [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+        class="absolute bottom-0 w-full h-6 slider-thumb-only"
     />
 
     <!-- Max slider -->
@@ -90,21 +75,6 @@
         value={valueMax}
         oninput={handleMaxInput}
         {disabled}
-        class="absolute bottom-0 w-full h-6 appearance-none bg-transparent pointer-events-none
-               [&::-webkit-slider-thumb]:pointer-events-auto
-               [&::-webkit-slider-thumb]:appearance-none
-               [&::-webkit-slider-thumb]:w-4
-               [&::-webkit-slider-thumb]:h-4
-               [&::-webkit-slider-thumb]:rounded-sm
-               [&::-webkit-slider-thumb]:bg-bento-yellow
-               [&::-webkit-slider-thumb]:shadow-[2px_2px_0px_0px_var(--color-bento-border)]
-               [&::-webkit-slider-thumb]:cursor-pointer
-               [&::-webkit-slider-thumb]:border-2
-               [&::-webkit-slider-thumb]:border-bento-border
-               [&::-webkit-slider-thumb]:transition-transform
-               [&::-webkit-slider-thumb]:active:scale-125
-               [&::-webkit-slider-thumb]:active:shadow-none
-               [&::-webkit-slider-thumb]:active:translate-y-[2px]
-               [&::-webkit-slider-thumb]:active:translate-x-[2px]"
+        class="absolute bottom-0 w-full h-6 slider-thumb-only"
     />
 </div>

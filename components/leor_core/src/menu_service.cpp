@@ -1,4 +1,5 @@
 #include "leor/menu_service.hpp"
+#include "leor/icons/icons.h"
 
 namespace leor {
 
@@ -42,31 +43,40 @@ void MenuService::draw(DisplayBackend &display, bool currently_clock_mode, uint3
 
   display.set_font_small();
 
-  // Helper lambda for standard button-like selection boxes
-  auto draw_panel = [&](int x, int y, int w, int h, const char* label, bool selected) {
+  auto draw_panel = [&](int x, int y, int w, int h, const uint8_t* icon, const char* label, bool selected) {
     if (selected) {
       display.set_color(1);
       display.fill_rbox(x, y, w, h, 6);
-      display.set_color(0); // invert text
+      display.set_color(0);
     } else {
       display.set_color(1);
-      // To mimic a frame with rounded corners, we do fill clear and then a pseudo-frame
-      // Since U8G2 wrapper lacks true draw_rframe, we use primitive boxes or filled lines
-      // The display_backend has fill_rbox, so we can do a hack:
       display.fill_rbox(x, y, w, h, 6);
       display.set_color(0);
       display.fill_rbox(x + 1, y + 1, w - 2, h - 2, 5);
-      display.set_color(1); // text is standard white
+      display.set_color(1);
     }
-    
+
+    int icx = x + (w - 16) / 2;
+    int icy = y + 3;
+    display.draw_xbmp(icx, icy, 16, 16, icon);
+
     int tw = display.text_width(label);
-    display.draw_text(x + (w - tw) / 2, y + h / 2 + 4, label);
-    display.set_color(1); // restore
+    display.draw_text(x + (w - tw) / 2, icy + 16 + 3 + 10, label);
+    display.set_color(1);
   };
 
-  // Split screen in two 52x40 panels
-  draw_panel(10, 12, 50, 40, "SLEEP", cursor_ == 0);
-  draw_panel(68, 12, 50, 40, currently_clock_mode ? "MOCHI" : "CLOCK", cursor_ == 1);
+  const uint8_t* right_icon;
+  const char* right_label;
+  if (currently_clock_mode) {
+    right_icon = leor::icons::mochi;
+    right_label = "MOCHI";
+  } else {
+    right_icon = leor::icons::clock;
+    right_label = "CLOCK";
+  }
+
+  draw_panel(10, 12, 50, 44, leor::icons::sleep, "SLEEP", cursor_ == 0);
+  draw_panel(68, 12, 50, 44, right_icon, right_label, cursor_ == 1);
 }
 
 } // namespace leor
