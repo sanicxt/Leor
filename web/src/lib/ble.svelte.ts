@@ -33,7 +33,7 @@ export const bleState = $state({
         mw: 20, lt: 1000, vt: 2000, bi: 3,
         gs: 6, os: 12, ss: 10, td: 3000, // gaze speed, openness speed, squish speed, touch hold delay (ms)
         wp: 0, pp: 1, ct: 127, nd: 5000, // wake GPIO pin, power-control GPIO pin, contrast (0-255), notification duration (ms)
-        touchMode: 2, buzzerMode: 0 // 0=off,1=on,2=detect; 0=off,1=on
+        touchMode: 2, buzzerMode: 0, wifiMode: 0 // 0=off,1=on,2=detect; 0=off,1=on; 0=off,1=on
     },
     display: {
         type: 'sh1106',  // sh1106 or ssd1306
@@ -59,7 +59,7 @@ export const bleState = $state({
     hardware: {
         display: 0, gyro: 0, buzzer: 0, touch: 0, power: 0
     },
-    wifi: { ssid: '', status: '' },
+    wifi: { ssid: '', status: '', pass: '' },
     // Gesture calibration state (synced from device)
     calPhase: 'idle' as 'idle' | 'wait' | 'capturing' | 'complete' | 'timeout',
     calGesture: '' as string,
@@ -138,6 +138,14 @@ export function getWifiStatus() {
     return bleState.wifi.status;
 }
 
+export function getWifiPass() {
+    return bleState.wifi.pass;
+}
+
+export function getWifiMode() {
+    return bleState.settings.wifiMode;
+}
+
 // Setters
 export function setShuffleEnabled(val: boolean) { bleState.shuffleEnabled = val; }
 export function setShuffleExprMin(val: number) { bleState.shuffleExprMin = val; }
@@ -182,6 +190,15 @@ export async function saveWifiCredentials(ssid: string, pass: string) {
 
 export async function sendWifiSync() {
     await sendCommand('wifi:sync');
+}
+
+export function setWifiMode(mode: number) {
+    bleState.settings.wifiMode = mode;
+    sendCommand(`set:wm=${mode}`);
+}
+
+export async function fetchWifiCredentials() {
+    await sendCommand('wifi:get');
 }
 
 export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
@@ -261,6 +278,7 @@ export async function connect(): Promise<boolean> {
                                 });
                                 if ('tm' in data.settings) bleState.settings.touchMode = data.settings.tm;
                                 if ('bm' in data.settings) bleState.settings.buzzerMode = data.settings.bm;
+                                if ('wm' in data.settings) bleState.settings.wifiMode = data.settings.wm;
                             }
                             if (data.display) {
                                 if (data.display.type) bleState.display.type = data.display.type;
@@ -337,6 +355,11 @@ export async function connect(): Promise<boolean> {
                             if ('buzzer' in data) bleState.hardware.buzzer = data.buzzer;
                             if ('touch' in data) bleState.hardware.touch = data.touch;
                             if ('power' in data) bleState.hardware.power = data.power;
+                        }
+
+                        if (data.type === 'wifi') {
+                            if ('ssid' in data) bleState.wifi.ssid = data.ssid;
+                            if ('pass' in data) bleState.wifi.pass = data.pass;
                         }
 
                         bleState.lastStatus = 'Sync complete';

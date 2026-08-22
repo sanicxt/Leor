@@ -17,6 +17,7 @@ class WifiTimeSyncService {
   void set_ssid(const std::string& ssid);
   void set_pass(const std::string& pass);
   std::string ssid() const;
+  std::string pass() const;
   std::string last_status() const;
   void set_time_callback(std::function<void(uint64_t epoch_ms)> cb);
 

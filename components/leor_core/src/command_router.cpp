@@ -62,6 +62,14 @@ std::string buzzer_mode_str(int value) {
     return value == 1 ? "on" : "off";
 }
 
+int wifi_mode_int(const std::string& mode) {
+    return mode == "on" ? 1 : 0;
+}
+
+std::string wifi_mode_str(int value) {
+    return value == 1 ? "on" : "off";
+}
+
 std::string json_escape(const std::string& in) {
     std::string out;
     out.reserve(in.size() + 4);
@@ -127,7 +135,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
     const std::string status_safe = json_escape(wifi_.last_status());
     std::snprintf(
         buf, sizeof(buf),
-        "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"ct\":%u,\"td\":%u,\"wp\":%u,\"pp\":%u,\"nd\":%u,\"tm\":%d,\"bm\":%d},"
+        "{\"type\":\"sync\",\"settings\":{\"ew\":%d,\"eh\":%d,\"es\":%d,\"er\":%d,\"mw\":%d,\"bi\":%d,\"gs\":%d,\"os\":%d,\"ss\":%d,\"ct\":%u,\"td\":%u,\"wp\":%u,\"pp\":%u,\"nd\":%u,\"tm\":%d,\"bm\":%d,\"wm\":%d},"
         "\"display\":{\"type\":\"%s\",\"addr\":\"0x%02X\"},"
         "\"state\":{\"shuf\":%d,\"mpu\":%d,\"clk\":%d},"
         "\"clock\":{\"on\":%d,\"tz\":%d,\"sec\":%u,\"fmt\":%d},"
@@ -143,6 +151,7 @@ std::string CommandRouter::sync_json(uint32_t now_ms) const {
         static_cast<unsigned>(notif_duration_ms_),
         touch_mode_int(preferences_.getString("touch_mode", "detect")),
         buzzer_mode_int(preferences_.getString("buzzer_mode", "off")),
+        wifi_mode_int(preferences_.getString("wifi_mode", "off")),
         display_config_.controller == DisplayController::kSsd1306 ? "ssd1306" : "sh1106", display_config_.i2c_address,
         shuffle_.enabled() ? 1 : 0, mpu_verbose_ ? 1 : 0, clock_.enabled() ? 1 : 0,
         clock_.enabled() ? 1 : 0, clock_.tz_offset(), static_cast<unsigned>(clock_.seconds_of_day()), clock_.use_24_hour() ? 24 : 12,
@@ -224,6 +233,10 @@ std::string CommandRouter::handle_settings(const std::string& params, uint32_t n
         } else if (key == "bm") {
             if (value == 0 || value == 1) {
                 preferences_.putString("buzzer_mode", buzzer_mode_str(value).c_str());
+            }
+        } else if (key == "wm") {
+            if (value == 0 || value == 1) {
+                preferences_.putString("wifi_mode", wifi_mode_str(value).c_str());
             }
         }
     }
@@ -396,6 +409,7 @@ std::string CommandRouter::handle_clock(const std::string& params, uint32_t now_
 std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manual) {
     cmd = trim(cmd);
     if (cmd.empty()) return "Empty command";
+    const std::string original = cmd;
     cmd = lower(cmd);
 
     auto set_expression = [&](int mood, int gaze, int mouth_type) {
@@ -703,16 +717,24 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
     if (cmd == "music") { buzzer_.play_melody(); return "Playing: Ode to Joy (Beethoven)"; }
     if (cmd == "hw:status") return hw_json();
     if (starts_with(cmd, "wifi:ssid=")) {
-        wifi_.set_ssid(cmd.substr(10));
+        wifi_.set_ssid(original.substr(10));
         return "ssid saved";
     }
     if (starts_with(cmd, "wifi:pass=")) {
-        wifi_.set_pass(cmd.substr(10));
+        wifi_.set_pass(original.substr(10));
         return "pass saved";
     }
     if (cmd == "wifi:sync") {
         wifi_.sync_async([this](const std::string& status) { ble_.notify_status(status); });
         return "wifi sync started";
+    }
+    if (cmd == "wifi:get") {
+        char buf[320];
+        const std::string ssid_safe = json_escape(wifi_.ssid());
+        const std::string pass_safe = json_escape(wifi_.pass());
+        std::snprintf(buf, sizeof(buf), "{\"type\":\"wifi\",\"ssid\":\"%s\",\"pass\":\"%s\"}",
+                      ssid_safe.c_str(), pass_safe.c_str());
+        return buf;
     }
     if (cmd == "help" || cmd == "?") return "help";
     return "Unknown: " + cmd;

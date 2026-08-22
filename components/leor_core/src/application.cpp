@@ -278,6 +278,7 @@ esp_err_t Application::start() {
 
   const std::string touch_mode = preferences_.getString("touch_mode", "detect");
   const std::string buzzer_mode = preferences_.getString("buzzer_mode", "off");
+  const std::string wifi_mode = preferences_.getString("wifi_mode", "off");
 
   if (touch_mode == "off" || touch_mode == "detect") {
     config_.touch_wake_pin = 255;
@@ -388,7 +389,8 @@ esp_err_t Application::start() {
   gesture_.set_pickup_tilt_deg(preferences_.getFloat("gtd", 30.0f));
 
   if (want_touch_detect && touch_probe.detected_pin == TouchProbe::kNotDetected) {
-    const uint32_t window_deadline_ms = touch_window_start_ms + kTouchDetectWindowMs;
+    const uint32_t window_deadline_ms =
+        static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) + kTouchDetectWindowMs;
     uint32_t last_draw_ms = 0;
     while (touch_probe.detected_pin == TouchProbe::kNotDetected) {
       const uint32_t now_ms =
@@ -465,7 +467,7 @@ esp_err_t Application::start() {
     clock_.set_from_epoch_ms(epoch_ms, static_cast<int16_t>(preferences_.getInt("clk_tz", 0)));
   });
 
-  if (wifi_.configured()) {
+  if (wifi_mode == "on" && wifi_.configured()) {
     const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
     draw_boot_screen(*display_, BootStage::kWifi, hw_, 100, false, true, false, now_ms);
     const bool wifi_ok = wifi_.sync_blocking(10000);

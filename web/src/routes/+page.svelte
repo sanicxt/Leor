@@ -224,8 +224,8 @@
               <PowerSettings />
               <NotificationSettings />
               <GestureSettings />
-              <HardwareStatusPanel />
               <WifiSettings />
+              <HardwareStatusPanel />
             </div>
           {/if}
         </div>
