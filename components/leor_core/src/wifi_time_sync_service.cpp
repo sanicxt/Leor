@@ -120,13 +120,17 @@ bool WifiTimeSyncService::bring_up() {
   ESP_LOGI(kTag, "wifi bring up ssid=%s pass=%s", ssid_.c_str(), pass_.c_str());
   esp_netif_init();
   esp_event_loop_create_default();
-  esp_netif_create_default_wifi_sta();
+  netif_ = esp_netif_create_default_wifi_sta();
 
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   const esp_err_t init_rc = esp_wifi_init(&cfg);
   ESP_LOGI(kTag, "esp_wifi_init rc=0x%x", init_rc);
   if (init_rc != ESP_OK) {
     last_status_ = "wifi init failed";
+    if (netif_) {
+      esp_netif_destroy_default_wifi(netif_);
+      netif_ = nullptr;
+    }
     esp_netif_deinit();
     esp_event_loop_delete_default();
     if (pm_lock_) {
@@ -160,6 +164,10 @@ bool WifiTimeSyncService::bring_up() {
 void WifiTimeSyncService::bring_down() {
   esp_wifi_stop();
   esp_wifi_deinit();
+  if (netif_) {
+    esp_netif_destroy_default_wifi(netif_);
+    netif_ = nullptr;
+  }
   esp_event_loop_delete_default();
   esp_netif_deinit();
   if (pm_lock_) {

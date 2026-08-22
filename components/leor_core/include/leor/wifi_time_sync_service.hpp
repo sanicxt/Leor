@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "esp_netif.h"
 #include "esp_pm.h"
 
 namespace leor {
@@ -44,6 +45,7 @@ class WifiTimeSyncService {
   std::function<void(uint64_t)> on_time_;
   bool syncing_ = false;
   esp_pm_lock_handle_t pm_lock_ = nullptr;
+  esp_netif_t* netif_ = nullptr;
 };
 
 }  // namespace leor
