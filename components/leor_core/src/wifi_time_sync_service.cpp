@@ -9,6 +9,7 @@
 #include "esp_netif_sntp.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "esp_coexist.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "leor/preferences.hpp"
@@ -152,6 +153,10 @@ bool WifiTimeSyncService::bring_up() {
   const esp_err_t start_rc = esp_wifi_start();
   ESP_LOGI(kTag, "esp_wifi_start rc=0x%x", start_rc);
 
+  // Give WiFi RF priority over the active BLE connection while we sync;
+  // auth frames must not be starved by BLE activity.
+  esp_coex_preference_set(ESP_COEX_PREFER_WIFI);
+
   // Wait for the driver to post STA_START before touching the radio.
   const uint32_t start_deadline = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) + 3000;
   while (!s_sta_started && static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) < start_deadline) {
@@ -184,8 +189,6 @@ bool WifiTimeSyncService::sync_locked(uint32_t timeout_ms) {
   wifi_scan_config_t scan_cfg = {};
   scan_cfg.show_hidden = true;
   scan_cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
-  scan_cfg.scan_time.active.min = 120;
-  scan_cfg.scan_time.active.max = 300;
   const esp_err_t scan_rc = esp_wifi_scan_start(&scan_cfg, true);
   ESP_LOGI(kTag, "esp_wifi_scan_start rc=0x%x", scan_rc);
   if (scan_rc == ESP_OK) {
@@ -206,20 +209,27 @@ bool WifiTimeSyncService::sync_locked(uint32_t timeout_ms) {
     }
   }
 
-  const esp_err_t connect_rc = esp_wifi_connect();
-  ESP_LOGI(kTag, "esp_wifi_connect rc=0x%x", connect_rc);
-
   esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
   esp_netif_ip_info_t ip{};
   const uint32_t deadline = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) + timeout_ms;
   bool got_ip = false;
-  while (static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) < deadline) {
-    esp_netif_get_ip_info(netif, &ip);
-    if (ip.ip.addr != 0) {
-      got_ip = true;
-      break;
+  for (int attempt = 0; attempt < 2 && !got_ip; ++attempt) {
+    const esp_err_t connect_rc = esp_wifi_connect();
+    ESP_LOGI(kTag, "esp_wifi_connect attempt=%d rc=0x%x", attempt, connect_rc);
+    while (static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) < deadline) {
+      esp_netif_get_ip_info(netif, &ip);
+      if (ip.ip.addr != 0) {
+        got_ip = true;
+        break;
+      }
+      vTaskDelay(pdMS_TO_TICKS(100));
     }
-    vTaskDelay(pdMS_TO_TICKS(100));
+    if (!got_ip && attempt == 0) {
+      // First attempt can die with WIFI_REASON_AUTH_EXPIRE while BLE and WiFi
+      // fight over the RF; the driver's reconnect coex policy makes a second
+      // attempt succeed.
+      vTaskDelay(pdMS_TO_TICKS(1000));
+    }
   }
   ESP_LOGI(kTag, "ip poll done got_ip=%d ip=" IPSTR, got_ip, IP2STR(&ip.ip));
   if (!got_ip) {
@@ -292,8 +302,6 @@ bool WifiTimeSyncService::scan_aps(uint32_t timeout_ms, std::vector<WifiApInfo>&
   wifi_scan_config_t scan_cfg = {};
   scan_cfg.show_hidden = true;
   scan_cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
-  scan_cfg.scan_time.active.min = 120;
-  scan_cfg.scan_time.active.max = 300;
   const esp_err_t scan_rc = esp_wifi_scan_start(&scan_cfg, true);
   ESP_LOGI(kTag, "esp_wifi_scan_start rc=0x%x", scan_rc);
   if (scan_rc == ESP_OK) {
