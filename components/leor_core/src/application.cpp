@@ -168,7 +168,7 @@ void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatu
   } else if (stage == BootStage::kTouch) {
     std::snprintf(pct_s, sizeof(pct_s), "%s", hw.touch == HwState::kPresent ? "OK" : "ABSENT");
   } else if (stage == BootStage::kWifi) {
-    std::snprintf(pct_s, sizeof(pct_s), "%s", wifi_waiting ? "SYNC..." : (wifi_ok ? "OK" : "FAIL"));
+    std::snprintf(pct_s, sizeof(pct_s), "%s", wifi_waiting ? "SYNC..." : (wifi_ok ? "SYNCED" : "FAIL"));
   }
   const int hint_w = disp.text_width(pct_s);
   disp.draw_text((disp.width() - hint_w) / 2, 58, pct_s);
@@ -470,9 +470,9 @@ esp_err_t Application::start() {
   if (wifi_mode == "on" && wifi_.configured()) {
     const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
     draw_boot_screen(*display_, BootStage::kWifi, hw_, 100, false, true, false, now_ms);
-    const bool wifi_ok = wifi_.sync_blocking(10000);
+    const bool wifi_ok = wifi_.sync_blocking(20000);
     draw_boot_screen(*display_, BootStage::kWifi, hw_, 100, false, false, wifi_ok, now_ms);
-    vTaskDelay(pdMS_TO_TICKS(200));
+    vTaskDelay(pdMS_TO_TICKS(1000));
   }
 
   shuffle_.restore(preferences_.getBool("shuf_en", true),
