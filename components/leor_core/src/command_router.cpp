@@ -728,6 +728,21 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         wifi_.sync_async([this](const std::string& status) { ble_.notify_status(status); });
         return "wifi sync started";
     }
+    if (cmd == "wifi:scan") {
+        wifi_.scan_async([this](const std::vector<leor::WifiApInfo>& aps) {
+            char buf[2048];
+            size_t used = std::snprintf(buf, sizeof(buf), "{\"type\":\"wifi_scan\",\"aps\":[");
+            for (size_t i = 0; i < aps.size() && used + 96 < sizeof(buf); ++i) {
+                const std::string ssid_safe = json_escape(aps[i].ssid);
+                used += static_cast<size_t>(std::snprintf(buf + used, sizeof(buf) - used,
+                                                          "%s{\"ssid\":\"%s\",\"rssi\":%d,\"auth\":%d}",
+                                                          i ? "," : "", ssid_safe.c_str(), aps[i].rssi, aps[i].authmode));
+            }
+            used += static_cast<size_t>(std::snprintf(buf + used, sizeof(buf) - used, "]}"));
+            ble_.notify_status(buf);
+        });
+        return "wifi scan started";
+    }
     if (cmd == "wifi:get") {
         char buf[320];
         const std::string ssid_safe = json_escape(wifi_.ssid());

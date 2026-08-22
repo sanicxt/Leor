@@ -4,9 +4,11 @@
 		getWifiStatus,
 		getWifiMode,
 		getWifiPass,
+		getWifiAps,
 		setWifiMode,
 		saveWifiCredentials,
 		sendWifiSync,
+		sendWifiScan,
 		fetchWifiCredentials
 	} from '$lib/ble.svelte';
 	import { bleState } from '$lib/ble.svelte';
@@ -14,15 +16,27 @@
 	let ssid = $derived(getWifiSsid());
 	let status = $derived(getWifiStatus());
 	let wifiMode = $derived(getWifiMode());
-	let ssidInput = $state('');
+	let aps = $derived(getWifiAps());
+	let selectedSsid = $state('');
 	let passInput = $state('');
 	let saving = $state(false);
 	let syncing = $state(false);
+	let scanning = $state(false);
 	let showPass = $state(false);
+
+	function pickAp(apSsid: string) {
+		selectedSsid = apSsid;
+	}
+
+	async function scanNow() {
+		scanning = true;
+		await sendWifiScan();
+		setTimeout(() => (scanning = false), 3000);
+	}
 
 	async function save() {
 		saving = true;
-		await saveWifiCredentials(ssidInput, passInput);
+		await saveWifiCredentials(selectedSsid, passInput);
 		saving = false;
 	}
 
@@ -71,11 +85,43 @@
 				{/each}
 			</div>
 		</div>
-		<input
-			bind:value={ssidInput}
-			placeholder="SSID"
-			class="rounded-xl border-2 border-bento-border bg-bento-pink px-3 py-2 text-sm font-bold"
-		/>
+		<div class="flex flex-col gap-1.5">
+			<span class="text-xs font-bold uppercase tracking-widest opacity-80">Network</span>
+			<button
+				class="bento-button bg-bento-blue px-4 py-2 text-sm font-bold uppercase"
+				onclick={scanNow}
+				disabled={scanning || !bleState.connected}
+			>
+				{scanning ? 'Scanning...' : 'Scan networks'}
+			</button>
+			{#if aps.length > 0}
+				<div class="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-xl border-2 border-bento-border bg-bento-pink p-2">
+					{#each aps as ap (ap.ssid + ap.rssi)}
+						<button
+							class="flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-bold transition-all {selectedSsid ===
+							ap.ssid
+								? 'bg-bento-green text-ink shadow-[2px_2px_0px_0px_var(--color-bento-border)]'
+								: 'bg-paper text-ink hover:bg-zinc-100 dark:hover:bg-zinc-800'}"
+							onclick={() => pickAp(ap.ssid)}
+						>
+							<span class="truncate">{ap.ssid}</span>
+							<span class="text-xs opacity-60">{ap.rssi} dBm</span>
+						</button>
+					{/each}
+				</div>
+			{:else if scanning}
+				<p class="text-xs font-bold opacity-60">Scanning for networks...</p>
+			{/if}
+		</div>
+		<div class="flex flex-col gap-1.5">
+			<span class="text-xs font-bold uppercase tracking-widest opacity-80">Selected</span>
+			<input
+				bind:value={selectedSsid}
+				placeholder="Pick a network above"
+				readonly
+				class="rounded-xl border-2 border-bento-border bg-bento-pink px-3 py-2 text-sm font-bold"
+			/>
+		</div>
 		<div class="flex gap-2">
 			<input
 				bind:value={passInput}
@@ -95,7 +141,7 @@
 			<button
 				class="bento-button bg-bento-blue px-4 py-2 text-sm font-bold uppercase"
 				onclick={save}
-				disabled={saving || !bleState.connected}
+				disabled={saving || !selectedSsid || !bleState.connected}
 			>
 				{saving ? 'Saving...' : 'Save'}
 			</button>

@@ -60,6 +60,7 @@ export const bleState = $state({
         display: 0, gyro: 0, buzzer: 0, touch: 0, power: 0
     },
     wifi: { ssid: '', status: '', pass: '' },
+    wifiAps: [] as { ssid: string; rssi: number; auth: number }[],
     // Gesture calibration state (synced from device)
     calPhase: 'idle' as 'idle' | 'wait' | 'capturing' | 'complete' | 'timeout',
     calGesture: '' as string,
@@ -146,6 +147,10 @@ export function getWifiMode() {
     return bleState.settings.wifiMode;
 }
 
+export function getWifiAps() {
+    return bleState.wifiAps;
+}
+
 // Setters
 export function setShuffleEnabled(val: boolean) { bleState.shuffleEnabled = val; }
 export function setShuffleExprMin(val: number) { bleState.shuffleExprMin = val; }
@@ -199,6 +204,10 @@ export function setWifiMode(mode: number) {
 
 export async function fetchWifiCredentials() {
     await sendCommand('wifi:get');
+}
+
+export async function sendWifiScan() {
+    await sendCommand('wifi:scan');
 }
 
 export function setGestureMatching(val: boolean) { bleState.gestureMatching = val; }
@@ -360,6 +369,12 @@ export async function connect(): Promise<boolean> {
                         if (data.type === 'wifi') {
                             if ('ssid' in data) bleState.wifi.ssid = data.ssid;
                             if ('pass' in data) bleState.wifi.pass = data.pass;
+                        }
+
+                        if (data.type === 'wifi_scan') {
+                            if ('aps' in data && Array.isArray(data.aps)) {
+                                bleState.wifiAps = data.aps;
+                            }
                         }
 
                         bleState.lastStatus = 'Sync complete';

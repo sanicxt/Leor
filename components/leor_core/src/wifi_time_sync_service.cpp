@@ -7,7 +7,6 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_netif_sntp.h"
-#include "esp_pm.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -19,10 +18,16 @@ namespace leor {
 namespace {
 constexpr char kTag[] = "leor_wifi";
 constexpr uint32_t kSyncTaskStack = 4096;
+constexpr uint16_t kMaxScanAps = 20;
 
 struct SyncContext {
   WifiTimeSyncService* self;
   std::function<void(const std::string&)> on_done;
+};
+
+struct ScanContext {
+  WifiTimeSyncService* self;
+  std::function<void(const std::vector<WifiApInfo>&)> on_done;
 };
 
 volatile bool s_sta_started = false;
@@ -61,6 +66,17 @@ void sync_task(void* arg) {
   delete ctx;
   vTaskDelete(nullptr);
 }
+
+void scan_task(void* arg) {
+  auto* ctx = static_cast<ScanContext*>(arg);
+  std::vector<WifiApInfo> aps;
+  ctx->self->scan_aps(5000, aps);
+  if (ctx->on_done) {
+    ctx->on_done(aps);
+  }
+  delete ctx;
+  vTaskDelete(nullptr);
+}
 }  // namespace
 
 void WifiTimeSyncService::init(Preferences& prefs) {
@@ -92,25 +108,16 @@ void WifiTimeSyncService::set_time_callback(std::function<void(uint64_t)> cb) {
   on_time_ = std::move(cb);
 }
 
-bool WifiTimeSyncService::sync_blocking(uint32_t timeout_ms) {
-  if (!configured()) {
-    last_status_ = "no wifi configured";
-    return false;
-  }
-  if (syncing_) {
-    last_status_ = "already syncing";
-    return false;
-  }
-  syncing_ = true;
+bool WifiTimeSyncService::bring_up() {
+  s_sta_started = false;
 
-  // Hold a no-light-sleep PM lock for the whole sync: with light sleep enabled
-  // (CONFIG_PM_ENABLE) the wifi task stalls mid-start while the station is in
-  // the disconnected state, so WIFI_EVENT_STA_START never fires.
-  esp_pm_lock_handle_t pm_lock = nullptr;
-  esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "wifi_sync", &pm_lock);
-  if (pm_lock) esp_pm_lock_acquire(pm_lock);
+  // Hold a no-light-sleep PM lock for the whole wifi session: with light sleep
+  // enabled (CONFIG_PM_ENABLE) the wifi task stalls mid-start while the station
+  // is in the disconnected state, so WIFI_EVENT_STA_START never fires.
+  esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "wifi_sync", &pm_lock_);
+  if (pm_lock_) esp_pm_lock_acquire(pm_lock_);
 
-  ESP_LOGI(kTag, "wifi sync start ssid=%s pass=%s", ssid_.c_str(), pass_.c_str());
+  ESP_LOGI(kTag, "wifi bring up ssid=%s pass=%s", ssid_.c_str(), pass_.c_str());
   esp_netif_init();
   esp_event_loop_create_default();
   esp_netif_create_default_wifi_sta();
@@ -122,11 +129,11 @@ bool WifiTimeSyncService::sync_blocking(uint32_t timeout_ms) {
     last_status_ = "wifi init failed";
     esp_netif_deinit();
     esp_event_loop_delete_default();
-    if (pm_lock) {
-      esp_pm_lock_release(pm_lock);
-      esp_pm_lock_delete(pm_lock);
+    if (pm_lock_) {
+      esp_pm_lock_release(pm_lock_);
+      esp_pm_lock_delete(pm_lock_);
+      pm_lock_ = nullptr;
     }
-    syncing_ = false;
     return false;
   }
 
@@ -147,7 +154,24 @@ bool WifiTimeSyncService::sync_blocking(uint32_t timeout_ms) {
     vTaskDelay(pdMS_TO_TICKS(20));
   }
   ESP_LOGI(kTag, "sta_started=%d", s_sta_started);
+  return true;
+}
 
+void WifiTimeSyncService::bring_down() {
+  esp_wifi_stop();
+  esp_wifi_deinit();
+  esp_event_loop_delete_default();
+  esp_netif_deinit();
+  if (pm_lock_) {
+    esp_pm_lock_release(pm_lock_);
+    esp_pm_lock_delete(pm_lock_);
+    pm_lock_ = nullptr;
+  }
+  syncing_ = false;
+  ESP_LOGI(kTag, "wifi brought down");
+}
+
+bool WifiTimeSyncService::sync_locked(uint32_t timeout_ms) {
   // Scan once and log every visible AP so a missing network is diagnosable.
   wifi_scan_config_t scan_cfg = {};
   scan_cfg.show_hidden = true;
@@ -192,15 +216,6 @@ bool WifiTimeSyncService::sync_blocking(uint32_t timeout_ms) {
   ESP_LOGI(kTag, "ip poll done got_ip=%d ip=" IPSTR, got_ip, IP2STR(&ip.ip));
   if (!got_ip) {
     last_status_ = "wifi connect timeout";
-    esp_wifi_stop();
-    esp_wifi_deinit();
-    esp_netif_deinit();
-    esp_event_loop_delete_default();
-    if (pm_lock) {
-      esp_pm_lock_release(pm_lock);
-      esp_pm_lock_delete(pm_lock);
-    }
-    syncing_ = false;
     return false;
   }
 
@@ -209,15 +224,6 @@ bool WifiTimeSyncService::sync_blocking(uint32_t timeout_ms) {
   ESP_LOGI(kTag, "esp_netif_sntp_init rc=0x%x", sntp_rc);
   if (sntp_rc != ESP_OK) {
     last_status_ = "sntp init failed";
-    esp_wifi_stop();
-    esp_wifi_deinit();
-    esp_event_loop_delete_default();
-    esp_netif_deinit();
-    if (pm_lock) {
-      esp_pm_lock_release(pm_lock);
-      esp_pm_lock_delete(pm_lock);
-    }
-    syncing_ = false;
     return false;
   }
   const esp_err_t wait_rc = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(timeout_ms));
@@ -240,17 +246,76 @@ bool WifiTimeSyncService::sync_blocking(uint32_t timeout_ms) {
     last_status_ = "sntp timeout";
   }
 
-  esp_wifi_stop();
-  esp_wifi_deinit();
-  esp_event_loop_delete_default();
-  esp_netif_deinit();
-  if (pm_lock) {
-    esp_pm_lock_release(pm_lock);
-    esp_pm_lock_delete(pm_lock);
-  }
-  syncing_ = false;
   ESP_LOGI(kTag, "wifi sync done ok=%d", synced);
   return synced;
+}
+
+bool WifiTimeSyncService::sync_blocking(uint32_t timeout_ms) {
+  if (!configured()) {
+    last_status_ = "no wifi configured";
+    return false;
+  }
+  if (syncing_) {
+    last_status_ = "already syncing";
+    return false;
+  }
+  syncing_ = true;
+  if (!bring_up()) {
+    syncing_ = false;
+    return false;
+  }
+  const bool ok = sync_locked(timeout_ms);
+  bring_down();
+  return ok;
+}
+
+bool WifiTimeSyncService::scan_aps(uint32_t timeout_ms, std::vector<WifiApInfo>& out) {
+  out.clear();
+  if (syncing_) {
+    last_status_ = "already syncing";
+    return false;
+  }
+  syncing_ = true;
+  if (!bring_up()) {
+    syncing_ = false;
+    return false;
+  }
+
+  wifi_scan_config_t scan_cfg = {};
+  scan_cfg.show_hidden = true;
+  scan_cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+  scan_cfg.scan_time.active.min = 120;
+  scan_cfg.scan_time.active.max = 300;
+  const esp_err_t scan_rc = esp_wifi_scan_start(&scan_cfg, true);
+  ESP_LOGI(kTag, "esp_wifi_scan_start rc=0x%x", scan_rc);
+  if (scan_rc == ESP_OK) {
+    uint16_t ap_count = 0;
+    esp_wifi_scan_get_ap_num(&ap_count);
+    ESP_LOGI(kTag, "scan found %u APs", ap_count);
+    if (ap_count > kMaxScanAps) ap_count = kMaxScanAps;
+    if (ap_count > 0) {
+      auto* records = static_cast<wifi_ap_record_t*>(calloc(ap_count, sizeof(wifi_ap_record_t)));
+      if (records) {
+        esp_wifi_scan_get_ap_records(&ap_count, records);
+        for (uint16_t i = 0; i < ap_count; ++i) {
+          WifiApInfo info;
+          info.ssid = reinterpret_cast<const char*>(records[i].ssid);
+          info.rssi = records[i].rssi;
+          info.authmode = records[i].authmode;
+          out.push_back(info);
+        }
+        free(records);
+      }
+    }
+  }
+  last_status_ = scan_rc == ESP_OK ? "scan done" : "scan failed";
+  bring_down();
+  return scan_rc == ESP_OK;
+}
+
+void WifiTimeSyncService::scan_async(std::function<void(const std::vector<WifiApInfo>&)> on_done) {
+  auto* ctx = new ScanContext{this, std::move(on_done)};
+  xTaskCreate(scan_task, "wifi_scan", kSyncTaskStack, ctx, tskIDLE_PRIORITY + 1, nullptr);
 }
 
 void WifiTimeSyncService::sync_async(std::function<void(const std::string&)> on_done) {
