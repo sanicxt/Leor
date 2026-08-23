@@ -4,6 +4,7 @@
 #include <cmath>
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "esp32_hw_i2c.h"
 #include "driver/i2c_master.h"
 #include "u8g2.h"
@@ -43,7 +44,7 @@ bool U8g2DisplayBackend::init(const DisplayConfig& config) {
     ctx.cfg.scl_pin = config.scl_pin;
     ctx.cfg.clk_hz = 1000000;  // 1 MHz for high FPS animations
     ctx.cfg.dev_addr_7bit = config.i2c_address;
-    ctx.cfg.timeout_ms = 1000;
+    ctx.cfg.timeout_ms = 100;
     ctx.cfg.reset_pin = -1;
     ESP_ERROR_CHECK(u8g2_esp32_i2c_set_default_context(&ctx));
     i2c_ctx_ = &ctx;
@@ -86,7 +87,22 @@ void U8g2DisplayBackend::prepare_sleep() {
 int U8g2DisplayBackend::width() const { return width_; }
 int U8g2DisplayBackend::height() const { return height_; }
 void U8g2DisplayBackend::clear() { u8g2_ClearBuffer(handle_); }
-void U8g2DisplayBackend::send_buffer() { u8g2_SendBuffer(handle_); }
+void U8g2DisplayBackend::send_buffer() {
+    // A half-powered device on the shared bus (e.g. gyro with VCC cut)
+    // drags SDA/SCL and stalls every transaction, so probe first and
+    // skip the frame while the bus is unhealthy.
+    const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+    if (now_ms - last_probe_ms_ >= 1000) {
+        last_probe_ms_ = now_ms;
+        if (i2c_ctx_ != nullptr && i2c_ctx_->bus_handle != nullptr) {
+            bus_ok_ = (i2c_master_probe(
+                           static_cast<i2c_master_bus_handle_t>(i2c_ctx_->bus_handle),
+                           static_cast<uint8_t>(i2c_ctx_->cfg.dev_addr_7bit), 20) == ESP_OK);
+        }
+    }
+    if (!bus_ok_) return;
+    u8g2_SendBuffer(handle_);
+}
 void U8g2DisplayBackend::set_contrast(uint8_t value) { u8g2_SetContrast(handle_, value); }
 void U8g2DisplayBackend::set_color(uint8_t color) { u8g2_SetDrawColor(handle_, color); }
 void U8g2DisplayBackend::draw_pixel(int x, int y) {

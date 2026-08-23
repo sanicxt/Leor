@@ -5,6 +5,8 @@
         abortCalibration,
         pollCalibrationStatus,
         resetCalibrationState,
+        gestureSupported,
+        gestureBadge,
     } from "$lib/ble.svelte";
 
     interface GestureDef {
@@ -165,15 +167,21 @@
     <div class="grid grid-cols-2 gap-3">
         {#each gestures as g}
             {@const active = bleState.calGesture === g.name && isCalibrating()}
+            {@const supported = gestureSupported(g.name)}
             <button
                 onclick={() => start(g)}
-                disabled={!bleState.connected || isCalibrating()}
+                disabled={!bleState.connected || isCalibrating() || !supported}
                 class="bento-button flex flex-col items-center gap-2 p-4 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed
                     {active ? 'bg-bento-yellow shadow-[4px_4px_0px_0px_var(--color-bento-border)] scale-[1.02]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)] hover:bg-paper/80'}"
             >
                 <span class="text-2xl {active ? 'animate-bounce' : ''}">{g.icon}</span>
                 <div class="text-center">
-                    <div class="text-ink font-black uppercase text-xs">{g.name}</div>
+                    <div class="flex items-center justify-center gap-1.5">
+                        <div class="text-ink font-black uppercase text-xs">{g.name}</div>
+                        {#if !supported}
+                            <span class="text-[10px] font-bold uppercase bg-bento-yellow px-1.5 py-0.5 rounded">{gestureBadge(g.name)}</span>
+                        {/if}
+                    </div>
                     <div class="text-ink/60 font-bold text-[10px]">{g.description}</div>
                 </div>
             </button>

@@ -316,12 +316,6 @@ void BleService::notify_gesture(const std::string& gesture) {
 
 void BleService::on_connected(uint16_t conn_handle) {
     connected_ = conn_handle != BLE_HS_CONN_HANDLE_NONE;
-    struct ble_gap_upd_params params = {};
-    params.itvl_min = 24;
-    params.itvl_max = 48;
-    params.latency = 0;
-    params.supervision_timeout = 180;
-    ble_gap_update_params(conn_handle, &params);
 }
 
 void BleService::on_disconnected() {

@@ -158,7 +158,13 @@ void draw_boot_screen(DisplayBackend& disp, BootStage stage, const HardwareStatu
   } else if (touch_waiting) {
     std::snprintf(pct_s, sizeof(pct_s), "PRESS TOUCH");
   } else if (stage == BootStage::kGyro) {
-    std::snprintf(pct_s, sizeof(pct_s), "CAL %d%%", gyro_pct);
+    if (hw.gyro == HwState::kProbeFailed) {
+      std::snprintf(pct_s, sizeof(pct_s), "FAIL");
+    } else if (hw.gyro == HwState::kAbsent) {
+      std::snprintf(pct_s, sizeof(pct_s), "ABSENT");
+    } else {
+      std::snprintf(pct_s, sizeof(pct_s), "CAL %d%%", gyro_pct);
+    }
   } else if (stage == BootStage::kDisplay) {
     std::snprintf(pct_s, sizeof(pct_s), "%s", hw.display == HwState::kPresent ? "OK" : "FAIL");
   } else if (stage == BootStage::kBuzzer) {
@@ -375,7 +381,13 @@ esp_err_t Application::start() {
   }
   gesture_.start(config_.gesture_dummy_enabled, config_.display.sda_pin,
                  config_.display.scl_pin, nullptr, probe_cb);
-  hw_.gyro = gesture_.mpu_available() ? HwState::kPresent : HwState::kProbeFailed;
+  if (gesture_.mpu_available()) {
+    hw_.gyro = HwState::kPresent;
+  } else if (gesture_.mpu_whoami_ok()) {
+    hw_.gyro = HwState::kProbeFailed;
+  } else {
+    hw_.gyro = HwState::kAbsent;
+  }
   gesture_.restore(preferences_.getBool("gm", true),
                     preferences_.getUInt("grt", 1500),
                     preferences_.getUInt("gcf", 70),
@@ -508,14 +520,8 @@ esp_err_t Application::start() {
         static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
     return commands_->handle(cmd, now_ms);
   }));
-  // With touch present, don't arm the BLE window at boot — a touch
-  // (short press) opens it for the configured window. With touch absent
-  // the tick loop keeps advertising continuously.
-  if (hw_.touch != HwState::kAbsent) {
-    ble_window_open_ = false;
-  } else {
-    open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), false);
-  }
+  // Advertise at boot for the BLE window; touch re-opens it later.
+  open_ble_window(static_cast<uint32_t>(esp_timer_get_time() / 1000ULL), true);
   display_->set_contrast(static_cast<uint8_t>(preferences_.getUInt("disp_con", 0x7f)));
 
   ESP_LOGI(kTag, "application started");
@@ -540,10 +546,19 @@ void Application::tick() {
       ble_window_open_ = true;
       ble_.start_advertising();
     }
-  } else if (ble_window_open_ && !ota_active && now_ms >= ble_window_deadline_ms_) {
+  } else if (ble_window_open_ && !ota_active && !ble_.connected() &&
+             now_ms >= ble_window_deadline_ms_) {
     ble_.stop(false);
     ble_window_open_ = false;
   }
+
+  // Re-open the BLE window when a connection drops so the device stays
+  // discoverable without needing a touch press.
+  const bool ble_connected = ble_.connected();
+  if (was_ble_connected_ && !ble_connected && !ota_active) {
+    open_ble_window(now_ms, true);
+  }
+  was_ble_connected_ = ble_connected;
 
   // --- OTA Priority Bypass ---
   // If an OTA update is active or finished and waiting to reboot, we suspend
@@ -751,6 +766,9 @@ void Application::tick() {
       display_->send_buffer();
     }
   } else {
+    if (hw_.gyro == HwState::kPresent && !gesture_.mpu_available()) {
+      hw_.gyro = HwState::kAbsent;
+    }
     const std::string gesture_cmd = gesture_.poll(now_ms, power_.is_pressed());
     if (!gesture_cmd.empty() && !clock_.enabled() && !menu_.is_open()) {
       commands_->handle(gesture_cmd, now_ms);

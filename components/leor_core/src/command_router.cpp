@@ -5,7 +5,6 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <sstream>
 #include <vector>
 
 #include "esp_system.h"
@@ -32,12 +31,24 @@ bool starts_with(const std::string& value, const char* prefix) {
 
 std::vector<std::string> split(const std::string& text, char delim) {
     std::vector<std::string> out;
-    std::stringstream ss(text);
-    std::string item;
-    while (std::getline(ss, item, delim)) {
+    size_t start = 0;
+    while (start <= text.size()) {
+        const size_t pos = text.find(delim, start);
+        const std::string item = (pos == std::string::npos) ? text.substr(start) : text.substr(start, pos - start);
         out.push_back(item);
+        if (pos == std::string::npos) break;
+        start = pos + 1;
     }
     return out;
+}
+
+// snprintf-based integer formatting instead of std::to_string: the latter pulls
+// the whole C++ <locale> machinery (~92KB) into the firmware. These ACK strings
+// are never parsed by the web client, so the exact format doesn't matter.
+std::string itos(long value) {
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%ld", value);
+    return std::string(buf);
 }
 
 int touch_mode_int(const std::string& mode) {
@@ -334,7 +345,7 @@ std::string CommandRouter::handle_display(const std::string& params) {
         if (value >= 0 && value <= 255) {
             display_.set_contrast(static_cast<uint8_t>(value));
             preferences_.putUInt("disp_con", static_cast<uint32_t>(value));
-            return "display:contrast=" + std::to_string(value) + " saved";
+            return "display:contrast=" + itos(value) + " saved";
         }
         return "display:contrast invalid. Use 0-255";
     }
@@ -563,49 +574,49 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         const int val = std::atoi(cmd.substr(4).c_str());
         gestures_.set_reaction_time(val);
         preferences_.putUInt("grt", val);
-        return "rt=" + std::to_string(gestures_.reaction_time_ms());
+        return "rt=" + itos(gestures_.reaction_time_ms());
     }
     if (starts_with(cmd, "gcf=")) {
         const int val = std::atoi(cmd.substr(4).c_str());
         gestures_.set_confidence(val);
         preferences_.putUInt("gcf", val);
-        return "cf=" + std::to_string(gestures_.confidence_percent());
+        return "cf=" + itos(gestures_.confidence_percent());
     }
     if (starts_with(cmd, "gcd=")) {
         const int val = std::atoi(cmd.substr(4).c_str());
         gestures_.set_cooldown(val);
         preferences_.putUInt("gcd", val);
-        return "cd=" + std::to_string(gestures_.cooldown_ms());
+        return "cd=" + itos(gestures_.cooldown_ms());
     }
     if (starts_with(cmd, "gst=")) {
         const float val = std::atof(cmd.substr(4).c_str());
         gestures_.set_shake_threshold(val);
         preferences_.putFloat("gst", val);
-        return "gst=" + std::to_string(val);
+        return "gst=" + itos(static_cast<long>(val * 1000.0f));
     }
     if (starts_with(cmd, "gpt=")) {
         const float val = std::atof(cmd.substr(4).c_str());
         gestures_.set_pat_threshold(val);
         preferences_.putFloat("gpt", val);
-        return "gpt=" + std::to_string(val);
+        return "gpt=" + itos(static_cast<long>(val * 1000.0f));
     }
     if (starts_with(cmd, "gvt=")) {
         const float val = std::atof(cmd.substr(4).c_str());
         gestures_.set_swipe_threshold(val);
         preferences_.putFloat("gvt", val);
-        return "gvt=" + std::to_string(val);
+        return "gvt=" + itos(static_cast<long>(val * 1000.0f));
     }
     if (starts_with(cmd, "gtt=")) {
         const float val = std::atof(cmd.substr(4).c_str());
         gestures_.set_touch_threshold(val);
         preferences_.putFloat("gtt", val);
-        return "gtt=" + std::to_string(val);
+        return "gtt=" + itos(static_cast<long>(val * 1000.0f));
     }
     if (starts_with(cmd, "gtd=")) {
         const float val = std::atof(cmd.substr(4).c_str());
         gestures_.set_pickup_tilt_deg(val);
         preferences_.putFloat("gtd", val);
-        return "gtd=" + std::to_string(val);
+        return "gtd=" + itos(static_cast<long>(val * 1000.0f));
     }
 
     // Per-gesture calibration commands
@@ -637,7 +648,13 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
             int idx = gestures_.calibration_gesture_index();
             float new_thresh = gestures_.calibration_new_threshold();
             switch (idx) {
-                case 0: preferences_.putFloat("gpt", new_thresh); break;
+                case 0:
+                    if (gestures_.mpu_available()) {
+                        preferences_.putFloat("gpt", new_thresh);
+                    } else {
+                        preferences_.putUInt("gtap", gestures_.touch_min_taps());
+                    }
+                    break;
                 case 1: preferences_.putFloat("gst", new_thresh); break;
                 case 2: preferences_.putFloat("gvt", new_thresh); break;
                 case 3: preferences_.putFloat("gtd", new_thresh); break;
@@ -647,12 +664,12 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         return json;
     }
 
-    if (cmd == "ble:") return std::string("ble:win=") + std::to_string(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
+    if (cmd == "ble:") return std::string("ble:win=") + itos(std::max<uint32_t>(20000U, preferences_.getUInt("ble_win", 60000)));
     if (starts_with(cmd, "ble:win=")) {
         const int window_ms = std::atoi(cmd.substr(8).c_str());
         const int clamped_ms = std::max(20000, std::min(window_ms, 600000));
         preferences_.putUInt("ble_win", static_cast<uint32_t>(clamped_ms));
-        return "ble:win=" + std::to_string(clamped_ms);
+        return "ble:win=" + itos(clamped_ms);
     }
     if (cmd == "ble:name") return "ble:name=" + preferences_.getString("ble_name", "Leor");
     if (starts_with(cmd, "ble:name=")) {
@@ -660,7 +677,7 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
         preferences_.putString("ble_name", name);
         return "ble:name=" + name + " saved. Reconnect now; restart if not visible.";
     }
-    if (cmd == "tw:") return "tw:pin=" + std::to_string(preferences_.getUInt("wake_pin", 0)) + " active=high hold=" + std::to_string(power_.hold_ms()) + "ms";
+    if (cmd == "tw:") return "tw:pin=" + itos(preferences_.getUInt("wake_pin", 0)) + " active=high hold=" + itos(power_.hold_ms()) + "ms";
     if (starts_with(cmd, "sh:") || starts_with(cmd, "shuffle:")) {
         const size_t prefix_len = starts_with(cmd, "shuffle:") ? 8 : 3;
         return handle_shuffle(cmd.substr(prefix_len));

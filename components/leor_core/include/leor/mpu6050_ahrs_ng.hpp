@@ -38,6 +38,7 @@ class Mpu6050AhrsNg {
     const Mpu6050Data& data() const { return data_; }
     bool is_calibrated() const { return !calibrating_; }
     uint16_t calibration_progress() const { return cal_count_; }
+    bool whoami_read_ok() const { return whoami_read_ok_; }
 
     void set_filter_gains(float kp, float ki) { kp_ = kp; ki_ = ki; }
     void set_accel_cal(float off_x, float off_y, float off_z, float sc_x, float sc_y, float sc_z);
@@ -61,6 +62,7 @@ class Mpu6050AhrsNg {
     i2c_port_num_t port_ = I2C_NUM_0;
 
     bool calibrating_ = true;
+    bool whoami_read_ok_ = false;
     uint16_t cal_count_ = 0;
     int64_t last_us_ = 0;
     int32_t gsum_[3] = {0, 0, 0};

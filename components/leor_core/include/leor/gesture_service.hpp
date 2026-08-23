@@ -55,6 +55,8 @@ class GestureService {
     float pickup_tilt_deg() const { return pickup_tilt_deg_; }
     void set_inverted(bool inv) { inverted_ = inv; }
     bool inverted() const { return inverted_; }
+    void set_touch_min_taps(uint8_t v) { touch_min_taps_ = v == 0 ? 1 : v; }
+    uint8_t touch_min_taps() const { return touch_min_taps_; }
     // ------------------------
 
     // --- Per-Gesture Calibration ---
@@ -80,6 +82,7 @@ class GestureService {
     float pitch() const { return inverted_ ? -mpu_.data().pitch : mpu_.data().pitch; }
     float roll() const { return mpu_.data().roll; }
     bool mpu_available() const { return mpu_available_; }
+bool mpu_whoami_ok() const { return mpu_.whoami_read_ok(); }
 
   private:
     bool init_mpu(int i2c_sda_pin, int i2c_scl_pin, DisplayBackend* display,
@@ -93,6 +96,8 @@ class GestureService {
     uint32_t touch_start_ms_ = 0;
     bool was_touching_ = false;
     bool was_tilted_ = false;
+    uint8_t touch_min_taps_ = 2;
+    uint8_t tap_count_ = 0;
 
     struct GestureFeatures {
         float max_gyro = 0.0f;
@@ -101,6 +106,7 @@ class GestureService {
         int touch_samples = 0;
         int total_samples = 0;
         bool tilt_triggered = false;
+        uint8_t tap_count = 0;
         void reset() { *this = GestureFeatures(); }
     };
 
@@ -118,6 +124,7 @@ class GestureService {
         float peak_value = 0.0f;
         float new_threshold = 0.0f;
         int sample_count = 0;
+        uint8_t tap_count = 0;
 
         static constexpr uint32_t kWaitMs = 500;
         static constexpr uint32_t kCaptureMs = 3000;
@@ -133,6 +140,7 @@ class GestureService {
             peak_value = 0.0f;
             new_threshold = 0.0f;
             sample_count = 0;
+            tap_count = 0;
         }
     };
     CalibrationState calib_{};
@@ -160,6 +168,8 @@ class GestureService {
 
     bool mpu_available_ = false;
     bool mpu_calibrated_ = false;
+    static constexpr uint8_t kMpuFailLimit = 20;
+    uint8_t mpu_fail_count_ = 0;
     int i2c_sda_pin_ = 10;
     int i2c_scl_pin_ = 7;
     float gyro_off_x_ = 0.0f;

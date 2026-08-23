@@ -94,7 +94,70 @@ void GestureService::set_suspended(bool suspended) {
 
 std::string GestureService::poll(uint32_t now_ms, bool touch_active) {
     if (calibrating()) return "";
-    if (!matching_enabled_ || suspended_ || !mpu_available_ || !mpu_calibrated_) {
+    if (!matching_enabled_ || suspended_) {
+        return "";
+    }
+
+    // Touch-only mode: no gyro present, pat is detected from tap count alone.
+    if (!mpu_available_ || !mpu_calibrated_) {
+        const bool rising = !was_touching_ && touch_active;
+        const bool falling = was_touching_ && !touch_active;
+
+        switch (state_) {
+            case State::kReady: {
+                if (rising) {
+                    tap_count_ = 1;
+                    state_ = State::kSampling;
+                    state_start_ms_ = now_ms;
+                    ESP_LOGI("leor_gest", "LIFE: READY -> SAMPLING (touch, 800ms)");
+                }
+                break;
+            }
+
+            case State::kSampling: {
+                if (falling) {
+                    tap_count_++;
+                } else if (rising) {
+                    tap_count_++;
+                    state_start_ms_ = now_ms;
+                }
+                if (now_ms - state_start_ms_ >= 800) {
+                    std::string result = classify();
+                    if (!result.empty()) {
+                        state_ = State::kActive;
+                        state_start_ms_ = now_ms;
+                        ESP_LOGI("leor_gest", "LIFE: SAMPLING -> ACTIVE (Duration: %ums)", (unsigned)reaction_time_ms_);
+                        return result;
+                    } else {
+                        state_ = State::kReady;
+                        tap_count_ = 0;
+                        ESP_LOGI("leor_gest", "LIFE: SAMPLING -> READY (No match)");
+                    }
+                }
+                break;
+            }
+
+            case State::kActive: {
+                if (now_ms - state_start_ms_ >= reaction_time_ms_) {
+                    state_ = State::kCooldown;
+                    state_start_ms_ = now_ms;
+                    ESP_LOGI("leor_gest", "LIFE: ACTIVE -> COOLDOWN (Lockout: %ums)", (unsigned)cooldown_ms_);
+                    return "neutral";
+                }
+                break;
+            }
+
+            case State::kCooldown: {
+                if (now_ms - state_start_ms_ >= cooldown_ms_) {
+                    state_ = State::kReady;
+                    tap_count_ = 0;
+                    ESP_LOGI("leor_gest", "LIFE: COOLDOWN -> READY");
+                }
+                break;
+            }
+        }
+
+        was_touching_ = touch_active;
         return "";
     }
 
@@ -103,8 +166,16 @@ std::string GestureService::poll(uint32_t now_ms, bool touch_active) {
     }
     last_mpu_read_ms_ = now_ms;
     if (!read_mpu_sample()) {
+        // A dead/unpowered MPU drags the shared I2C bus and corrupts the
+        // display, so stop polling it after consecutive failures.
+        if (++mpu_fail_count_ >= kMpuFailLimit) {
+            mpu_available_ = false;
+            mpu_calibrated_ = false;
+            ESP_LOGW("leor_gest", "MPU unresponsive, degrading to touch-only mode");
+        }
         return "";
     }
+    mpu_fail_count_ = 0;
 
     const auto& d = mpu_.data();
     
@@ -182,6 +253,15 @@ std::string GestureService::poll(uint32_t now_ms, bool touch_active) {
 }
 
 std::string GestureService::classify() {
+    if (!mpu_available_ || !mpu_calibrated_) {
+        if (tap_count_ >= touch_min_taps_) {
+            ESP_LOGI("leor_gest", "ALGO EVAL: TOUCH taps=%u min=%u -> pat", (unsigned)tap_count_, (unsigned)touch_min_taps_);
+            return actions_[0];
+        }
+        ESP_LOGI("leor_gest", "ALGO: DISCARDED (Below Confidence)");
+        return "";
+    }
+
     float touch_ratio = (float)window_stats_.touch_samples / (float)window_stats_.total_samples;
     
     ESP_LOGI("leor_gest", "ALGO EVAL: G=%.1f, AZ=%.2f, AXY=%.2f, T=%.2f, Tilt=%d", 
@@ -246,6 +326,65 @@ std::string GestureService::calibration_tick(uint32_t now_ms, bool touch_active)
         calib_.reset();
         if (mpu_available_ && !matching_enabled_) mpu_.sleep();
         return "{\"type\":\"cal\",\"phase\":\"timeout\"}";
+    }
+
+    // Touch-only calibration: no gyro present, only pat (index 0) is supported.
+    if (!mpu_available_ || !mpu_calibrated_) {
+        if (calib_.gesture_index != 0) {
+            ESP_LOGW("leor_gest", "CAL: gesture[%d] %s not supported without IMU",
+                     calib_.gesture_index, labels_[calib_.gesture_index]);
+            calib_.reset();
+            return "{\"type\":\"cal\",\"phase\":\"timeout\"}";
+        }
+
+        const bool rising = !was_touching_ && touch_active;
+        const bool falling = was_touching_ && !touch_active;
+
+        switch (calib_.phase) {
+            case CalibrationPhase::kWait: {
+                if (rising) {
+                    calib_.phase = CalibrationPhase::kCapturing;
+                    calib_.phase_start_ms = now_ms;
+                    calib_.capture_ms = 0;
+                    calib_.tap_count = 1;
+                    calib_.peak_value = 0.0f;
+                    ESP_LOGI("leor_gest", "CAL: NOW CAPTURING — tap the device %s",
+                             labels_[calib_.gesture_index]);
+                }
+                break;
+            }
+
+            case CalibrationPhase::kCapturing: {
+                if (falling) {
+                    calib_.tap_count++;
+                } else if (rising) {
+                    calib_.tap_count++;
+                }
+                calib_.capture_ms = now_ms - calib_.phase_start_ms;
+
+                if (calib_.capture_ms >= CalibrationState::kCaptureMs) {
+                    const int taps = std::max(1, static_cast<int>(calib_.tap_count));
+                    const uint8_t new_min = static_cast<uint8_t>(
+                        std::max(1, static_cast<int>(std::round(taps * CalibrationState::kThresholdRatio))));
+                    set_touch_min_taps(new_min);
+                    calib_.new_threshold = static_cast<float>(new_min);
+                    calib_.phase = CalibrationPhase::kComplete;
+                    ESP_LOGI("leor_gest", "CAL: COMPLETE — gesture[0] taps=%d new_min_taps=%u",
+                             taps, (unsigned)new_min);
+                    return calibration_status_json();
+                }
+                break;
+            }
+
+            case CalibrationPhase::kComplete:
+                return "";
+
+            default:
+                break;
+        }
+
+        was_touching_ = touch_active;
+        return "";
     }
 
     // Rate-limit IMU reads to 50 Hz

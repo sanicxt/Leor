@@ -67,8 +67,10 @@ bool Mpu6050AhrsNg::begin(int sda_pin, int scl_pin, uint32_t i2c_clock_hz, i2c_p
     uint8_t whoami = 0xFF;
     if (read_reg(0x75, &whoami) != ESP_OK) {
         ESP_LOGW(kTag, "WHO_AM_I read failed");
+        whoami_read_ok_ = false;
         return false;
     }
+    whoami_read_ok_ = true;
 
     bool found = (whoami == 0x68 || whoami == 0x72 || whoami == 0x70 || whoami == 0x71 || whoami == 0x73 || whoami == 0x98);
     if (!found) {
