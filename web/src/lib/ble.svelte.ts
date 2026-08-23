@@ -35,7 +35,7 @@ export const bleState = $state({
         ew: 36, eh: 36, es: 10, er: 8,
         mw: 20, lt: 1000, vt: 2000, bi: 3,
         gs: 6, os: 12, ss: 10, td: 3000, // gaze speed, openness speed, squish speed, touch hold delay (ms)
-        wp: 0, pp: 1, ct: 127, nd: 5000, // wake GPIO pin, power-control GPIO pin, contrast (0-255), notification duration (ms)
+        wp: 0, pp: 1, ct: 127, nd: 5000, st: 0, // wake GPIO pin, power-control GPIO pin, contrast (0-255), notification duration (ms), sleep timer (minutes, 0=off)
         touchMode: 2, buzzerMode: 0, wifiMode: 0 // 0=off,1=on,2=detect; 0=off,1=on; 0=off,1=on
     },
     display: {
@@ -119,6 +119,7 @@ export function getSettingsWp() { return bleState.settings.wp; }
 export function getSettingsPp() { return bleState.settings.pp; }
 export function getSettingsCt() { return bleState.settings.ct; }
 export function getSettingsNd() { return bleState.settings.nd; }
+export function getSettingsSt() { return bleState.settings.st; }
 
 export function getTouchMode() { return bleState.settings.touchMode; }
 export function getBuzzerMode() { return bleState.settings.buzzerMode; }
@@ -219,6 +220,7 @@ export function setSettingsWp(val: number) { bleState.settings.wp = val; }
 export function setSettingsPp(val: number) { bleState.settings.pp = val; }
 export function setSettingsCt(val: number) { bleState.settings.ct = val; }
 export function setSettingsNd(val: number) { bleState.settings.nd = val; }
+export function setSettingsSt(val: number) { bleState.settings.st = val; }
 
 export function setTouchMode(mode: number) {
     bleState.settings.touchMode = mode;

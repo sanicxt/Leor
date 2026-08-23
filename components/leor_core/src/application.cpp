@@ -49,6 +49,39 @@ void Application::open_ble_window(uint32_t now_ms, bool start_advertising) {
   }
 }
 
+void Application::enter_sleep(uint32_t now_ms) {
+  if (display_ && eyes_) {
+    bool was_shuffle = shuffle_.enabled();
+    if (was_shuffle) shuffle_.set_enabled(false);
+
+    buzzer_.play_power_off();
+    eyes_->triggerSleep();
+    uint32_t start_ms = now_ms;
+    while (!eyes_->is_sleep_done()) {
+      uint32_t loop_ms =
+          static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+      display_->clear();
+      eyes_->update(loop_ms);
+      vTaskDelay(pdMS_TO_TICKS(16));
+      if (loop_ms - start_ms > 4000)
+        break; // failsafe
+    }
+    display_->prepare_sleep();
+    ble_.stop();
+    power_.do_sleep();
+
+    // If do_sleep returns, the sleep was aborted by user holding button too long!
+    if (was_shuffle) shuffle_.set_enabled(true);
+    eyes_->reset_emotions();
+  } else if (display_) {
+    display_->clear();
+    display_->send_buffer();
+    display_->prepare_sleep();
+    ble_.stop();
+    power_.do_sleep();
+  }
+}
+
 void draw_ota_screen(DisplayBackend& display, int pct, const char* line1, const char* line2, uint32_t now_ms) {
   display.clear();
   display.set_font_small();
@@ -499,6 +532,15 @@ esp_err_t Application::start() {
                  preferences_.getUInt("clk_sec", 0));
   was_clock_enabled_ = clock_.enabled();
 
+  sleep_timer_minutes_ = preferences_.getUInt("sleep_timer", 0);
+  if (sleep_timer_minutes_ > 0) {
+    sleep_timer_deadline_ms_ =
+        static_cast<uint32_t>(esp_timer_get_time() / 1000ULL) +
+        sleep_timer_minutes_ * 60000U;
+  } else {
+    sleep_timer_deadline_ms_ = 0;
+  }
+
   commands_ = std::make_unique<CommandRouter>(preferences_, config_.display,
                                                *display_, *eyes_, gesture_,
                                                shuffle_, clock_, power_, ble_,
@@ -593,6 +635,17 @@ void Application::tick() {
   }
   // ---------------------------
 
+  const uint32_t sleep_timer = preferences_.getUInt("sleep_timer", 0);
+  if (sleep_timer != sleep_timer_minutes_) {
+    sleep_timer_minutes_ = sleep_timer;
+    sleep_timer_deadline_ms_ =
+        sleep_timer > 0 ? now_ms + sleep_timer * 60000U : 0;
+  }
+  if (sleep_timer_deadline_ms_ != 0 && now_ms >= sleep_timer_deadline_ms_) {
+    enter_sleep(now_ms);
+    return;
+  }
+
   ButtonEvent btn = power_.poll(now_ms);
   if (btn == ButtonEvent::kShortPress) {
     if (now_ms - last_short_press_ms_ < kDoubleTapThresholdMs) {
@@ -626,37 +679,7 @@ void Application::tick() {
     break;
   }
   case MenuAction::kPowerOff:
-    if (display_ && eyes_) {
-      bool was_shuffle = shuffle_.enabled();
-      if (was_shuffle) shuffle_.set_enabled(false);
-
-      buzzer_.play_power_off();
-      eyes_->triggerSleep();
-      uint32_t start_ms = now_ms;
-      while (!eyes_->is_sleep_done()) {
-        uint32_t loop_ms =
-            static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
-        display_->clear();
-        eyes_->update(loop_ms);
-        vTaskDelay(pdMS_TO_TICKS(16));
-        if (loop_ms - start_ms > 4000)
-          break; // failsafe
-      }
-      display_->prepare_sleep();
-      ble_.stop();
-      power_.do_sleep();
-      
-      // If do_sleep returns, the sleep was aborted by user holding button too long!
-      if (was_shuffle) shuffle_.set_enabled(true);
-      eyes_->reset_emotions();
-      return;
-    } else if (display_) {
-      display_->clear();
-      display_->send_buffer();
-      display_->prepare_sleep();
-      ble_.stop();
-      power_.do_sleep();
-    }
+    enter_sleep(now_ms);
     return;
   default:
     break;

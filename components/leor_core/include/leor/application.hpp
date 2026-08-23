@@ -31,6 +31,7 @@ public:
 
 private:
   void open_ble_window(uint32_t now_ms, bool start_advertising);
+  void enter_sleep(uint32_t now_ms);
 
   RuntimeConfig config_{};
   Preferences preferences_{};
@@ -54,6 +55,8 @@ private:
   uint32_t ble_window_duration_ms_ = 60000;
   uint32_t ble_window_deadline_ms_ = 0;
   uint32_t last_short_press_ms_ = 0;
+  uint32_t sleep_timer_minutes_ = 0;
+  uint32_t sleep_timer_deadline_ms_ = 0;
   HardwareStatus hw_{};
   WifiTimeSyncService wifi_{};
   static constexpr uint32_t kDoubleTapThresholdMs = 400;
