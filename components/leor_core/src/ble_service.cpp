@@ -320,7 +320,7 @@ void BleService::on_connected(uint16_t conn_handle) {
 
 void BleService::on_disconnected() {
     connected_ = false;
-    if (ota_.in_progress()) {
+    if (ota_.in_progress() && !ota_.reboot_pending()) {
         ota_.set_error("BLE Disconnected");
     }
 }
