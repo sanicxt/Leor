@@ -35,6 +35,9 @@ class GestureService {
     bool matching_enabled() const { return matching_enabled_; }
     void set_suspended(bool suspended);
     bool suspended() const { return suspended_; }
+    // True while a validated gesture's expression animation is playing
+    // (kActive state). Shuffle must not override it during this window.
+    bool reacting() const { return state_ == State::kActive; }
     void set_reaction_time(uint32_t value) { reaction_time_ms_ = value; }
     uint32_t reaction_time_ms() const { return reaction_time_ms_; }
     void set_confidence(uint32_t value) { confidence_percent_ = value; }

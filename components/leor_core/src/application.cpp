@@ -796,7 +796,7 @@ void Application::tick() {
   // -----------------------------------
 
   const char *shuffle_cmd = nullptr;
-  if (!clock_.enabled() && shuffle_.should_emit(now_ms, false, false, &shuffle_cmd) &&
+  if (!clock_.enabled() && shuffle_.should_emit(now_ms, gesture_.reacting(), false, &shuffle_cmd) &&
       shuffle_cmd != nullptr) {
     commands_->handle(shuffle_cmd, now_ms, false);
   }
