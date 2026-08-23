@@ -131,6 +131,8 @@ class U8g2DisplayBackend final : public DisplayBackend {
     u8g2_esp32_i2c_ctx_t* i2c_ctx_ = nullptr;
     int width_ = 128;
     int height_ = 64;
+    bool bus_ok_ = true;
+    uint32_t last_probe_ms_ = 0;
     std::unique_ptr<uint8_t[]> storage_;
 };
 

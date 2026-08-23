@@ -648,7 +648,13 @@ std::string CommandRouter::handle(std::string cmd, uint32_t now_ms, bool is_manu
             int idx = gestures_.calibration_gesture_index();
             float new_thresh = gestures_.calibration_new_threshold();
             switch (idx) {
-                case 0: preferences_.putFloat("gpt", new_thresh); break;
+                case 0:
+                    if (gestures_.mpu_available()) {
+                        preferences_.putFloat("gpt", new_thresh);
+                    } else {
+                        preferences_.putUInt("gtap", gestures_.touch_min_taps());
+                    }
+                    break;
                 case 1: preferences_.putFloat("gst", new_thresh); break;
                 case 2: preferences_.putFloat("gvt", new_thresh); break;
                 case 3: preferences_.putFloat("gtd", new_thresh); break;
