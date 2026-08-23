@@ -20,6 +20,8 @@
         setGesturePickupTiltDeg,
         getGestureInverted,
         setGestureInverted,
+        gestureSupported,
+        gestureBadge,
     } from "$lib/ble.svelte";
 
     async function updateInversion(val: boolean) {
@@ -123,7 +125,7 @@
              {getGestureInverted() ? 'bg-bento-blue shadow-[2px_2px_0px_0px_var(--color-bento-border)]' : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)]'}"
             aria-label="Invert gyro axes"
             onclick={() => updateInversion(!getGestureInverted())}
-            disabled={!bleState.connected}
+            disabled={!bleState.connected || !gestureSupported('shake')}
         >
             <span class="absolute left-1 top-0.5 w-6 h-6 bg-paper border-[1.5px] border-bento-border rounded-full transition-transform duration-300 flex items-center justify-center {getGestureInverted() ? 'translate-x-6' : 'translate-x-0'}">
                 {#if getGestureInverted()}
@@ -164,63 +166,78 @@
 
         <div class="grid grid-cols-2 gap-4">
             <!-- Shake Energy -->
-            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl {!gestureSupported('shake') ? 'opacity-40 pointer-events-none' : ''}">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                         <span class="text-ink/80 text-[10px] font-bold uppercase tracking-wider">Shake</span>
+                        {#if gestureBadge('shake')}
+                            <span class="text-[10px] font-bold uppercase bg-bento-yellow px-1.5 py-0.5 rounded">{gestureBadge('shake')}</span>
+                        {/if}
                     </div>
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGestureShakeThreshold()}</span>
                 </div>
-                <input type="range" min="100" max="500" step="10" value={getGestureShakeThreshold()} onchange={(e) => updateShakeThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
+                <input type="range" min="100" max="500" step="10" value={getGestureShakeThreshold()} onchange={(e) => updateShakeThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected || !gestureSupported('shake')} class="slider" />
             </div>
 
             <!-- Pat Impact -->
-            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl {!gestureSupported('pat') ? 'opacity-40 pointer-events-none' : ''}">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
                         <span class="text-ink/80 text-[10px] font-bold uppercase tracking-wider">Pat</span>
+                        {#if gestureBadge('pat')}
+                            <span class="text-[10px] font-bold uppercase bg-bento-yellow px-1.5 py-0.5 rounded">{gestureBadge('pat')}</span>
+                        {/if}
                     </div>
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGesturePatThreshold().toFixed(2)}g</span>
                 </div>
-                <input type="range" min="0.1" max="0.8" step="0.01" value={getGesturePatThreshold()} onchange={(e) => updatePatThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
+                <input type="range" min="0.1" max="0.8" step="0.01" value={getGesturePatThreshold()} onchange={(e) => updatePatThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected || !gestureSupported('pat')} class="slider" />
             </div>
 
             <!-- Nudge Impact -->
-            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl {!gestureSupported('swipe') ? 'opacity-40 pointer-events-none' : ''}">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
                         <span class="text-ink/80 text-[10px] font-bold uppercase tracking-wider">Nudge</span>
+                        {#if gestureBadge('swipe')}
+                            <span class="text-[10px] font-bold uppercase bg-bento-yellow px-1.5 py-0.5 rounded">{gestureBadge('swipe')}</span>
+                        {/if}
                     </div>
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGestureSwipeThreshold().toFixed(2)}g</span>
                 </div>
-                <input type="range" min="0.2" max="1.0" step="0.05" value={getGestureSwipeThreshold()} onchange={(e) => updateSwipeThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
+                <input type="range" min="0.2" max="1.0" step="0.05" value={getGestureSwipeThreshold()} onchange={(e) => updateSwipeThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected || !gestureSupported('swipe')} class="slider" />
             </div>
 
             <!-- Touch Min -->
-            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl {!gestureSupported('pat') && !gestureSupported('swipe') ? 'opacity-40 pointer-events-none' : ''}">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" /></svg>
                         <span class="text-ink/80 text-[10px] font-bold uppercase tracking-wider">Touch</span>
+                        {#if !gestureSupported('pat') && !gestureSupported('swipe')}
+                            <span class="text-[10px] font-bold uppercase bg-bento-yellow px-1.5 py-0.5 rounded">Needs touch</span>
+                        {/if}
                     </div>
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{(getGestureTouchThreshold() * 100).toFixed(0)}%</span>
                 </div>
-                <input type="range" min="0.01" max="0.4" step="0.01" value={getGestureTouchThreshold()} onchange={(e) => updateTouchThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
+                <input type="range" min="0.01" max="0.4" step="0.01" value={getGestureTouchThreshold()} onchange={(e) => updateTouchThreshold(parseFloat(e.currentTarget.value))} disabled={!bleState.connected || !gestureSupported('pat') && !gestureSupported('swipe')} class="slider" />
             </div>
 
             <!-- Pickup Tilt Angle -->
-            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl">
+            <div class="space-y-2 p-3 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl {!gestureSupported('pickup') ? 'opacity-40 pointer-events-none' : ''}">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <svg class="w-3.5 h-3.5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-7 7 3-14L3 7l7 7" /></svg>
                         <span class="text-ink/80 text-[10px] font-bold uppercase tracking-wider">Pickup Tilt</span>
+                        {#if gestureBadge('pickup')}
+                            <span class="text-[10px] font-bold uppercase bg-bento-yellow px-1.5 py-0.5 rounded">{gestureBadge('pickup')}</span>
+                        {/if}
                     </div>
                     <span class="text-ink font-mono font-bold text-[10px] px-1.5 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">{getGesturePickupTiltDeg().toFixed(0)}°</span>
                 </div>
-                <input type="range" min="10" max="80" step="5" value={getGesturePickupTiltDeg()} onchange={(e) => updatePickupTiltDeg(parseFloat(e.currentTarget.value))} disabled={!bleState.connected} class="slider" />
+                <input type="range" min="10" max="80" step="5" value={getGesturePickupTiltDeg()} onchange={(e) => updatePickupTiltDeg(parseFloat(e.currentTarget.value))} disabled={!bleState.connected || !gestureSupported('pickup')} class="slider" />
             </div>
         </div>
     </div>

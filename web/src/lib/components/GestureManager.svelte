@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { sendCommand, bleState, setGestureMatching } from "$lib/ble.svelte";
+    import { sendCommand, bleState, setGestureMatching, gestureSupported, gestureBadge } from "$lib/ble.svelte";
 
     // Available expressions that can be mapped to gestures
     const expressions = [
@@ -182,7 +182,7 @@
     <div class="mb-4 border-b-2 border-bento-border pb-2 flex items-center justify-between flex-wrap gap-3">
         <div>
             <h2 class="font-display text-xl uppercase">Gesture Recognition</h2>
-            <p class="text-sm font-bold opacity-80">TTP223 + MPU6050 • Hybrid Logic</p>
+            <p class="text-sm font-bold opacity-80">Tap, shake, swipe &amp; pick me up</p>
         </div>
 
         <div class="flex items-center gap-3">
@@ -254,18 +254,24 @@
         </div>
 
         {#each gestures as gesture, i}
+            {@const supported = gestureSupported(gesture.name)}
             <div
                 class="flex items-center justify-between p-3 transition-all duration-300 border-2 border-bento-border rounded-xl {lastDetectedGesture === gesture.name
                     ? 'bg-bento-yellow shadow-[4px_4px_0px_0px_var(--color-bento-border)] scale-[1.02]'
-                    : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)] hover:bg-paper/80'}"
+                    : 'bg-paper shadow-[2px_2px_0px_0px_var(--color-bento-border)] hover:bg-paper/80'} {supported ? '' : 'opacity-40 pointer-events-none'}"
             >
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-paper border-2 border-bento-border flex items-center justify-center text-xl shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
                         {gesture.icon}
                     </div>
                     <div>
-                        <div class="text-ink font-bold uppercase text-sm">
-                            {gesture.name}
+                        <div class="flex items-center gap-2">
+                            <div class="text-ink font-bold uppercase text-sm">
+                                {gesture.name}
+                            </div>
+                            {#if !supported}
+                                <span class="text-[10px] font-bold uppercase bg-bento-yellow px-1.5 py-0.5 rounded">{gestureBadge(gesture.name)}</span>
+                            {/if}
                         </div>
                         <div class="text-ink/60 font-bold text-[10px]">
                             {gesture.description}

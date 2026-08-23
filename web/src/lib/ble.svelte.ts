@@ -142,6 +142,36 @@ export function getClockTimezoneOffset() { return bleState.clockTimezoneOffset; 
 export function getClock24Hour() { return bleState.clock24Hour; }
 export function getHardware() { return bleState.hardware; }
 
+// ==================== Gesture hardware requirements ====================
+
+export function gestureRequiresGyro(name: string): boolean {
+    if (name === 'shake' || name === 'pickup' || name === 'swipe') return true;
+    if (name === 'pat') return bleState.hardware.gyro === 0;
+    return false;
+}
+
+export function gestureRequiresTouch(name: string): boolean {
+    return name === 'pat' || name === 'swipe';
+}
+
+export function gestureSupported(name: string): boolean {
+    const needsGyro = gestureRequiresGyro(name);
+    const needsTouch = gestureRequiresTouch(name);
+    if (needsGyro && bleState.hardware.gyro !== 0) return false;
+    if (needsTouch && bleState.hardware.touch !== 0) return false;
+    return true;
+}
+
+export function gestureBadge(name: string): string {
+    const supported = gestureSupported(name);
+    const needsGyro = gestureRequiresGyro(name);
+    const needsTouch = gestureRequiresTouch(name);
+    if (!supported && needsGyro && bleState.hardware.gyro !== 0) return 'Needs gyro';
+    if (!supported && needsTouch) return 'Needs touch';
+    if (name === 'pat' && bleState.hardware.gyro !== 0 && bleState.hardware.touch === 0) return 'Touch only';
+    return '';
+}
+
 export function getWifiSsid() {
     return bleState.wifi.ssid;
 }
