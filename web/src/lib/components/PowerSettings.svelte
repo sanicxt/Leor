@@ -14,6 +14,8 @@
         setTouchMode,
         getBuzzerMode,
         setBuzzerMode,
+        getSettingsSt,
+        setSettingsSt,
     } from "$lib/ble.svelte";
 
     let touchHoldDelay = $derived(getSettingsTd());
@@ -22,6 +24,7 @@
     let bleWindowMs = $derived(getBleWindowMs());
     let touchMode = $derived(getTouchMode());
     let buzzerMode = $derived(getBuzzerMode());
+    let sleepTimer = $derived(getSettingsSt());
 
     // ESP32-C3 RTC-capable GPIO pins (0-5)
     const rtcPins = [0, 1, 2, 3, 4, 5];
@@ -44,6 +47,11 @@
     async function updatePwrPin(value: number) {
         setSettingsPp(value);
         await sendCommand(`s:pp=${value}`);
+    }
+
+    async function updateSleepTimer(value: number) {
+        setSettingsSt(value);
+        await sendCommand(`s:st=${value}`);
     }
 
     let rebooting = $state(false);
@@ -342,6 +350,42 @@
         <div class="flex justify-between text-[10px] text-ink/60 font-bold px-1">
             <span>20s</span>
             <span>10m</span>
+        </div>
+    </div>
+
+    <!-- Sleep Timer -->
+    <div class="mt-3 p-4 bg-paper border-2 border-bento-border shadow-[2px_2px_0px_0px_var(--color-bento-border)] rounded-xl space-y-3">
+        <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg border-2 border-bento-border bg-bento-yellow flex items-center justify-center">
+                    <svg class="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364 6.364l-2.121-2.121M7.757 7.757L5.636 5.636m12.728 0l-2.121 2.121M7.757 16.243l-2.121 2.121" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-ink font-black uppercase text-sm">Sleep Timer</div>
+                    <div class="text-ink/60 font-bold text-xs">Auto-sleep after this many minutes (0 = off)</div>
+                </div>
+            </div>
+            <span class="text-ink font-mono font-bold text-xs px-2 py-0.5 bg-paper border-2 border-bento-border rounded-lg shadow-[2px_2px_0px_0px_var(--color-bento-border)]">
+                {sleepTimer === 0 ? 'Off' : `${sleepTimer}m`}
+            </span>
+        </div>
+
+        <input
+            type="range"
+            min="0"
+            max="120"
+            step="5"
+            value={sleepTimer}
+            onchange={(e) => updateSleepTimer(parseInt(e.currentTarget.value))}
+            disabled={!bleState.connected}
+            class="slider"
+        />
+
+        <div class="flex justify-between text-[10px] text-ink/60 font-bold px-1">
+            <span>Off</span>
+            <span>2h</span>
         </div>
     </div>
 </div>
