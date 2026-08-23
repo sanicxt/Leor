@@ -865,10 +865,8 @@ export async function sendOTA(
         while (offset < total) {
             if (aborted) throw new Error('BLE disconnected during OTA');
 
-            await consumeCredit(); // rate-limit to device capacity
-
             const slice = data.slice(offset, offset + packetSize);
-            await otaDataChar!.writeValueWithoutResponse(slice);
+            await otaDataChar!.writeValueWithResponse(slice);
             offset += slice.byteLength;
             packet++;
 
