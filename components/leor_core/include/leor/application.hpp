@@ -49,6 +49,7 @@ private:
   bool was_menu_open_ = false;
   bool ble_window_open_ = false;
   bool was_ble_connected_ = false;
+  bool was_tilted_ = false;
   uint32_t ble_window_started_ms_ = 0;
   uint32_t ble_window_duration_ms_ = 60000;
   uint32_t ble_window_deadline_ms_ = 0;

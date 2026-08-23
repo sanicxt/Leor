@@ -776,6 +776,8 @@ void Application::tick() {
   }
 
   // --- Tilt Compensation (Passive) ---
+  // Gaze is only written while actually tilted; writing (0,0) every tick
+  // when flat would fight idle wandering and expression gaze positions.
   if (!clock_.enabled() && !menu_.is_open() && eyes_) {
     if (gesture_.matching_enabled() && !gesture_.suspended()) {
       float p = gesture_.pitch();
@@ -785,12 +787,14 @@ void Application::tick() {
           float gx = std::clamp(-r / 45.0f, -0.6f, 0.6f);
           float gy = std::clamp(-p / 45.0f, -0.6f, 0.6f);
           eyes_->set_gaze_manual(gx, gy);
-      } else {
-          eyes_->set_gaze_manual(0.0f, 0.0f); 
+          was_tilted_ = true;
+      } else if (was_tilted_) {
+          eyes_->set_gaze_manual(0.0f, 0.0f);
+          was_tilted_ = false;
       }
-    } else {
-      // Force neutral if gestures are disabled/suspended
+    } else if (was_tilted_) {
       eyes_->set_gaze_manual(0.0f, 0.0f);
+      was_tilted_ = false;
     }
   }
   // -----------------------------------
