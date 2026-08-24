@@ -273,8 +273,9 @@ std::string GestureService::classify() {
         return actions_[1]; // shake
     }
 
-    // Rule 2: Pat (Vertical impulse + ANY touch contact)
-    if (window_stats_.max_az_delta > pat_threshold_ && touch_ratio > touch_ratio_threshold_) {
+    // Rule 2: Pat (Vertical impulse dominant + touch contact)
+    if (window_stats_.max_az_delta > pat_threshold_ && touch_ratio > touch_ratio_threshold_ &&
+        window_stats_.max_az_delta > window_stats_.max_axy_delta * 1.5f) {
         return actions_[0]; // pat
     }
 
@@ -283,8 +284,9 @@ std::string GestureService::classify() {
         return actions_[3]; // pickup
     }
 
-    // Rule 4: Swipe (Horizontal impulse + touch contact)
-    if (window_stats_.max_axy_delta > swipe_threshold_ && touch_ratio > touch_ratio_threshold_) {
+    // Rule 4: Swipe (Horizontal impulse dominant + touch contact)
+    if (window_stats_.max_axy_delta > swipe_threshold_ && touch_ratio > touch_ratio_threshold_ &&
+        window_stats_.max_axy_delta > window_stats_.max_az_delta * 1.5f) {
         return actions_[2]; // swipe
     }
 
