@@ -74,7 +74,10 @@ def svg_to_bitmap(svg_path: Path, size: int = 16) -> bytes:
     # Threshold at 128, no dither. 1 = white = ON = drawn pixel
     bw = inverted.convert("1", dither=Image.NONE)
 
-    pixels = list(bw.getdata())
+    if hasattr(bw, "get_flattened_data"):
+        pixels = list(bw.get_flattened_data())
+    else:
+        pixels = list(bw.getdata())
     bytes_per_row = (size + 7) // 8
     out = bytearray()
     for row in range(size):
